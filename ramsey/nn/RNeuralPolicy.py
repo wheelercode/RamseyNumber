@@ -157,6 +157,7 @@ class RNeuralPolicy(RPolicy):
             )
 
     def _resolve_device(
+        self,
         device: torch.device | str,
     ) -> torch.device:
         """Resolve an unindexed CUDA device to the current device."""
