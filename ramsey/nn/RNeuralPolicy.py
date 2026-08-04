@@ -11,6 +11,7 @@ from ..REnvironment import REnvironment
 from ..RPolicy import RPolicy
 from .REncoding import build_network_input
 from .RModel import RPairPolicyValueNetwork
+from .RRuntime import resolve_torch_device
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +42,7 @@ class RNeuralPolicy(RPolicy):
             raise TypeError("greedy must be boolean.")
 
         self._network = network
-        self._device = self._resolve_device(device)
+        self._device = resolve_torch_device(device)
         self._greedy = greedy
 
     @property
@@ -155,22 +156,3 @@ class RNeuralPolicy(RPolicy):
                 f"{self._device}. Move the network "
                 "with network.to(device)."
             )
-
-    def _resolve_device(
-        self,
-        device: torch.device | str,
-    ) -> torch.device:
-        """Resolve an unindexed CUDA device to the current device."""
-        resolved_device = torch.device(device)
-
-        if (
-            resolved_device.type == "cuda"
-            and resolved_device.index is None
-            and torch.cuda.is_available()
-        ):
-            resolved_device = torch.device(
-                "cuda",
-                torch.cuda.current_device(),
-            )
-
-        return resolved_device

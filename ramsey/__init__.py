@@ -51,10 +51,18 @@ from .RArchive import (
     RArchiveRecord,
     RSQLiteArchive,
 )
+from .RArchiveBatch import (
+    RArchiveBatch,
+    RArchiveBatchAttempt,
+    RArchiveBatchConfig,
+    RArchiveBatchResult,
+)
 from .RConstruction import (
+    RArchiveConstruction,
     RCyclicConstruction,
     RConstruction,
     RFixedConstruction,
+    RMixedConstruction,
     RRandomConstruction,
 )
 from .RExperiment import (
@@ -92,11 +100,17 @@ __all__ = [
     "RSearch",
     "RSearchResult",
     "RArchive",
+    "RArchiveBatch",
+    "RArchiveBatchAttempt",
+    "RArchiveBatchConfig",
+    "RArchiveBatchResult",
+    "RArchiveConstruction",
     "RArchivedColoring",
     "RArchiveRecord",
     "RConstruction",
     "RCyclicConstruction",
     "RFixedConstruction",
+    "RMixedConstruction",
     "RRandomConstruction",
     "RSQLiteArchive",
     "RExperiment",

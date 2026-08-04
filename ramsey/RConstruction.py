@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from numbers import Real
 
 import numpy as np
 
+from .RArchive import (
+    RArchive,
+    RArchiveRecord,
+)
 from .RColoring import RColoring
 from .RGraph import RGraph
 
@@ -64,6 +69,16 @@ class RConstruction(ABC):
         Construct one coloring of the supplied graph.
         """
         ...
+
+    @property
+    def last_source_name(self) -> str:
+        """
+        Return the construction that produced the most recent seed.
+
+        Ordinary constructions produce their own stable name. Composite
+        constructions override this property to identify the selected child.
+        """
+        return self.name
 
 
 @dataclass(slots=True)
@@ -227,3 +242,278 @@ class RFixedConstruction(RConstruction):
             graph,
             self.coloring.colors,
         )
+
+
+@dataclass(slots=True)
+class RArchiveConstruction(RConstruction):
+    """
+    Sample seed colorings uniformly from an archive score range.
+    """
+
+    archive: RArchive
+    rng: np.random.Generator
+    minimum_score: int | None = None
+    maximum_score: int | None = None
+    limit: int | None = None
+
+    _last_record: RArchiveRecord | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.archive, RArchive):
+            raise TypeError("archive must implement RArchive.")
+
+        if not isinstance(
+            self.rng,
+            np.random.Generator,
+        ):
+            raise TypeError("rng must be a NumPy Generator.")
+
+        self.minimum_score = _optional_nonnegative_integer(
+            "minimum_score",
+            self.minimum_score,
+        )
+
+        self.maximum_score = _optional_nonnegative_integer(
+            "maximum_score",
+            self.maximum_score,
+        )
+
+        if (
+            self.minimum_score is not None
+            and self.maximum_score is not None
+            and self.minimum_score > self.maximum_score
+        ):
+            raise ValueError(
+                "minimum_score cannot be greater than "
+                "maximum_score."
+            )
+
+        self.limit = _optional_positive_integer(
+            "limit",
+            self.limit,
+        )
+
+    @property
+    def name(self) -> str:
+        lower = (
+            "any"
+            if self.minimum_score is None
+            else str(self.minimum_score)
+        )
+
+        upper = (
+            "any"
+            if self.maximum_score is None
+            else str(self.maximum_score)
+        )
+
+        return f"archive-score-{lower}-to-{upper}"
+
+    @property
+    def last_record(self) -> RArchiveRecord | None:
+        """
+        Return the record selected by the most recent construction.
+        """
+        return self._last_record
+
+    def eligible_records(
+        self,
+        graph: RGraph,
+    ) -> list[RArchiveRecord]:
+        """
+        Return the current archive pool eligible for sampling.
+        """
+        return self.archive.colorings_in_score_range(
+            minimum_score=self.minimum_score,
+            maximum_score=self.maximum_score,
+            limit=self.limit,
+            graph=graph,
+        )
+
+    def construct(
+        self,
+        graph: RGraph,
+    ) -> RColoring:
+        records = self.eligible_records(graph)
+
+        if not records:
+            raise RuntimeError(
+                "Archive contains no colorings in the requested "
+                "score range."
+            )
+
+        selected_index = int(
+            self.rng.integers(
+                0,
+                len(records),
+            )
+        )
+
+        self._last_record = records[selected_index]
+
+        archived = self.archive.load_coloring(
+            self._last_record.coloring_id,
+            graph,
+        )
+
+        return archived.coloring
+
+
+@dataclass(slots=True)
+class RMixedConstruction(RConstruction):
+    """
+    Select among seed constructions using fixed probabilities.
+    """
+
+    constructions: tuple[RConstruction, ...]
+    probabilities: tuple[float, ...]
+    rng: np.random.Generator
+    construction_name: str = "mixed"
+
+    _last_source_name: str = field(
+        init=False,
+        default="mixed",
+        repr=False,
+    )
+
+    def __post_init__(self) -> None:
+        self.constructions = tuple(self.constructions)
+        self.probabilities = tuple(self.probabilities)
+
+        if not self.constructions:
+            raise ValueError("constructions cannot be empty.")
+
+        if not all(
+            isinstance(construction, RConstruction)
+            for construction in self.constructions
+        ):
+            raise TypeError(
+                "Every construction must implement RConstruction."
+            )
+
+        if len(self.probabilities) != len(self.constructions):
+            raise ValueError(
+                "probabilities must contain one value per "
+                "construction."
+            )
+
+        normalized_probabilities: list[float] = []
+
+        for probability in self.probabilities:
+            if isinstance(probability, bool) or not isinstance(
+                probability,
+                Real,
+            ):
+                raise TypeError("Every probability must be numeric.")
+
+            probability = float(probability)
+
+            if not np.isfinite(probability) or probability < 0.0:
+                raise ValueError(
+                    "Every probability must be finite and "
+                    "nonnegative."
+                )
+
+            normalized_probabilities.append(probability)
+
+        if not np.isclose(
+            sum(normalized_probabilities),
+            1.0,
+        ):
+            raise ValueError("probabilities must sum to one.")
+
+        self.probabilities = tuple(normalized_probabilities)
+
+        if not isinstance(
+            self.rng,
+            np.random.Generator,
+        ):
+            raise TypeError("rng must be a NumPy Generator.")
+
+        if not isinstance(
+            self.construction_name,
+            str,
+        ) or not self.construction_name.strip():
+            raise ValueError(
+                "construction_name must be a nonempty string."
+            )
+
+        self._last_source_name = self.construction_name
+
+    @property
+    def name(self) -> str:
+        return self.construction_name
+
+    @property
+    def last_source_name(self) -> str:
+        return self._last_source_name
+
+    def construct(
+        self,
+        graph: RGraph,
+    ) -> RColoring:
+        selected_index = int(
+            self.rng.choice(
+                len(self.constructions),
+                p=np.asarray(
+                    self.probabilities,
+                    dtype=np.float64,
+                ),
+            )
+        )
+
+        selected = self.constructions[selected_index]
+
+        coloring = selected.construct(graph)
+
+        self._last_source_name = selected.last_source_name
+
+        return coloring
+
+
+def _optional_nonnegative_integer(
+    name: str,
+    value: int | None,
+) -> int | None:
+    """
+    Validate an optional nonnegative integer.
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, bool) or not isinstance(
+        value,
+        (int, np.integer),
+    ):
+        raise TypeError(f"{name} must be an integer or None.")
+
+    value = int(value)
+
+    if value < 0:
+        raise ValueError(f"{name} cannot be negative.")
+
+    return value
+
+
+def _optional_positive_integer(
+    name: str,
+    value: int | None,
+) -> int | None:
+    """
+    Validate an optional positive integer.
+    """
+    value = _optional_nonnegative_integer(
+        name,
+        value,
+    )
+
+    if value == 0:
+        raise ValueError(
+            f"{name} must be positive when supplied."
+        )
+
+    return value

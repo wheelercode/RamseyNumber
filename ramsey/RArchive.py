@@ -114,6 +114,33 @@ class RArchive(ABC):
         ...
 
     @abstractmethod
+    def colorings_in_score_range(
+        self,
+        *,
+        minimum_score: int | None = None,
+        maximum_score: int | None = None,
+        limit: int | None = None,
+        graph: RGraph | None = None,
+    ) -> list[RArchiveRecord]:
+        """
+        Return records in an inclusive score range.
+        """
+        ...
+
+    @abstractmethod
+    def coloring_count_in_score_range(
+        self,
+        *,
+        minimum_score: int | None = None,
+        maximum_score: int | None = None,
+        graph: RGraph | None = None,
+    ) -> int:
+        """
+        Count unique colorings in an inclusive score range.
+        """
+        ...
+
+    @abstractmethod
     def coloring_count(
         self,
         graph: RGraph | None = None,
@@ -491,6 +518,89 @@ class RSQLiteArchive(RArchive):
 
         return int(row["coloring_count"])
 
+    def colorings_in_score_range(
+        self,
+        *,
+        minimum_score: int | None = None,
+        maximum_score: int | None = None,
+        limit: int | None = None,
+        graph: RGraph | None = None,
+    ) -> list[RArchiveRecord]:
+        """
+        Return records ordered by score within inclusive bounds.
+        """
+        self._require_open()
+
+        (
+            where_clause,
+            parameters,
+        ) = self._score_range_filter(
+            graph=graph,
+            minimum_score=minimum_score,
+            maximum_score=maximum_score,
+        )
+
+        limit = self._validate_optional_positive_integer(
+            "limit",
+            limit,
+        )
+
+        limit_clause = ""
+
+        if limit is not None:
+            limit_clause = "LIMIT ?"
+            parameters = (
+                *parameters,
+                limit,
+            )
+
+        rows = self.connection.execute(
+            f"""
+            SELECT *
+            FROM colorings
+            {where_clause}
+            ORDER BY
+                score ASC,
+                coloring_id ASC
+            {limit_clause}
+            """,
+            parameters,
+        ).fetchall()
+
+        return [self._row_to_record(row) for row in rows]
+
+    def coloring_count_in_score_range(
+        self,
+        *,
+        minimum_score: int | None = None,
+        maximum_score: int | None = None,
+        graph: RGraph | None = None,
+    ) -> int:
+        """
+        Count bounded records without loading their metadata.
+        """
+        self._require_open()
+
+        (
+            where_clause,
+            parameters,
+        ) = self._score_range_filter(
+            graph=graph,
+            minimum_score=minimum_score,
+            maximum_score=maximum_score,
+        )
+
+        row = self.connection.execute(
+            f"""
+            SELECT COUNT(*) AS coloring_count
+            FROM colorings
+            {where_clause}
+            """,
+            parameters,
+        ).fetchone()
+
+        return int(row["coloring_count"])
+
     def close(self) -> None:
         """
         Commit outstanding work and close the archive.
@@ -594,6 +704,80 @@ class RSQLiteArchive(RArchive):
             ),
         )
 
+    def _score_range_filter(
+        self,
+        *,
+        graph: RGraph | None,
+        minimum_score: int | None,
+        maximum_score: int | None,
+    ) -> tuple[
+        str,
+        tuple[int, ...],
+    ]:
+        """
+        Build a validated SQL problem-and-score filter.
+        """
+        minimum_score = self._validate_optional_nonnegative_integer(
+            "minimum_score",
+            minimum_score,
+        )
+
+        maximum_score = self._validate_optional_nonnegative_integer(
+            "maximum_score",
+            maximum_score,
+        )
+
+        if (
+            minimum_score is not None
+            and maximum_score is not None
+            and minimum_score > maximum_score
+        ):
+            raise ValueError(
+                "minimum_score cannot be greater than "
+                "maximum_score."
+            )
+
+        clauses: list[str] = []
+        parameters: list[int] = []
+
+        if graph is not None:
+            (
+                n_vertices,
+                k_size,
+            ) = self._problem_key(graph)
+
+            clauses.extend(
+                (
+                    "n_vertices = ?",
+                    "k_size = ?",
+                )
+            )
+
+            parameters.extend(
+                (
+                    n_vertices,
+                    k_size,
+                )
+            )
+
+        if minimum_score is not None:
+            clauses.append("score >= ?")
+            parameters.append(minimum_score)
+
+        if maximum_score is not None:
+            clauses.append("score <= ?")
+            parameters.append(maximum_score)
+
+        where_clause = ""
+
+        if clauses:
+            where_clause = "WHERE " + " AND ".join(clauses)
+
+        return (
+            where_clause,
+            tuple(parameters),
+        )
+
     @staticmethod
     def _validate_provenance(
         run_name: str,
@@ -613,6 +797,50 @@ class RSQLiteArchive(RArchive):
 
         if iteration < 0:
             raise ValueError("iteration cannot be negative.")
+
+    @staticmethod
+    def _validate_optional_nonnegative_integer(
+        name: str,
+        value: int | None,
+    ) -> int | None:
+        """
+        Validate an optional nonnegative integer.
+        """
+        if value is None:
+            return None
+
+        if isinstance(value, bool) or not isinstance(
+            value,
+            (int, np.integer),
+        ):
+            raise TypeError(f"{name} must be an integer or None.")
+
+        value = int(value)
+
+        if value < 0:
+            raise ValueError(f"{name} cannot be negative.")
+
+        return value
+
+    @staticmethod
+    def _validate_optional_positive_integer(
+        name: str,
+        value: int | None,
+    ) -> int | None:
+        """
+        Validate an optional positive integer.
+        """
+        value = RSQLiteArchive._validate_optional_nonnegative_integer(
+            name,
+            value,
+        )
+
+        if value == 0:
+            raise ValueError(
+                f"{name} must be positive when supplied."
+            )
+
+        return value
 
     def _require_open(self) -> None:
         """

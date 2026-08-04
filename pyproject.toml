@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ramsey-number"
+version = "0.1.0"
+description = "Search tools for finite Ramsey-number colorings"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.0",
+    "matplotlib>=3.9",
+]
+
+[project.optional-dependencies]
+torch = [
+    "torch>=2.5",
+]
+
+test = [
+    "pytest>=8.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["ramsey*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

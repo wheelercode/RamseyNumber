@@ -20,6 +20,11 @@ from .RNeuralPolicy import (
     RNeuralDecision,
     RNeuralPolicy,
 )
+from .RRuntime import (
+    create_numpy_generator,
+    resolve_torch_device,
+    seed_torch,
+)
 from .RRollout import (
     RRolloutBatch,
     RRolloutConfig,
@@ -61,6 +66,9 @@ __all__ = [
     "encode_pair_features",
     "RNeuralDecision",
     "RNeuralPolicy",
+    "create_numpy_generator",
+    "resolve_torch_device",
+    "seed_torch",
     "RRolloutBatch",
     "RRolloutConfig",
     "RRolloutReward",

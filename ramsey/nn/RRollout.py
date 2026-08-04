@@ -15,6 +15,7 @@ from ..RColoring import RColoring
 from ..REnvironment import REnvironment
 from .REncoding import build_network_input
 from .RModel import RPairPolicyValueNetwork
+from .RRuntime import resolve_torch_device
 
 
 class RRolloutReward(str, Enum):
@@ -270,7 +271,7 @@ def collect_rollout(
     The returned tensors remain on the CPU. Minibatches are moved to
     the training device later by PPO.
     """
-    device = _resolve_device(device)
+    device = resolve_torch_device(device)
 
     _require_network_device(
         network,
@@ -504,27 +505,3 @@ def _require_network_device(
         raise RuntimeError(
             f"Network is on {actual_device}, " "but rollout device is " f"{device}."
         )
-
-
-def _resolve_device(
-    device: torch.device | str,
-) -> torch.device:
-    """
-    Resolve an unindexed CUDA device to the current CUDA device.
-
-    For example, torch.device("cuda") becomes
-    torch.device("cuda:0") when CUDA device zero is current.
-    """
-    resolved_device = torch.device(device)
-
-    if (
-        resolved_device.type == "cuda"
-        and resolved_device.index is None
-        and torch.cuda.is_available()
-    ):
-        resolved_device = torch.device(
-            "cuda",
-            torch.cuda.current_device(),
-        )
-
-    return resolved_device
