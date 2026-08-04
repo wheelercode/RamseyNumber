@@ -1,0 +1,2 @@
+# Test runner for characterization and equivalence tests.
+pytest>=8.0
