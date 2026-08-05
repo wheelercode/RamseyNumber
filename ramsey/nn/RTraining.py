@@ -148,6 +148,7 @@ class RTrainingIteration:
 
     iteration: int
     construction_name: str
+    construction_source: str
     initial_score: int
     final_score: int
     best_score: int
@@ -360,6 +361,9 @@ class RPPOTrainer:
         ):
             seed_coloring = self._construction.construct(self._graph)
 
+            construction_name = self._construction.name
+            construction_source = self._construction.last_source_name
+
             rollout = collect_rollout(
                 network=self._network,
                 environment=self._environment,
@@ -402,11 +406,13 @@ class RPPOTrainer:
                 final_requested_iteration=final_requested_iteration,
                 solved=solved,
                 archive_record=archive_record,
+                construction_source=construction_source,
             )
 
             iteration_result = RTrainingIteration(
                 iteration=iteration,
-                construction_name=self._construction.name,
+                construction_name=construction_name,
+                construction_source=construction_source,
                 initial_score=rollout.initial_score,
                 final_score=rollout.final_score,
                 best_score=rollout.best_score,
@@ -475,6 +481,7 @@ class RPPOTrainer:
         final_requested_iteration: bool,
         solved: bool,
         archive_record: RArchiveRecord | None,
+        construction_source: str,
     ) -> Path | None:
         """Save and return a checkpoint path when scheduled."""
 
@@ -498,6 +505,7 @@ class RPPOTrainer:
         ] = {
             "run_name": (config.run_name),
             "construction_name": (self._construction.name),
+            "construction_source": construction_source,
         }
 
         if archive_record is not None:

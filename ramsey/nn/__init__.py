@@ -52,6 +52,15 @@ from .RTraining import (
     RTrainingObserver,
     RTrainingResult,
 )
+from .REvaluation import (
+    RCheckpointEvaluation,
+    RCheckpointEvaluationConfig,
+    RCheckpointEvaluationResult,
+    RCheckpointEvaluationRun,
+    RCheckpointEvaluator,
+    REvaluationSeed,
+    build_evaluation_seeds,
+)
 
 __all__ = [
     "AVAILABILITY_CHANNEL",
@@ -88,4 +97,11 @@ __all__ = [
     "RTrainingIteration",
     "RTrainingObserver",
     "RTrainingResult",
+    "RCheckpointEvaluation",
+    "RCheckpointEvaluationConfig",
+    "RCheckpointEvaluationResult",
+    "RCheckpointEvaluationRun",
+    "RCheckpointEvaluator",
+    "REvaluationSeed",
+    "build_evaluation_seeds",
 ]

@@ -9,6 +9,7 @@ from ramsey.RArchive import RSQLiteArchive
 from ramsey.RColoring import RColoring
 from ramsey.RConstruction import (
     RFixedConstruction,
+    RMixedConstruction,
 )
 from ramsey.REnvironment import REnvironment
 from ramsey.REnvironmentConfig import (
@@ -46,6 +47,7 @@ def make_trainer(
     max_steps: int = 2,
     colors: np.ndarray | None = None,
     archive=None,
+    construction=None,
 ) -> RPPOTrainer:
     """Create a small complete training assembly."""
 
@@ -61,12 +63,13 @@ def make_trainer(
             dtype=np.uint8,
         )
 
-    construction = RFixedConstruction(
-        RColoring(
-            graph,
-            colors,
+    if construction is None:
+        construction = RFixedConstruction(
+            RColoring(
+                graph,
+                colors,
+            )
         )
-    )
 
     environment = REnvironment(
         graph=graph,
@@ -253,6 +256,16 @@ def test_trainer_updates_network_archives_and_notifies_observer(
 
         assert all(item.archive_record is not None for item in result.iteration_results)
 
+        assert all(
+            item.construction_name == "fixed"
+            for item in result.iteration_results
+        )
+
+        assert all(
+            item.construction_source == "fixed"
+            for item in result.iteration_results
+        )
+
         assert archive.coloring_count(trainer.graph) >= 1
 
         assert result.best_score == result.best_iteration.best_score
@@ -275,6 +288,48 @@ def test_trainer_updates_network_archives_and_notifies_observer(
             result.iteration_results[0],
             "rollout",
         )
+
+
+def test_trainer_reports_selected_mixed_construction_source() -> None:
+    graph = RGraph(
+        RProblem.r55(
+            n_vertices=7,
+        )
+    )
+
+    fixed = RFixedConstruction(
+        RColoring(
+            graph,
+            np.zeros(
+                graph.number_of_edges,
+                dtype=np.uint8,
+            ),
+        ),
+        construction_name="archive-source",
+    )
+
+    mixed = RMixedConstruction(
+        constructions=(fixed,),
+        probabilities=(1.0,),
+        rng=np.random.default_rng(904),
+        construction_name="mixed-curriculum",
+    )
+
+    trainer = make_trainer(
+        construction=mixed,
+    )
+
+    result = trainer.run(
+        RTrainingConfig(
+            run_name="mixed-source-test",
+            iterations=1,
+        )
+    )
+
+    iteration = result.iteration_results[0]
+
+    assert iteration.construction_name == "mixed-curriculum"
+    assert iteration.construction_source == "archive-source"
 
 
 def test_trainer_saves_periodic_and_final_checkpoints(
