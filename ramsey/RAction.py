@@ -125,33 +125,12 @@ def edge_clique_profiles(
 
     profiles[e, k] is the number of indexed cliques containing
     edge e that currently have exactly k color-one edges.
+
+    RSearchState constructs this information lazily and maintains it
+    incrementally after each edge flip.  Return an owned copy so this
+    function retains its original value-returning behavior.
     """
-    if state.index.cliques_per_edge > np.iinfo(np.uint16).max:
-        raise ValueError(
-            "The number of cliques per edge "
-            "exceeds the uint16 action-profile "
-            "capacity."
-        )
-
-    affected_counts = state.color_one_counts[state.index.edge_to_cliques]
-
-    number_of_bins = state.edges_per_clique + 1
-
-    profiles = np.empty(
-        (
-            state.number_of_edges,
-            number_of_bins,
-        ),
-        dtype=np.uint16,
-    )
-
-    for count in range(number_of_bins):
-        profiles[:, count] = np.count_nonzero(
-            affected_counts == count,
-            axis=1,
-        )
-
-    return profiles
+    return state.action_profiles.copy()
 
 
 def all_histogram_deltas(

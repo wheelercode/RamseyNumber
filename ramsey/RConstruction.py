@@ -474,6 +474,215 @@ class RMixedConstruction(RConstruction):
 
         return coloring
 
+@dataclass(slots=True)
+class RArchiveSnapshotConstruction(RConstruction):
+    """
+    Consume a fixed archive score-range snapshot without replacement.
+
+    The eligible records are queried once, shuffled once, and then
+    consumed exactly once each. Records subsequently added to the
+    archive cannot enter this seed pool.
+    """
+
+    archive: RArchive
+    rng: np.random.Generator
+    minimum_score: int | None = None
+    maximum_score: int | None = None
+    limit: int | None = None
+
+    _records: tuple[RArchiveRecord, ...] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+
+    _problem: object | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+
+    _next_record: int = field(
+        init=False,
+        default=0,
+        repr=False,
+    )
+
+    _last_record: RArchiveRecord | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.archive, RArchive):
+            raise TypeError(
+                "archive must implement RArchive."
+            )
+
+        if not isinstance(
+            self.rng,
+            np.random.Generator,
+        ):
+            raise TypeError(
+                "rng must be a NumPy Generator."
+            )
+
+        self.minimum_score = (
+            _optional_nonnegative_integer(
+                "minimum_score",
+                self.minimum_score,
+            )
+        )
+
+        self.maximum_score = (
+            _optional_nonnegative_integer(
+                "maximum_score",
+                self.maximum_score,
+            )
+        )
+
+        if (
+            self.minimum_score is not None
+            and self.maximum_score is not None
+            and self.minimum_score
+            > self.maximum_score
+        ):
+            raise ValueError(
+                "minimum_score cannot be greater than "
+                "maximum_score."
+            )
+
+        self.limit = _optional_positive_integer(
+            "limit",
+            self.limit,
+        )
+
+    @property
+    def name(self) -> str:
+        lower = (
+            "any"
+            if self.minimum_score is None
+            else str(self.minimum_score)
+        )
+
+        upper = (
+            "any"
+            if self.maximum_score is None
+            else str(self.maximum_score)
+        )
+
+        return (
+            f"archive-snapshot-score-"
+            f"{lower}-to-{upper}"
+        )
+
+    @property
+    def last_record(
+        self,
+    ) -> RArchiveRecord | None:
+        return self._last_record
+
+    @property
+    def prepared(self) -> bool:
+        return self._records is not None
+
+    @property
+    def snapshot_size(self) -> int:
+        if self._records is None:
+            return 0
+
+        return len(self._records)
+
+    @property
+    def remaining_count(self) -> int:
+        if self._records is None:
+            return 0
+
+        return (
+            len(self._records)
+            - self._next_record
+        )
+
+    def prepare(
+        self,
+        graph: RGraph,
+    ) -> int:
+        """
+        Freeze and shuffle the currently eligible archive records.
+        """
+        if self._records is not None:
+            if graph.problem != self._problem:
+                raise ValueError(
+                    "Prepared archive snapshot belongs "
+                    "to a different Ramsey problem."
+                )
+
+            return len(self._records)
+
+        records = (
+            self.archive.colorings_in_score_range(
+                minimum_score=self.minimum_score,
+                maximum_score=self.maximum_score,
+                limit=self.limit,
+                graph=graph,
+            )
+        )
+
+        if not records:
+            raise RuntimeError(
+                "Archive contains no colorings in the "
+                "requested snapshot score range."
+            )
+
+        order = self.rng.permutation(
+            len(records)
+        )
+
+        self._records = tuple(
+            records[int(index)]
+            for index in order
+        )
+
+        self._problem = graph.problem
+
+        return len(self._records)
+
+    def construct(
+        self,
+        graph: RGraph,
+    ) -> RColoring:
+        self.prepare(graph)
+
+        if self._records is None:
+            raise RuntimeError(
+                "Archive snapshot was not prepared."
+            )
+
+        if (
+            self._next_record
+            >= len(self._records)
+        ):
+            raise RuntimeError(
+                "Archive snapshot is exhausted; "
+                "every seed has already been "
+                "consumed once."
+            )
+
+        self._last_record = (
+            self._records[
+                self._next_record
+            ]
+        )
+
+        self._next_record += 1
+
+        archived = self.archive.load_coloring(
+            self._last_record.coloring_id,
+            graph,
+        )
+
+        return archived.coloring
 
 def _optional_nonnegative_integer(
     name: str,

@@ -50,6 +50,12 @@ class RSearchState:
 
         self._score = int(self._histogram[0] + self._histogram[-1])
 
+        # Full greedy action analysis needs, for every host edge, the
+        # number of incident cliques in each color-one-count bin.  The
+        # cache is lazy so neural/random searches that use the fast
+        # action path never pay to construct it.
+        self._action_profiles: NDArray[np.uint16] | None = None
+
         self._version = 0
 
     @property
@@ -128,6 +134,25 @@ class RSearchState:
         """
         return self._read_only_view(self._histogram)
 
+    @property
+    def action_profiles(
+        self,
+    ) -> NDArray[np.uint16]:
+        """
+        Return incrementally maintained all-edge clique profiles.
+
+        profiles[e, k] is the number of indexed cliques containing
+        edge e that currently contain exactly k color-one edges.
+
+        The profiles are constructed only on first use.  Once they
+        exist, every edge flip updates only the profile contributions
+        of cliques affected by that flip.
+        """
+        if self._action_profiles is None:
+            self._action_profiles = self._build_action_profiles()
+
+        return self._read_only_view(self._action_profiles)
+
     def coloring_snapshot(
         self,
     ) -> RColoring:
@@ -192,11 +217,227 @@ class RSearchState:
 
         self._color_one_counts[affected_cliques] = new_counts
 
+        if self._action_profiles is not None:
+            self._update_action_profiles(
+                affected_cliques=affected_cliques,
+                old_counts=old_counts,
+                new_counts=new_counts,
+            )
+
         self._score = int(self._histogram[0] + self._histogram[-1])
 
         self._version += 1
 
         return old_score - self._score
+
+    def apply_edge_recoloring(
+        self,
+        edges: NDArray[np.integer],
+        colors: NDArray[np.integer],
+    ) -> int:
+        """
+        Recolor several distinct edges and return exact score reduction.
+
+        Only edges whose requested color differs from the current color
+        are mutated.
+
+        Each changed edge goes through apply_edge_flip(), preserving all
+        incrementally maintained state:
+
+        - edge colors
+        - K5 color counts
+        - histogram
+        - monochromatic score
+        - action-profile cache
+        - state version
+        """
+        edges = np.asarray(edges)
+        colors = np.asarray(colors)
+
+        if edges.ndim != 1 or colors.ndim != 1:
+            raise ValueError(
+                "edges and colors must be one-dimensional."
+            )
+
+        if len(edges) != len(colors):
+            raise ValueError(
+                "edges and colors must have equal length."
+            )
+
+        if not np.issubdtype(edges.dtype, np.integer):
+            raise TypeError(
+                "edges must contain integers."
+            )
+
+        if not np.issubdtype(colors.dtype, np.integer):
+            raise TypeError(
+                "colors must contain integers."
+            )
+
+        normalized_edges = edges.astype(
+            np.int32,
+            copy=False,
+        )
+
+        normalized_colors = colors.astype(
+            np.int8,
+            copy=False,
+        )
+
+        if (
+            np.any(normalized_edges < 0)
+            or np.any(
+                normalized_edges
+                >= self.number_of_edges
+            )
+        ):
+            raise IndexError(
+                "edges contains an invalid edge index."
+            )
+
+        if (
+            len(np.unique(normalized_edges))
+            != len(normalized_edges)
+        ):
+            raise ValueError(
+                "edges must not contain duplicates."
+            )
+
+        if np.any(
+            (normalized_colors != 0)
+            & (normalized_colors != 1)
+        ):
+            raise ValueError(
+                "colors must contain only zero or one."
+            )
+
+        old_score = self._score
+
+        for edge, color in zip(
+            normalized_edges,
+            normalized_colors,
+        ):
+            edge = int(edge)
+
+            if self._colors[edge] != color:
+                self.apply_edge_flip(edge)
+
+        return old_score - self._score
+        
+    def _build_action_profiles(
+        self,
+    ) -> NDArray[np.uint16]:
+        """
+        Construct the complete action-profile cache from current state.
+
+        This is the expensive full reconstruction.  It occurs at most
+        once per RSearchState; subsequent mutations use the incremental
+        update path.
+        """
+        if self._index.cliques_per_edge > np.iinfo(np.uint16).max:
+            raise ValueError(
+                "The number of cliques per edge exceeds the "
+                "uint16 action-profile capacity."
+            )
+
+        affected_counts = self._color_one_counts[
+            self._index.edge_to_cliques
+        ]
+
+        number_of_bins = self.edges_per_clique + 1
+
+        profiles = np.empty(
+            (
+                self.number_of_edges,
+                number_of_bins,
+            ),
+            dtype=np.uint16,
+        )
+
+        for count in range(number_of_bins):
+            profiles[:, count] = np.count_nonzero(
+                affected_counts == count,
+                axis=1,
+            )
+
+        return profiles
+
+    def _update_action_profiles(
+        self,
+        *,
+        affected_cliques: NDArray[np.uint32],
+        old_counts: NDArray[np.uint8],
+        new_counts: NDArray[np.uint8],
+    ) -> None:
+        """
+        Update cached profiles after one edge flip.
+
+        Each affected clique moves from one histogram bin to an
+        adjacent bin.  That move changes the action profile of every
+        edge contained in the clique.  Flattening (edge, bin) to one
+        integer lets two small bincount operations accumulate all
+        repeated updates efficiently in compiled NumPy code.
+        """
+        if self._action_profiles is None:
+            return
+
+        number_of_bins = self.edges_per_clique + 1
+
+        clique_edges = self._index.clique_edges[
+            affected_cliques
+        ].reshape(-1).astype(
+            np.int32,
+            copy=False,
+        )
+
+        edges_per_clique = self._index.edges_per_clique
+
+        old_bins = np.repeat(
+            old_counts,
+            edges_per_clique,
+        ).astype(
+            np.int32,
+            copy=False,
+        )
+
+        new_bins = np.repeat(
+            new_counts,
+            edges_per_clique,
+        ).astype(
+            np.int32,
+            copy=False,
+        )
+
+        old_indexes = clique_edges * number_of_bins + old_bins
+
+        new_indexes = clique_edges * number_of_bins + new_bins
+
+        profile_size = self._action_profiles.size
+
+        profile_delta = np.bincount(
+            new_indexes,
+            minlength=profile_size,
+        ) - np.bincount(
+            old_indexes,
+            minlength=profile_size,
+        )
+
+        updated_profiles = (
+            self._action_profiles.astype(np.int32)
+            + profile_delta.reshape(self._action_profiles.shape)
+        )
+
+        if np.any(updated_profiles < 0) or np.any(
+            updated_profiles > np.iinfo(np.uint16).max
+        ):
+            raise RuntimeError(
+                "Incremental action-profile update exceeded "
+                "uint16 bounds."
+            )
+
+        self._action_profiles[:] = updated_profiles.astype(
+            np.uint16,
+        )
 
     def _validate_edge(
         self,
