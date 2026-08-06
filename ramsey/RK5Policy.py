@@ -182,7 +182,7 @@ class RK5PolicyConfig:
     frozen=True,
     slots=True,
 )
-class RK5ActionSelection:
+class RActionSelectionK5:
     """The K5 target/pattern pair selected by one greedy policy call."""
 
     target_clique: int
@@ -245,12 +245,12 @@ def rank_monochromatic_k5_targets(
 def select_greedy_k5_action(
     state: RSearchState,
     config: RK5PolicyConfig | None = None,
-) -> RK5ActionSelection:
+) -> RActionSelectionK5:
     """
     Select one K5-pattern macro action without mutating the state.
 
     Target ranking and objective evaluation live here rather than in
-    RK5Action so the action representation remains objective-neutral.
+    RAction so the action representation remains objective-neutral.
     """
     config = (
         config
@@ -268,7 +268,7 @@ def select_greedy_k5_action(
             "There are no monochromatic K5 targets."
         )
 
-    best_selection: RK5ActionSelection | None = None
+    best_selection: RActionSelectionK5 | None = None
     best_objective_reward = -np.inf
 
     for target_offset, target_clique in enumerate(
@@ -322,7 +322,7 @@ def select_greedy_k5_action(
         if objective_reward > best_objective_reward:
             best_objective_reward = objective_reward
 
-            best_selection = RK5ActionSelection(
+            best_selection = RActionSelectionK5(
                 target_clique=int(target_clique),
                 pattern_id=int(
                     analysis.pattern_ids[pattern_offset]
