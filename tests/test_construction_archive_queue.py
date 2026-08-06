@@ -1,22 +1,22 @@
-"""Test cyclic live-archive seed construction."""
+"""Test the live cyclic archive queue construction."""
 
 import numpy as np
 
 from ramsey.RArchive import RSQLiteArchive
 from ramsey.RColoring import RColoring
-from ramsey.RConstruction import (
-    RArchiveCycleConstruction,
+from ramsey.RConstructionArchiveQueue import (
+    RArchiveQueueConstruction,
 )
 from ramsey.RGraph import RGraph
 from ramsey.RProblem import RProblem
 
 
-def test_archive_cycle_refreshes_only_after_exhaustion(
+def test_queue_refreshes_only_after_generation_exhaustion(
     tmp_path,
 ) -> None:
     graph = RGraph(RProblem.r55(n_vertices=5))
 
-    with RSQLiteArchive(tmp_path / "cycle.sqlite3") as archive:
+    with RSQLiteArchive(tmp_path / "queue.sqlite3") as archive:
         initial_records = []
 
         for edge in range(3):
@@ -30,31 +30,29 @@ def test_archive_cycle_refreshes_only_after_exhaustion(
             initial_records.append(
                 archive.save_coloring(
                     RColoring(graph, colors),
-                    run_name="cycle-source",
+                    run_name="queue-source",
                     iteration=edge,
                 )
             )
 
-        construction = RArchiveCycleConstruction(
+        construction = RArchiveQueueConstruction(
             archive=archive,
             rng=np.random.default_rng(405),
         )
 
-        first_cycle_ids = []
+        first_generation_ids = []
 
         construction.construct(graph)
 
         assert construction.last_record is not None
 
-        first_cycle_ids.append(
+        first_generation_ids.append(
             construction.last_record.coloring_id
         )
 
-        assert construction.cycle_number == 1
-        assert construction.current_cycle_size == 3
+        assert construction.generation == 1
+        assert construction.current_queue_size == 3
 
-        # Add a descendant while cycle 1 is already in progress.
-        # It must not disturb that frozen cycle.
         later_colors = np.ones(
             graph.number_of_edges,
             dtype=np.uint8,
@@ -62,7 +60,7 @@ def test_archive_cycle_refreshes_only_after_exhaustion(
 
         later = archive.save_coloring(
             RColoring(graph, later_colors),
-            run_name="cycle-descendant",
+            run_name="queue-descendant",
             iteration=3,
         )
 
@@ -71,39 +69,37 @@ def test_archive_cycle_refreshes_only_after_exhaustion(
 
             assert construction.last_record is not None
 
-            first_cycle_ids.append(
+            first_generation_ids.append(
                 construction.last_record.coloring_id
             )
 
-        assert set(first_cycle_ids) == {
+        assert set(first_generation_ids) == {
             record.coloring_id
             for record in initial_records
         }
 
-        # Cycle 2 refreshes from SQLite and must now contain the
-        # descendant that was created during cycle 1.
-        second_cycle_ids = []
+        second_generation_ids = []
 
         for _ in range(4):
             construction.construct(graph)
 
             assert construction.last_record is not None
 
-            second_cycle_ids.append(
+            second_generation_ids.append(
                 construction.last_record.coloring_id
             )
 
-        assert construction.cycle_number == 2
-        assert construction.current_cycle_size == 4
-        assert later.coloring_id in second_cycle_ids
+        assert construction.generation == 2
+        assert construction.current_queue_size == 4
+        assert later.coloring_id in second_generation_ids
 
 
-def test_archive_cycle_limit_selects_best_live_pool(
+def test_queue_limit_selects_best_live_pool(
     tmp_path,
 ) -> None:
     graph = RGraph(RProblem.r55(n_vertices=5))
 
-    with RSQLiteArchive(tmp_path / "cycle-limit.sqlite3") as archive:
+    with RSQLiteArchive(tmp_path / "queue-limit.sqlite3") as archive:
         for edge_count in range(4):
             colors = np.zeros(
                 graph.number_of_edges,
@@ -114,7 +110,7 @@ def test_archive_cycle_limit_selects_best_live_pool(
 
             archive.save_coloring(
                 RColoring(graph, colors),
-                run_name="cycle-limit-source",
+                run_name="queue-limit-source",
                 iteration=edge_count,
             )
 
@@ -126,7 +122,7 @@ def test_archive_cycle_limit_selects_best_live_pool(
             )
         }
 
-        construction = RArchiveCycleConstruction(
+        construction = RArchiveQueueConstruction(
             archive=archive,
             rng=np.random.default_rng(406),
             limit=2,
