@@ -1,0 +1,2371 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Ramsey Search Definitions and Research Glossary</title>
+  <style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+</style>
+  <style type="text/css">:root {
+color-scheme: light dark;
+--page: #ffffff;
+--text: #172033;
+--muted: #5c667a;
+--line: #dfe4ec;
+--panel: #f6f8fb;
+--accent: #2457c5;
+--code: #eef2f7;
+}
+@media (prefers-color-scheme: dark) {
+:root {
+--page: #11151d;
+--text: #e8edf6;
+--muted: #aeb8c9;
+--line: #303847;
+--panel: #181e29;
+--accent: #8db4ff;
+--code: #202735;
+}
+}
+html {
+scroll-behavior: smooth;
+}
+body {
+margin: 0;
+padding: 3rem 4rem 6rem 340px;
+background: var(--page);
+color: var(--text);
+font: 17px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+body > :not(nav#TOC) {
+max-width: 1080px;
+}
+h1, h2, h3, h4 {
+line-height: 1.25;
+scroll-margin-top: 1rem;
+}
+h1 {
+font-size: 2.4rem;
+margin-bottom: 1.5rem;
+}
+h2 {
+margin-top: 3.25rem;
+padding-bottom: .45rem;
+border-bottom: 1px solid var(--line);
+}
+h3 {
+margin-top: 2.1rem;
+}
+a {
+color: var(--accent);
+}
+nav#TOC {
+position: fixed;
+top: 0;
+bottom: 0;
+left: 0;
+box-sizing: border-box;
+width: 300px;
+margin: 0;
+padding: 20px;
+overflow-y: auto;
+border-right: 1px solid var(--line);
+background: var(--panel);
+}
+nav#TOC::before {
+content: "Contents";
+display: block;
+margin-bottom: .6rem;
+font-size: 1.2rem;
+font-weight: 700;
+}
+nav#TOC ul {
+margin-top: .25rem;
+padding-left: 1.25rem;
+}
+nav#TOC a {
+text-decoration: none;
+}
+nav#TOC a:hover {
+text-decoration: underline;
+}
+table {
+width: 100%;
+margin: 1.4rem 0 2rem;
+border-collapse: collapse;
+}
+th, td {
+padding: .6rem .75rem;
+border: 1px solid var(--line);
+text-align: left;
+vertical-align: top;
+}
+th {
+background: var(--panel);
+}
+code {
+padding: .12em .28em;
+border-radius: 4px;
+background: var(--code);
+}
+pre {
+overflow-x: auto;
+padding: 1rem 1.2rem;
+border-radius: 8px;
+background: var(--code);
+}
+pre code {
+padding: 0;
+}
+blockquote {
+margin-left: 0;
+padding: .3rem 1.2rem;
+border-left: 4px solid var(--accent);
+color: var(--muted);
+}
+math[display="block"] {
+margin: 1.4rem 0;
+overflow-x: auto;
+font-size: 1.08em;
+}
+hr {
+margin: 3rem 0;
+border: 0;
+border-top: 1px solid var(--line);
+}
+@media (max-width: 900px) {
+body {
+padding: 1.5rem 1.1rem 4rem;
+font-size: 16px;
+}
+nav#TOC {
+position: static;
+width: auto;
+max-height: 45vh;
+margin: 0 0 2rem;
+border: 1px solid var(--line);
+border-radius: 10px;
+}
+}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Ramsey Search Definitions and Research Glossary</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#ramsey-search-definitions-and-research-glossary" id="toc-ramsey-search-definitions-and-research-glossary">Ramsey Search
+Definitions and Research Glossary</a>
+<ul>
+<li><a href="#1-core-ramsey-and-graph-theory-definitions" id="toc-1-core-ramsey-and-graph-theory-definitions">1. Core Ramsey and
+Graph-Theory Definitions</a>
+<ul>
+<li><a href="#graph" id="toc-graph">Graph</a></li>
+<li><a href="#vertex" id="toc-vertex">Vertex</a></li>
+<li><a href="#edge" id="toc-edge">Edge</a></li>
+<li><a href="#simple-or-ordinary-graph" id="toc-simple-or-ordinary-graph">Simple or ordinary graph</a></li>
+<li><a href="#complete-graph-k_n" id="toc-complete-graph-k_n">Complete
+graph,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mi>n</mi></msub><annotation encoding="application/x-tex">K_n</annotation></semantics></math></a></li>
+<li><a href="#subgraph" id="toc-subgraph">Subgraph</a></li>
+<li><a href="#clique" id="toc-clique">Clique</a></li>
+<li><a href="#independent-set" id="toc-independent-set">Independent
+set</a></li>
+<li><a href="#connected-graph" id="toc-connected-graph">Connected
+graph</a></li>
+<li><a href="#isolated-vertex" id="toc-isolated-vertex">Isolated
+vertex</a></li>
+<li><a href="#degree-dv" id="toc-degree-dv">Degree,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>v</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">d(v)</annotation></semantics></math></a></li>
+<li><a href="#vertex-color-imbalance" id="toc-vertex-color-imbalance">Vertex color imbalance</a></li>
+<li><a href="#edge-coloring" id="toc-edge-coloring">Edge
+coloring</a></li>
+<li><a href="#monochromatic" id="toc-monochromatic">Monochromatic</a></li>
+<li><a href="#violation" id="toc-violation">Violation</a></li>
+<li><a href="#ramsey-number-rab" id="toc-ramsey-number-rab">Ramsey
+number,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>a</mi><mo>,</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">R(a,b)</annotation></semantics></math></a></li>
+<li><a href="#r55" id="toc-r55"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo>,</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">R(5,5)</annotation></semantics></math></a></li>
+<li><a href="#party-interpretation" id="toc-party-interpretation">Party
+interpretation</a></li>
+<li><a href="#binomial-coefficient-binomnk" id="toc-binomial-coefficient-binomnk">Binomial coefficient,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mi>n</mi><mi>k</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\binom{n}{k}</annotation></semantics></math></a></li>
+<li><a href="#k5s-containing-one-edge" id="toc-k5s-containing-one-edge">K5s containing one edge</a></li>
+</ul></li>
+<li><a href="#2-coloring-and-data-representations" id="toc-2-coloring-and-data-representations">2. Coloring and Data
+Representations</a>
+<ul>
+<li><a href="#903-bit-coloring" id="toc-903-bit-coloring">903-bit
+coloring</a></li>
+<li><a href="#symmetric-adjacencycolor-matrix" id="toc-symmetric-adjacencycolor-matrix">Symmetric adjacency/color
+matrix</a></li>
+<li><a href="#edge-table" id="toc-edge-table">Edge table</a></li>
+<li><a href="#edge-index-lookup" id="toc-edge-index-lookup">Edge-index
+lookup</a></li>
+<li><a href="#clique-table--k5-edge-table" id="toc-clique-table--k5-edge-table">Clique table / K5 edge
+table</a></li>
+<li><a href="#edge-to-k5-incidence-table" id="toc-edge-to-k5-incidence-table">Edge-to-K5 incidence table</a></li>
+<li><a href="#coloring-state" id="toc-coloring-state">Coloring
+state</a></li>
+<li><a href="#state-version" id="toc-state-version">State
+version</a></li>
+<li><a href="#coloring-hash--state-key" id="toc-coloring-hash--state-key">Coloring hash / state key</a></li>
+</ul></li>
+<li><a href="#3-k5-histogram-score-and-violations" id="toc-3-k5-histogram-score-and-violations">3. K5 Histogram, Score, and
+Violations</a>
+<ul>
+<li><a href="#blue-edge-count-of-a-k5" id="toc-blue-edge-count-of-a-k5">Blue-edge count of a K5</a></li>
+<li><a href="#k5-histogram" id="toc-k5-histogram">K5 histogram</a></li>
+<li><a href="#ramsey-score-sg" id="toc-ramsey-score-sg">Ramsey score,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>G</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">S(G)</annotation></semantics></math></a></li>
+<li><a href="#scalar-score" id="toc-scalar-score">Scalar score</a></li>
+<li><a href="#score-distance" id="toc-score-distance">Score
+distance</a></li>
+<li><a href="#search-distance" id="toc-search-distance">Search
+distance</a></li>
+</ul></li>
+<li><a href="#4-completion-deficits-and-danger" id="toc-4-completion-deficits-and-danger">4. Completion Deficits and
+Danger</a>
+<ul>
+<li><a href="#red-completion-deficit" id="toc-red-completion-deficit">Red completion deficit</a></li>
+<li><a href="#blue-completion-deficit" id="toc-blue-completion-deficit">Blue completion deficit</a></li>
+<li><a href="#deficit-0" id="toc-deficit-0">Deficit 0</a></li>
+<li><a href="#deficit-1" id="toc-deficit-1">Deficit 1</a></li>
+<li><a href="#deficit-2" id="toc-deficit-2">Deficit 2</a></li>
+<li><a href="#deficit-3-and-higher" id="toc-deficit-3-and-higher">Deficit 3 and higher</a></li>
+<li><a href="#danger" id="toc-danger">Danger</a></li>
+<li><a href="#danger-objective--danger-energy" id="toc-danger-objective--danger-energy">Danger objective / danger
+energy</a></li>
+<li><a href="#danger-decay" id="toc-danger-decay">Danger decay</a></li>
+<li><a href="#k5-safety-level-lk" id="toc-k5-safety-level-lk">K5 safety
+level,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">L(K)</annotation></semantics></math></a></li>
+<li><a href="#balanced-k5" id="toc-balanced-k5">Balanced K5</a></li>
+<li><a href="#structural-safety" id="toc-structural-safety">Structural
+safety</a></li>
+<li><a href="#safety-change-of-an-edge-delta-le" id="toc-safety-change-of-an-edge-delta-le">Safety change of an edge,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\Delta L(e)</annotation></semantics></math></a></li>
+<li><a href="#weighted-structural-safety-objective-qg" id="toc-weighted-structural-safety-objective-qg">Weighted
+structural-safety objective,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>G</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">Q(G)</annotation></semantics></math></a></li>
+</ul></li>
+<li><a href="#5-actions-and-exact-consequences" id="toc-5-actions-and-exact-consequences">5. Actions and Exact
+Consequences</a>
+<ul>
+<li><a href="#action" id="toc-action">Action</a></li>
+<li><a href="#single-edge-flip" id="toc-single-edge-flip">Single-edge
+flip</a></li>
+<li><a href="#two-edge-action" id="toc-two-edge-action">Two-edge
+action</a></li>
+<li><a href="#k5-macro-action" id="toc-k5-macro-action">K5 macro
+action</a></li>
+<li><a href="#k5-pattern" id="toc-k5-pattern">K5 pattern</a></li>
+<li><a href="#vertex-balance-action" id="toc-vertex-balance-action">Vertex-balance action</a></li>
+<li><a href="#action-analysis" id="toc-action-analysis">Action
+analysis</a></li>
+<li><a href="#counterfactual" id="toc-counterfactual">Counterfactual</a></li>
+<li><a href="#action-landscape" id="toc-action-landscape">Action
+landscape</a></li>
+<li><a href="#histogram-delta" id="toc-histogram-delta">Histogram
+delta</a></li>
+<li><a href="#exact-immediate-reward-re" id="toc-exact-immediate-reward-re">Exact immediate reward,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">r(e)</annotation></semantics></math></a></li>
+<li><a href="#improving-action" id="toc-improving-action">Improving
+action</a></li>
+<li><a href="#neutral-action" id="toc-neutral-action">Neutral
+action</a></li>
+<li><a href="#worsening-or-uphill-action" id="toc-worsening-or-uphill-action">Worsening or uphill action</a></li>
+<li><a href="#score-increasing-move" id="toc-score-increasing-move">Score-increasing move</a></li>
+<li><a href="#created-and-destroyed-violations" id="toc-created-and-destroyed-violations">Created and destroyed
+violations</a></li>
+</ul></li>
+<li><a href="#6-edge-role-profiles-n1-through-n10" id="toc-6-edge-role-profiles-n1-through-n10">6. Edge Role Profiles: N1
+Through N10</a>
+<ul>
+<li><a href="#same-color-multiplicity-k" id="toc-same-color-multiplicity-k">Same-color multiplicity,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math></a></li>
+<li><a href="#edge-role-profile-n_1ldotsn_10" id="toc-edge-role-profile-n_1ldotsn_10">Edge role profile,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>N</mi><mn>1</mn></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>N</mi><mn>10</mn></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(N_1,\ldots,N_{10})</annotation></semantics></math></a></li>
+<li><a href="#n_1-unique-blocker-load" id="toc-n_1-unique-blocker-load"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>1</mn></msub><annotation encoding="application/x-tex">N_1</annotation></semantics></math>:
+unique-blocker load</a></li>
+<li><a href="#n_10-violation-participation" id="toc-n_10-violation-participation"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>10</mn></msub><annotation encoding="application/x-tex">N_{10}</annotation></semantics></math>:
+violation participation</a></li>
+<li><a href="#greedy-reward-identity" id="toc-greedy-reward-identity">Greedy reward identity</a></li>
+<li><a href="#blocker" id="toc-blocker">Blocker</a></li>
+<li><a href="#blocker-liability" id="toc-blocker-liability">Blocker
+liability</a></li>
+<li><a href="#violation-load" id="toc-violation-load">Violation
+load</a></li>
+</ul></li>
+<li><a href="#7-flipability" id="toc-7-flipability">7. Flipability</a>
+<ul>
+<li><a href="#local-discrete-flipability" id="toc-local-discrete-flipability">Local discrete flipability</a></li>
+<li><a href="#global-edge-flipability" id="toc-global-edge-flipability">Global edge flipability</a></li>
+<li><a href="#important-limitation-of-scalar-flipability" id="toc-important-limitation-of-scalar-flipability">Important limitation
+of scalar flipability</a></li>
+<li><a href="#flipability-versus-flexibility" id="toc-flipability-versus-flexibility">Flipability versus
+flexibility</a></li>
+</ul></li>
+<li><a href="#8-flexibility" id="toc-8-flexibility">8. Flexibility</a>
+<ul>
+<li><a href="#damage-budget-b" id="toc-damage-budget-b">Damage budget,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math></a></li>
+<li><a href="#flexibility-fb" id="toc-flexibility-fb">Flexibility,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(b)</annotation></semantics></math></a></li>
+<li><a href="#f0" id="toc-f0"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(0)</annotation></semantics></math></a></li>
+<li><a href="#f1" id="toc-f1"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(1)</annotation></semantics></math></a></li>
+<li><a href="#f2-f3-f4-f5-" id="toc-f2-f3-f4-f5-"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(2)</annotation></semantics></math>,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>3</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(3)</annotation></semantics></math>,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>4</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(4)</annotation></semantics></math>,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(5)</annotation></semantics></math>,
+...</a></li>
+<li><a href="#flexibility-curve" id="toc-flexibility-curve">Flexibility
+curve</a></li>
+<li><a href="#flexibility-reserve" id="toc-flexibility-reserve">Flexibility reserve</a></li>
+<li><a href="#flexibility-as-search-capital" id="toc-flexibility-as-search-capital">Flexibility as search
+capital</a></li>
+<li><a href="#flexibility-as-opportunity" id="toc-flexibility-as-opportunity">Flexibility as opportunity</a></li>
+<li><a href="#counterfactual-flexibility" id="toc-counterfactual-flexibility">Counterfactual flexibility</a></li>
+<li><a href="#flexibility-delta-delta-f" id="toc-flexibility-delta-delta-f">Flexibility delta,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>F</mi></mrow><annotation encoding="application/x-tex">\Delta F</annotation></semantics></math></a></li>
+<li><a href="#local-flexibility" id="toc-local-flexibility">Local
+flexibility</a></li>
+<li><a href="#multi-step-flexibility" id="toc-multi-step-flexibility">Multi-step flexibility</a></li>
+<li><a href="#reachable-volume" id="toc-reachable-volume">Reachable
+volume</a></li>
+</ul></li>
+<li><a href="#9-rigidity-cages-basins-and-repairability" id="toc-9-rigidity-cages-basins-and-repairability">9. Rigidity, Cages,
+Basins, and Repairability</a>
+<ul>
+<li><a href="#rigidity" id="toc-rigidity">Rigidity</a></li>
+<li><a href="#cage" id="toc-cage">Cage</a></li>
+<li><a href="#basin" id="toc-basin">Basin</a></li>
+<li><a href="#local-minimum" id="toc-local-minimum">Local
+minimum</a></li>
+<li><a href="#plateau" id="toc-plateau">Plateau</a></li>
+<li><a href="#escape-barrier" id="toc-escape-barrier">Escape
+barrier</a></li>
+<li><a href="#repair-handle" id="toc-repair-handle">Repair
+handle</a></li>
+<li><a href="#repair-cost-of-a-violation-ck" id="toc-repair-cost-of-a-violation-ck">Repair cost of a violation,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">C(K)</annotation></semantics></math></a></li>
+<li><a href="#repair-landscape" id="toc-repair-landscape">Repair
+landscape</a></li>
+<li><a href="#structural-disorder--frustration" id="toc-structural-disorder--frustration">Structural disorder /
+frustration</a></li>
+</ul></li>
+<li><a href="#10-greedy-and-flexibility-aware-search" id="toc-10-greedy-and-flexibility-aware-search">10. Greedy and
+Flexibility-Aware Search</a>
+<ul>
+<li><a href="#greedy-search" id="toc-greedy-search">Greedy
+search</a></li>
+<li><a href="#exact-score-greedy" id="toc-exact-score-greedy">Exact-score greedy</a></li>
+<li><a href="#score-first-greedy" id="toc-score-first-greedy">Score-first greedy</a></li>
+<li><a href="#greedy-as-a-flexibility-sink" id="toc-greedy-as-a-flexibility-sink">Greedy as a flexibility
+sink</a></li>
+<li><a href="#flexibility-aware-policy" id="toc-flexibility-aware-policy">Flexibility-aware policy</a></li>
+<li><a href="#fixed-flexibility-floor" id="toc-fixed-flexibility-floor">Fixed flexibility floor</a></li>
+<li><a href="#flexibility-first-descent" id="toc-flexibility-first-descent">Flexibility-first descent</a></li>
+<li><a href="#scoreflexibility-tradeoff" id="toc-scoreflexibility-tradeoff">Score/flexibility tradeoff</a></li>
+<li><a href="#flexibility-efficiency" id="toc-flexibility-efficiency">Flexibility efficiency</a></li>
+</ul></li>
+<li><a href="#11-pareto-terminology" id="toc-11-pareto-terminology">11.
+Pareto Terminology</a>
+<ul>
+<li><a href="#objective-vector" id="toc-objective-vector">Objective
+vector</a></li>
+<li><a href="#pareto-dominance" id="toc-pareto-dominance">Pareto
+dominance</a></li>
+<li><a href="#dominated-action" id="toc-dominated-action">Dominated
+action</a></li>
+<li><a href="#pareto-frontier" id="toc-pareto-frontier">Pareto
+frontier</a></li>
+<li><a href="#nondominated-action" id="toc-nondominated-action">Nondominated action</a></li>
+</ul></li>
+<li><a href="#12-search-memory-and-exploration" id="toc-12-search-memory-and-exploration">12. Search Memory and
+Exploration</a>
+<ul>
+<li><a href="#search-memory" id="toc-search-memory">Search
+memory</a></li>
+<li><a href="#tabu-search" id="toc-tabu-search">Tabu search</a></li>
+<li><a href="#tabu-edge-tenure" id="toc-tabu-edge-tenure">Tabu edge
+tenure</a></li>
+<li><a href="#visited-state-window" id="toc-visited-state-window">Visited-state window</a></li>
+<li><a href="#aspiration" id="toc-aspiration">Aspiration</a></li>
+<li><a href="#cycle" id="toc-cycle">Cycle</a></li>
+<li><a href="#random-restart" id="toc-random-restart">Random
+restart</a></li>
+<li><a href="#seed-coloring" id="toc-seed-coloring">Seed
+coloring</a></li>
+<li><a href="#trajectory" id="toc-trajectory">Trajectory</a></li>
+</ul></li>
+<li><a href="#13-construction-and-archive-terminology" id="toc-13-construction-and-archive-terminology">13. Construction and
+Archive Terminology</a>
+<ul>
+<li><a href="#construction" id="toc-construction">Construction</a></li>
+<li><a href="#random-construction" id="toc-random-construction">Random
+construction</a></li>
+<li><a href="#cyclic--circulant-construction" id="toc-cyclic--circulant-construction">Cyclic / circulant
+construction</a></li>
+<li><a href="#circular-distance" id="toc-circular-distance">Circular
+distance</a></li>
+<li><a href="#quadratic-residue-coloring" id="toc-quadratic-residue-coloring">Quadratic-residue coloring</a></li>
+<li><a href="#symmetry-reduction" id="toc-symmetry-reduction">Symmetry
+reduction</a></li>
+<li><a href="#vertex-renaming--graph-isomorphism" id="toc-vertex-renaming--graph-isomorphism">Vertex renaming / graph
+isomorphism</a></li>
+<li><a href="#color-symmetry" id="toc-color-symmetry">Color
+symmetry</a></li>
+<li><a href="#archive" id="toc-archive">Archive</a></li>
+<li><a href="#archive-record" id="toc-archive-record">Archive
+record</a></li>
+<li><a href="#population" id="toc-population">Population</a></li>
+<li><a href="#ancestor--descendant-coloring" id="toc-ancestor--descendant-coloring">Ancestor / descendant
+coloring</a></li>
+<li><a href="#diversity" id="toc-diversity">Diversity</a></li>
+</ul></li>
+<li><a href="#14-experimental-metrics-and-comparisons" id="toc-14-experimental-metrics-and-comparisons">14. Experimental
+Metrics and Comparisons</a>
+<ul>
+<li><a href="#matched-score-comparison" id="toc-matched-score-comparison">Matched-score comparison</a></li>
+<li><a href="#matched-score-flexibility-release" id="toc-matched-score-flexibility-release">Matched-score flexibility
+release</a></li>
+<li><a href="#baseline" id="toc-baseline">Baseline</a></li>
+<li><a href="#benchmark" id="toc-benchmark">Benchmark</a></li>
+<li><a href="#control-surface" id="toc-control-surface">Control
+surface</a></li>
+</ul></li>
+<li><a href="#15-objectives-policies-and-search-architecture" id="toc-15-objectives-policies-and-search-architecture">15. Objectives,
+Policies, and Search Architecture</a>
+<ul>
+<li><a href="#objective" id="toc-objective">Objective</a></li>
+<li><a href="#scoring-function" id="toc-scoring-function">Scoring
+function</a></li>
+<li><a href="#reward" id="toc-reward">Reward</a></li>
+<li><a href="#policy" id="toc-policy">Policy</a></li>
+<li><a href="#search" id="toc-search">Search</a></li>
+<li><a href="#environment" id="toc-environment">Environment</a></li>
+<li><a href="#search-episode--run" id="toc-search-episode--run">Search
+episode / run</a></li>
+<li><a href="#iteration" id="toc-iteration">Iteration</a></li>
+</ul></li>
+<li><a href="#16-neural-network-and-reinforcement-learning-definitions" id="toc-16-neural-network-and-reinforcement-learning-definitions">16.
+Neural-Network and Reinforcement-Learning Definitions</a>
+<ul>
+<li><a href="#neural-network" id="toc-neural-network">Neural
+network</a></li>
+<li><a href="#parameter--weight" id="toc-parameter--weight">Parameter /
+weight</a></li>
+<li><a href="#feature" id="toc-feature">Feature</a></li>
+<li><a href="#encoding" id="toc-encoding">Encoding</a></li>
+<li><a href="#embedding" id="toc-embedding">Embedding</a></li>
+<li><a href="#hidden-representation" id="toc-hidden-representation">Hidden representation</a></li>
+<li><a href="#message-passing-layer" id="toc-message-passing-layer">Message-passing layer</a></li>
+<li><a href="#attention" id="toc-attention">Attention</a></li>
+<li><a href="#head" id="toc-head">Head</a></li>
+<li><a href="#policy-head" id="toc-policy-head">Policy head</a></li>
+<li><a href="#value-head" id="toc-value-head">Value head</a></li>
+<li><a href="#logit" id="toc-logit">Logit</a></li>
+<li><a href="#categorical-policy-distribution" id="toc-categorical-policy-distribution">Categorical policy
+distribution</a></li>
+<li><a href="#reinforcement-learning-rl" id="toc-reinforcement-learning-rl">Reinforcement learning (RL)</a></li>
+<li><a href="#state-s_t" id="toc-state-s_t">State,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>s</mi><mi>t</mi></msub><annotation encoding="application/x-tex">s_t</annotation></semantics></math></a></li>
+<li><a href="#action-a_t" id="toc-action-a_t">Action,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>a</mi><mi>t</mi></msub><annotation encoding="application/x-tex">a_t</annotation></semantics></math></a></li>
+<li><a href="#pia_tmid-s_t" id="toc-pia_tmid-s_t"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>s</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\pi(a_t\mid s_t)</annotation></semantics></math></a></li>
+<li><a href="#rollout" id="toc-rollout">Rollout</a></li>
+<li><a href="#return" id="toc-return">Return</a></li>
+<li><a href="#discount-factor-gamma" id="toc-discount-factor-gamma">Discount factor,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>γ</mi><annotation encoding="application/x-tex">\gamma</annotation></semantics></math></a></li>
+<li><a href="#value-vs" id="toc-value-vs">Value,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>V</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>s</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">V(s)</annotation></semantics></math></a></li>
+<li><a href="#advantage-a_t" id="toc-advantage-a_t">Advantage,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>A</mi><mi>t</mi></msub><annotation encoding="application/x-tex">A_t</annotation></semantics></math></a></li>
+<li><a href="#gae--generalized-advantage-estimation" id="toc-gae--generalized-advantage-estimation">GAE / generalized
+advantage estimation</a></li>
+<li><a href="#gae-lambda-lambda" id="toc-gae-lambda-lambda">GAE lambda,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math></a></li>
+<li><a href="#ppo" id="toc-ppo">PPO</a></li>
+<li><a href="#ppo-probability-ratio" id="toc-ppo-probability-ratio">PPO
+probability ratio</a></li>
+<li><a href="#clip-ratio" id="toc-clip-ratio">Clip ratio</a></li>
+<li><a href="#clipped-fraction" id="toc-clipped-fraction">Clipped
+fraction</a></li>
+<li><a href="#policy-loss" id="toc-policy-loss">Policy loss</a></li>
+<li><a href="#value-loss" id="toc-value-loss">Value loss</a></li>
+<li><a href="#entropy" id="toc-entropy">Entropy</a></li>
+<li><a href="#entropy-bonus--entropy-weight" id="toc-entropy-bonus--entropy-weight">Entropy bonus / entropy
+weight</a></li>
+<li><a href="#kl-divergence" id="toc-kl-divergence">KL
+divergence</a></li>
+<li><a href="#approximate-kl" id="toc-approximate-kl">Approximate
+KL</a></li>
+<li><a href="#log-probability" id="toc-log-probability">Log
+probability</a></li>
+<li><a href="#learning-rate" id="toc-learning-rate">Learning
+rate</a></li>
+<li><a href="#gradient" id="toc-gradient">Gradient</a></li>
+<li><a href="#gradient-clipping" id="toc-gradient-clipping">Gradient
+clipping</a></li>
+<li><a href="#minibatch" id="toc-minibatch">Minibatch</a></li>
+<li><a href="#update-epoch" id="toc-update-epoch">Update epoch</a></li>
+<li><a href="#checkpoint" id="toc-checkpoint">Checkpoint</a></li>
+<li><a href="#inference" id="toc-inference">Inference</a></li>
+<li><a href="#training" id="toc-training">Training</a></li>
+<li><a href="#curriculum" id="toc-curriculum">Curriculum</a></li>
+</ul></li>
+<li><a href="#17-search-space-and-learning-concepts" id="toc-17-search-space-and-learning-concepts">17. Search-Space and
+Learning Concepts</a>
+<ul>
+<li><a href="#search-space" id="toc-search-space">Search space</a></li>
+<li><a href="#neighborhood" id="toc-neighborhood">Neighborhood</a></li>
+<li><a href="#action-space" id="toc-action-space">Action space</a></li>
+<li><a href="#exploration" id="toc-exploration">Exploration</a></li>
+<li><a href="#exploitation" id="toc-exploitation">Exploitation</a></li>
+<li><a href="#local-versus-global-optimum" id="toc-local-versus-global-optimum">Local versus global
+optimum</a></li>
+<li><a href="#phase--search-phase" id="toc-phase--search-phase">Phase /
+search phase</a></li>
+<li><a href="#plateau-criterion" id="toc-plateau-criterion">Plateau
+criterion</a></li>
+</ul></li>
+<li><a href="#18-key-experimental-lessons-encoded-as-terms" id="toc-18-key-experimental-lessons-encoded-as-terms">18. Key
+Experimental Lessons Encoded as Terms</a>
+<ul>
+<li><a href="#greedy-wall" id="toc-greedy-wall">Greedy wall</a></li>
+<li><a href="#flexibility-collapse" id="toc-flexibility-collapse">Flexibility collapse</a></li>
+<li><a href="#constraint-reorganization" id="toc-constraint-reorganization">Constraint reorganization</a></li>
+<li><a href="#thermostat-behavior" id="toc-thermostat-behavior">Thermostat behavior</a></li>
+<li><a href="#same-score-structural-difference" id="toc-same-score-structural-difference">Same-score structural
+difference</a></li>
+<li><a href="#flexibility-opportunity-versus-progress" id="toc-flexibility-opportunity-versus-progress">Flexibility opportunity
+versus progress</a></li>
+</ul></li>
+<li><a href="#19-compact-formula-reference" id="toc-19-compact-formula-reference">19. Compact Formula Reference</a>
+<ul>
+<li><a href="#k43-edge-count" id="toc-k43-edge-count">K43 edge
+count</a></li>
+<li><a href="#number-of-k5s-in-k43" id="toc-number-of-k5s-in-k43">Number
+of K5s in K43</a></li>
+<li><a href="#k5s-containing-one-k43-edge" id="toc-k5s-containing-one-k43-edge">K5s containing one K43
+edge</a></li>
+<li><a href="#k5-edge-count" id="toc-k5-edge-count">K5 edge
+count</a></li>
+<li><a href="#ramsey-score" id="toc-ramsey-score">Ramsey score</a></li>
+<li><a href="#exact-single-edge-reward" id="toc-exact-single-edge-reward">Exact single-edge reward</a></li>
+<li><a href="#edge-role-profile-total" id="toc-edge-role-profile-total">Edge role-profile total</a></li>
+<li><a href="#greedy-reward-identity-1" id="toc-greedy-reward-identity-1">Greedy reward identity</a></li>
+<li><a href="#local-discrete-flipability-1" id="toc-local-discrete-flipability-1">Local discrete
+flipability</a></li>
+<li><a href="#scalar-global-flipability" id="toc-scalar-global-flipability">Scalar global flipability</a></li>
+<li><a href="#flexibility" id="toc-flexibility">Flexibility</a></li>
+<li><a href="#flexibility-delta" id="toc-flexibility-delta">Flexibility
+delta</a></li>
+<li><a href="#repair-cost" id="toc-repair-cost">Repair cost</a></li>
+<li><a href="#policy-notation" id="toc-policy-notation">Policy
+notation</a></li>
+<li><a href="#ppo-probability-ratio-1" id="toc-ppo-probability-ratio-1">PPO probability ratio</a></li>
+</ul></li>
+<li><a href="#20-terminology-we-intentionally-keep-distinct" id="toc-20-terminology-we-intentionally-keep-distinct">20. Terminology
+We Intentionally Keep Distinct</a></li>
+<li><a href="#21-guiding-research-principle" id="toc-21-guiding-research-principle">21. Guiding Research
+Principle</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="ramsey-search-definitions-and-research-glossary">Ramsey Search
+Definitions and Research Glossary</h1>
+<p>This document collects the mathematical, graph-theoretic, search, and
+machine-learning terminology used throughout the RamseyNumber project
+and our R(5,5) research. It is intended as a human reference: formal
+enough to remove ambiguity, but written so that a term can be understood
+without remembering the conversation in which it was introduced.</p>
+<p>The central problem is to color every edge of the complete graph on
+43 vertices either red or blue while minimizing the number of
+monochromatic copies of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>.</p>
+<hr />
+<h2 id="1-core-ramsey-and-graph-theory-definitions">1. Core Ramsey and
+Graph-Theory Definitions</h2>
+<h3 id="graph">Graph</h3>
+<p>A <strong>graph</strong> consists of a set of vertices and a set of
+edges joining pairs of vertices.</p>
+<p>In this project the host graph is complete: every distinct pair of
+vertices has an edge.</p>
+<h3 id="vertex">Vertex</h3>
+<p>A <strong>vertex</strong> is a node of a graph. In the party
+interpretation, a vertex represents a person.</p>
+<p>For
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>43</mn></msub><annotation encoding="application/x-tex">K_{43}</annotation></semantics></math>
+there are 43 vertices, conventionally indexed
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn><mo>,</mo><mn>1</mn><mo>,</mo><mi>…</mi><mo>,</mo><mn>42</mn></mrow><annotation encoding="application/x-tex">0,1,\ldots,42</annotation></semantics></math>
+in the code.</p>
+<h3 id="edge">Edge</h3>
+<p>An <strong>edge</strong> joins two distinct vertices. In the party
+interpretation, its color describes the relationship between those two
+people.</p>
+<p>For
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>43</mn></msub><annotation encoding="application/x-tex">K_{43}</annotation></semantics></math>:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mn>43</mn><mn>2</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>903</mn></mrow><annotation encoding="application/x-tex">
+\binom{43}{2}=903
+</annotation></semantics></math></p>
+<p>so a complete coloring contains 903 independently colored edges.</p>
+<h3 id="simple-or-ordinary-graph">Simple or ordinary graph</h3>
+<p>A <strong>simple graph</strong> (what we earlier called an ordinary
+graph) has no self-loops and no duplicate edges between the same pair of
+vertices.</p>
+<p>When a red/blue coloring is converted into an ordinary graph, we can
+keep one color as the graph&#39;s edges and treat the other color as
+non-edges. A blue clique then becomes an ordinary clique, while a red
+clique becomes an independent set, or vice versa.</p>
+<h3 id="complete-graph-k_n">Complete graph,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mi>n</mi></msub><annotation encoding="application/x-tex">K_n</annotation></semantics></math></h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mi>n</mi></msub><annotation encoding="application/x-tex">K_n</annotation></semantics></math>
+is the <strong>complete graph</strong> on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
+vertices: every pair of distinct vertices is joined by an edge.</p>
+<p>Examples:</p>
+<ul>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>43</mn></msub><annotation encoding="application/x-tex">K_{43}</annotation></semantics></math>
+has 43 vertices and 903 edges.</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>
+has 5 vertices and 10 edges.</li>
+</ul>
+<h3 id="subgraph">Subgraph</h3>
+<p>A <strong>subgraph</strong> is a graph formed from some subset of a
+graph&#39;s vertices and/or edges.</p>
+<p>Every five-vertex subset of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>43</mn></msub><annotation encoding="application/x-tex">K_{43}</annotation></semantics></math>
+induces a
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>
+because the host graph is complete.</p>
+<h3 id="clique">Clique</h3>
+<p>A <strong>clique</strong> is a set of vertices in which every pair is
+connected by an edge.</p>
+<p>A clique of size
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
+is a copy of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mi>k</mi></msub><annotation encoding="application/x-tex">K_k</annotation></semantics></math>.</p>
+<h3 id="independent-set">Independent set</h3>
+<p>An <strong>independent set</strong> is a set of vertices containing
+no edges in an ordinary graph representation.</p>
+<p>If blue edges are retained and red edges are treated as absent, an
+all-red
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>
+in the two-color representation appears as a five-vertex independent set
+in the blue-only graph.</p>
+<h3 id="connected-graph">Connected graph</h3>
+<p>A graph is <strong>connected</strong> if every vertex can be reached
+from every other vertex by following edges.</p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>43</mn></msub><annotation encoding="application/x-tex">K_{43}</annotation></semantics></math>
+is automatically connected. Connectivity is not a restriction on our
+red/blue coloring because every host edge exists; only its color
+changes.</p>
+<h3 id="isolated-vertex">Isolated vertex</h3>
+<p>An <strong>isolated vertex</strong> in an ordinary graph has degree
+zero. This notion is representation-dependent: a vertex may have degree
+zero in the blue-only graph while still having 42 red relationships in
+the two-color representation.</p>
+<h3 id="degree-dv">Degree,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>v</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">d(v)</annotation></semantics></math></h3>
+<p>The <strong>degree</strong>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>v</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">d(v)</annotation></semantics></math>
+of a vertex is the number of graph edges incident to it.</p>
+<p>In
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>43</mn></msub><annotation encoding="application/x-tex">K_{43}</annotation></semantics></math>
+every vertex has total degree 42.</p>
+<p>For a red/blue coloring we can split this into:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>d</mi><mi>R</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>v</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><msub><mi>d</mi><mi>B</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>v</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>42</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+d_R(v)+d_B(v)=42.
+</annotation></semantics></math></p>
+<h3 id="vertex-color-imbalance">Vertex color imbalance</h3>
+<p>A <strong>vertex color imbalance</strong> measures the difference
+between the numbers of red and blue edges incident to a vertex. One
+natural signed form is</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>d</mi><mi>B</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>v</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><msub><mi>d</mi><mi>R</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>v</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+d_B(v)-d_R(v).
+</annotation></semantics></math></p>
+<p>A value of zero means a 21/21 split. Our experiments showed that low
+Ramsey score does not require every vertex to be perfectly balanced.</p>
+<h3 id="edge-coloring">Edge coloring</h3>
+<p>An <strong>edge coloring</strong> assigns a color to every edge of
+the host graph.</p>
+<p>Our search uses two colors:</p>
+<ul>
+<li><code>0</code> = red</li>
+<li><code>1</code> = blue</li>
+</ul>
+<h3 id="monochromatic">Monochromatic</h3>
+<p>A subgraph is <strong>monochromatic</strong> if all of its relevant
+edges have the same color.</p>
+<p>A monochromatic
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>
+therefore has either 10 red edges or 10 blue edges.</p>
+<h3 id="violation">Violation</h3>
+<p>A <strong>violation</strong> is a monochromatic forbidden clique. For
+the R(5,5) search, a violation is an all-red or all-blue
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>.</p>
+<h3 id="ramsey-number-rab">Ramsey number,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>a</mi><mo>,</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">R(a,b)</annotation></semantics></math></h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>a</mi><mo>,</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">R(a,b)</annotation></semantics></math>
+is the smallest integer
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
+such that every red/blue edge coloring of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mi>n</mi></msub><annotation encoding="application/x-tex">K_n</annotation></semantics></math>
+contains either:</p>
+<ul>
+<li>a red
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mi>a</mi></msub><annotation encoding="application/x-tex">K_a</annotation></semantics></math>,
+or</li>
+<li>a blue
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mi>b</mi></msub><annotation encoding="application/x-tex">K_b</annotation></semantics></math>.</li>
+</ul>
+<p>The color names can be swapped without changing the mathematics.</p>
+<h3 id="r55"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo>,</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">R(5,5)</annotation></semantics></math></h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo>,</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">R(5,5)</annotation></semantics></math>
+is the smallest
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
+for which every two-coloring of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mi>n</mi></msub><annotation encoding="application/x-tex">K_n</annotation></semantics></math>
+necessarily contains a monochromatic
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>.</p>
+<p>Our computational work studies colorings of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>43</mn></msub><annotation encoding="application/x-tex">K_{43}</annotation></semantics></math>
+that have as few monochromatic
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>s
+as possible.</p>
+<h3 id="party-interpretation">Party interpretation</h3>
+<p>The <strong>party problem</strong> interprets vertices as people and
+edge colors as relationships, for example:</p>
+<ul>
+<li>blue = know each other</li>
+<li>red = strangers</li>
+</ul>
+<p>A monochromatic clique is therefore a group whose pairwise
+relationships are all of the same type.</p>
+<h3 id="binomial-coefficient-binomnk">Binomial coefficient,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mi>n</mi><mi>k</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\binom{n}{k}</annotation></semantics></math></h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mi>n</mi><mi>k</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\binom{n}{k}</annotation></semantics></math>,
+read
+“<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
+choose
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>,”
+is the number of ways to choose an unordered
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>-element
+subset from
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
+elements:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mi>n</mi><mi>k</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mfrac><mrow><mi>n</mi><mi>!</mi></mrow><mrow><mi>k</mi><mi>!</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>n</mi><mo>−</mo><mi>k</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>!</mi></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\binom{n}{k}=\frac{n!}{k!(n-k)!}.
+</annotation></semantics></math></p>
+<p>Important values in this project are:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mn>43</mn><mn>2</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>903</mn></mrow><annotation encoding="application/x-tex">
+\binom{43}{2}=903
+</annotation></semantics></math></p>
+<p>edges and</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mn>43</mn><mn>5</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>962</mn><mo>,</mo><mn>598</mn></mrow><annotation encoding="application/x-tex">
+\binom{43}{5}=962,598
+</annotation></semantics></math></p>
+<p>five-vertex subsets, hence 962,598 copies of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>.</p>
+<h3 id="k5s-containing-one-edge">K5s containing one edge</h3>
+<p>Once one edge has fixed two of the five vertices, the other three
+vertices can be chosen from the remaining 41:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mn>41</mn><mn>3</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>10</mn><mo>,</mo><mn>660</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\binom{41}{3}=10,660.
+</annotation></semantics></math></p>
+<p>Therefore every edge of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>43</mn></msub><annotation encoding="application/x-tex">K_{43}</annotation></semantics></math>
+participates in exactly 10,660 different
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>K</mi><mn>5</mn></msub><annotation encoding="application/x-tex">K_5</annotation></semantics></math>s.</p>
+<hr />
+<h2 id="2-coloring-and-data-representations">2. Coloring and Data
+Representations</h2>
+<h3 id="903-bit-coloring">903-bit coloring</h3>
+<p>A complete K43 red/blue coloring can be represented by one bit per
+edge. Since K43 has 903 edges, the complete state is a <strong>903-bit
+coloring</strong>.</p>
+<h3 id="symmetric-adjacencycolor-matrix">Symmetric adjacency/color
+matrix</h3>
+<p>The same coloring may be displayed as a symmetric
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>43</mn><mo>×</mo><mn>43</mn></mrow><annotation encoding="application/x-tex">43\times43</annotation></semantics></math>
+matrix. Entry
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(i,j)</annotation></semantics></math>
+gives the color of edge
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(i,j)</annotation></semantics></math>.
+The diagonal does not represent edges and is unused.</p>
+<p>The 903-bit representation is generally more compact and convenient
+for search.</p>
+<h3 id="edge-table">Edge table</h3>
+<p>The <strong>edge table</strong> maps each edge index to its two
+endpoints:</p>
+<pre class="text"><code>edge_index -&gt; (vertex_i, vertex_j)</code></pre>
+<p>For K43 it has shape <code>(903, 2)</code>.</p>
+<h3 id="edge-index-lookup">Edge-index lookup</h3>
+<p>An <strong>edge-index lookup</strong> performs the inverse
+mapping:</p>
+<pre class="text"><code>(vertex_i, vertex_j) -&gt; edge_index</code></pre>
+<p>It is useful while constructing incidence tables but is not itself
+the coloring.</p>
+<h3 id="clique-table--k5-edge-table">Clique table / K5 edge table</h3>
+<p>The <strong>K5 edge table</strong> stores the ten host-edge indexes
+belonging to each five-vertex subset.</p>
+<p>For K43/K5 its shape is:</p>
+<pre class="text"><code>(962598, 10)</code></pre>
+<h3 id="edge-to-k5-incidence-table">Edge-to-K5 incidence table</h3>
+<p>The <strong>edge-to-K5 table</strong> lists every K5 containing each
+host edge. For K43 its shape is:</p>
+<pre class="text"><code>(903, 10660)</code></pre>
+<p>This table is crucial for fast incremental updates after an edge
+flip.</p>
+<h3 id="coloring-state">Coloring state</h3>
+<p>A <strong>state</strong> is one complete current coloring together
+with the derived information maintained for search, such as the K5
+histogram, exact score, and cached action profiles.</p>
+<h3 id="state-version">State version</h3>
+<p>A <strong>state version</strong> is a mutation counter. Analyses
+associated with an earlier version are stale after the coloring
+changes.</p>
+<h3 id="coloring-hash--state-key">Coloring hash / state key</h3>
+<p>A <strong>coloring hash</strong> or exact state key is a compact
+identifier for a coloring, typically derived from its 903 bits. It lets
+search memory recognize a coloring it has already visited without
+comparing higher-level structures manually.</p>
+<p>Hashing does not improve a coloring; it makes state lookup and cycle
+detection efficient.</p>
+<hr />
+<h2 id="3-k5-histogram-score-and-violations">3. K5 Histogram, Score, and
+Violations</h2>
+<h3 id="blue-edge-count-of-a-k5">Blue-edge count of a K5</h3>
+<p>Every K5 has 10 edges. Its <strong>blue-edge count</strong> is
+therefore an integer from 0 through 10.</p>
+<p>If it has
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math>
+blue edges, it has
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>10</mn><mo>−</mo><mi>b</mi></mrow><annotation encoding="application/x-tex">10-b</annotation></semantics></math>
+red edges.</p>
+<h3 id="k5-histogram">K5 histogram</h3>
+<p>The <strong>K5 histogram</strong>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math>
+has 11 bins:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>H</mi><mn>0</mn></msub><mo>,</mo><msub><mi>H</mi><mn>1</mn></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>H</mi><mn>10</mn></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+H_0,H_1,\ldots,H_{10}.
+</annotation></semantics></math></p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>H</mi><mi>b</mi></msub><annotation encoding="application/x-tex">H_b</annotation></semantics></math>
+is the number of K5s containing exactly
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math>
+blue edges.</p>
+<p>Thus:</p>
+<ul>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>H</mi><mn>0</mn></msub><annotation encoding="application/x-tex">H_0</annotation></semantics></math>
+= all-red K5s</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>H</mi><mn>10</mn></msub><annotation encoding="application/x-tex">H_{10}</annotation></semantics></math>
+= all-blue K5s</li>
+<li>central bins describe increasingly balanced K5s</li>
+</ul>
+<p>and</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><munderover><mo>∑</mo><mrow><mi>b</mi><mo>=</mo><mn>0</mn></mrow><mn>10</mn></munderover><msub><mi>H</mi><mi>b</mi></msub><mo>=</mo><mn>962</mn><mo>,</mo><mn>598</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\sum_{b=0}^{10}H_b=962,598.
+</annotation></semantics></math></p>
+<h3 id="ramsey-score-sg">Ramsey score,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>G</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">S(G)</annotation></semantics></math></h3>
+<p>The <strong>Ramsey score</strong> of a coloring is the number of
+monochromatic K5s:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><mi>S</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>G</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>H</mi><mn>0</mn></msub><mo>+</mo><msub><mi>H</mi><mn>10</mn></msub></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{S(G)=H_0+H_{10}}.
+</annotation></semantics></math></p>
+<p>Lower is better. A score-zero K43 coloring would contain no
+monochromatic K5s.</p>
+<h3 id="scalar-score">Scalar score</h3>
+<p>A <strong>scalar score</strong> reduces the quality of an entire
+coloring to one number. Our central warning is that a scalar destroys
+structural information: two graphs with the same Ramsey score can have
+very different internal constraint structures and search behavior.</p>
+<h3 id="score-distance">Score distance</h3>
+<p>The <strong>score distance</strong> is the naive idea that a graph
+with score 100 is “closer” to a solution than a graph with score 500
+simply because 100 is numerically closer to zero.</p>
+<p>Our experiments show that score is not necessarily a reliable measure
+of search difficulty.</p>
+<h3 id="search-distance">Search distance</h3>
+<p><strong>Search distance</strong> is the still-unknown difficulty of
+actually reaching a zero-score coloring from a state. Unlike Ramsey
+score, it depends on the structure of the surrounding coloring space and
+the actions available to the search algorithm.</p>
+<hr />
+<h2 id="4-completion-deficits-and-danger">4. Completion Deficits and
+Danger</h2>
+<h3 id="red-completion-deficit">Red completion deficit</h3>
+<p>For a K5 containing
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math>
+blue edges, its <strong>red completion deficit</strong> is
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math>:
+that many edges would have to become red to make the K5 all red.</p>
+<h3 id="blue-completion-deficit">Blue completion deficit</h3>
+<p>For the same K5, its <strong>blue completion deficit</strong> is
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>10</mn><mo>−</mo><mi>b</mi></mrow><annotation encoding="application/x-tex">10-b</annotation></semantics></math>:
+that many edges would have to become blue to make it all blue.</p>
+<p>The two colors are deliberately kept separate because they describe
+different potential failure modes.</p>
+<h3 id="deficit-0">Deficit 0</h3>
+<p>A <strong>deficit-0</strong> K5 is already monochromatic in the
+relevant color and is therefore an actual violation.</p>
+<h3 id="deficit-1">Deficit 1</h3>
+<p>A <strong>deficit-1</strong> K5 is one edge recoloring away from
+becoming monochromatic. It is a near-violation.</p>
+<p>Examples include 9-red/1-blue when considering all-red completion and
+9-blue/1-red when considering all-blue completion.</p>
+<h3 id="deficit-2">Deficit 2</h3>
+<p>A <strong>deficit-2</strong> K5 requires two edge recolorings to
+become monochromatic in the relevant color.</p>
+<h3 id="deficit-3-and-higher">Deficit 3 and higher</h3>
+<p><strong>Deficit 3</strong>, and analogously higher deficits, count
+how many edge changes separate the K5 from a monochromatic state in a
+particular color.</p>
+<p>They provide graded information discarded by the binary
+violation/not-violation score.</p>
+<h3 id="danger">Danger</h3>
+<p><strong>Danger</strong> is a heuristic notion of how close a K5 is to
+becoming monochromatic. Low completion deficit means greater danger.</p>
+<h3 id="danger-objective--danger-energy">Danger objective / danger
+energy</h3>
+<p>A <strong>danger objective</strong> assigns graded weights to K5
+histogram bins so that near-violations matter before they become actual
+violations. It provides a smoother objective than the all-or-nothing
+Ramsey score.</p>
+<h3 id="danger-decay">Danger decay</h3>
+<p><strong>Danger decay</strong> controls how quickly the weight given
+to near-violations falls as their completion deficit grows.</p>
+<h3 id="k5-safety-level-lk">K5 safety level,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">L(K)</annotation></semantics></math></h3>
+<p>The <strong>K5 safety level</strong> is a color-symmetric measure of
+how far a K5 is from its nearest monochromatic state. If the K5 contains
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math>
+blue edges and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>10</mn><mo>−</mo><mi>b</mi></mrow><annotation encoding="application/x-tex">10-b</annotation></semantics></math>
+red edges, define</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mo>min</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo>,</mo><mn>10</mn><mo>−</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{L(K)=\min(b,10-b)}.
+</annotation></semantics></math></p>
+<p>Therefore:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Red/blue composition</th>
+<th style="text-align: right;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">L(K)</annotation></semantics></math></th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>10/0 or 0/10</td>
+<td style="text-align: right;">0</td>
+<td>monochromatic violation</td>
+</tr>
+<tr class="even">
+<td>9/1 or 1/9</td>
+<td style="text-align: right;">1</td>
+<td>extremely dangerous</td>
+</tr>
+<tr class="odd">
+<td>8/2 or 2/8</td>
+<td style="text-align: right;">2</td>
+<td>dangerous</td>
+</tr>
+<tr class="even">
+<td>7/3 or 3/7</td>
+<td style="text-align: right;">3</td>
+<td>moderately safe</td>
+</tr>
+<tr class="odd">
+<td>6/4 or 4/6</td>
+<td style="text-align: right;">4</td>
+<td>quite safe</td>
+</tr>
+<tr class="even">
+<td>5/5</td>
+<td style="text-align: right;">5</td>
+<td>maximally balanced</td>
+</tr>
+</tbody>
+</table>
+<p>This is closely related to completion deficit, but deliberately
+collapses the red and blue directions into one color-symmetric safety
+coordinate.</p>
+<h3 id="balanced-k5">Balanced K5</h3>
+<p>A <strong>balanced K5</strong> is a K5 with five red and five blue
+edges. It has the maximum safety level
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>5</mn></mrow><annotation encoding="application/x-tex">L(K)=5</annotation></semantics></math>.</p>
+<p>The word <em>balanced</em> is preferable to <em>neutral K5</em>,
+because a <strong>neutral action</strong> already has the separate
+meaning of an action whose immediate Ramsey reward is zero.</p>
+<h3 id="structural-safety">Structural safety</h3>
+<p><strong>Structural safety</strong> refers to the distribution of K5s
+away from the monochromatic boundary, rather than merely the number that
+are currently monochromatic.</p>
+<p>Two colorings with the same Ramsey score can therefore have different
+structural safety: one may contain many 9/1 near-violations while the
+other places more of its K5s around 6/4 and 5/5.</p>
+<h3 id="safety-change-of-an-edge-delta-le">Safety change of an edge,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\Delta L(e)</annotation></semantics></math></h3>
+<p>For a proposed edge flip
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>,
+its unweighted <strong>safety change</strong> can be defined over the
+10,660 K5s containing that edge:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><mi>Δ</mi><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munder><mo>∑</mo><mrow><mi>K</mi><mo>∋</mo><mi>e</mi></mrow></munder><mrow><mo stretchy="true" form="prefix">[</mo><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>K</mi><mrow><mi mathvariant="normal">a</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>K</mi><mrow><mi mathvariant="normal">b</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="true" form="postfix">]</mo></mrow></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{\Delta L(e)=\sum_{K\ni e}\left[L(K_{\mathrm{after}})-L(K_{\mathrm{before}})\right]}.
+</annotation></semantics></math></p>
+<p>A positive value means the flip moves its affected K5 neighborhood
+collectively farther from monochromaticity; a negative value means it
+moves that neighborhood toward danger.</p>
+<h3 id="weighted-structural-safety-objective-qg">Weighted
+structural-safety objective,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>G</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">Q(G)</annotation></semantics></math></h3>
+<p>A <strong>weighted structural-safety objective</strong> assigns a
+nonlinear value
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>L</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">q(L)</annotation></semantics></math>
+to each safety level and sums it over every K5:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>G</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munder><mo>∑</mo><mi>K</mi></munder><mi>q</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>L</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+Q(G)=\sum_K q(L(K)).
+</annotation></semantics></math></p>
+<p>The weights can make movement away from the dangerous 9/1 boundary
+more important than movement from 6/4 to 5/5. The particular weights are
+an experimental policy choice, not a Ramsey-theoretic identity.</p>
+<p>For an action,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>Q</mi></mrow><annotation encoding="application/x-tex">\Delta Q</annotation></semantics></math>
+measures its change in this structural-safety objective. This gives a
+richer action description such as
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>Δ</mi><mi>S</mi><mo>,</mo><mi>Δ</mi><mi>Q</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\Delta S,\Delta Q)</annotation></semantics></math>
+instead of ranking an edge solely by immediate Ramsey-score change.</p>
+<hr />
+<h2 id="5-actions-and-exact-consequences">5. Actions and Exact
+Consequences</h2>
+<h3 id="action">Action</h3>
+<p>An <strong>action</strong> is one permitted transformation of a
+coloring.</p>
+<p>The simplest action in our search is a single edge flip.</p>
+<h3 id="single-edge-flip">Single-edge flip</h3>
+<p>A <strong>single-edge flip</strong> changes exactly one host
+edge:</p>
+<pre class="text"><code>red -&gt; blue</code></pre>
+<p>or</p>
+<pre class="text"><code>blue -&gt; red</code></pre>
+<p>There are 903 possible single-edge actions in a K43 coloring before
+memory restrictions are applied.</p>
+<h3 id="two-edge-action">Two-edge action</h3>
+<p>A <strong>two-edge action</strong> changes two edges as one search
+move. It explores a larger neighborhood than single-edge greedy search
+and can potentially cross barriers invisible to a one-edge
+neighborhood.</p>
+<h3 id="k5-macro-action">K5 macro action</h3>
+<p>A <strong>K5 macro action</strong> recolors multiple edges belonging
+to one chosen K5 as a single action. It allows the search to manipulate
+K5-level structure rather than building every transformation from
+one-edge moves.</p>
+<h3 id="k5-pattern">K5 pattern</h3>
+<p>A <strong>K5 pattern</strong> is one red/blue assignment of the ten
+edges of a K5. There are</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mn>2</mn><mn>10</mn></msup><mo>=</mo><mn>1024</mn></mrow><annotation encoding="application/x-tex">
+2^{10}=1024
+</annotation></semantics></math></p>
+<p>possible patterns, of which two are monochromatic.</p>
+<h3 id="vertex-balance-action">Vertex-balance action</h3>
+<p>A <strong>vertex-balance action</strong> attempts to change edge
+colors in a way that alters red/blue degree imbalance at vertices.
+Experiments showed that our low-score archive graphs were already
+remarkably degree-balanced, so simple vertex balance did not provide an
+escape mechanism.</p>
+<h3 id="action-analysis">Action analysis</h3>
+<p>An <strong>action analysis</strong> computes the consequences of
+candidate actions without applying them to the real search state.</p>
+<p>For single-edge actions this includes exact resulting score changes
+and K5-profile changes for all 903 edges.</p>
+<h3 id="counterfactual">Counterfactual</h3>
+<p>A <strong>counterfactual</strong> asks what the state or a metric
+<em>would</em> become if a candidate action were taken, without
+committing that action to the real search state.</p>
+<h3 id="action-landscape">Action landscape</h3>
+<p>The <strong>action landscape</strong> is the complete collection of
+candidate actions and their predicted consequences at one state.</p>
+<p>It is more informative than merely asking for the single action with
+maximum reward.</p>
+<h3 id="histogram-delta">Histogram delta</h3>
+<p>A <strong>histogram delta</strong> is the exact change to every K5
+histogram bin caused by an action:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>H</mi><mo>=</mo><msub><mi>H</mi><mtext mathvariant="normal">after</mtext></msub><mo>−</mo><msub><mi>H</mi><mtext mathvariant="normal">before</mtext></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\Delta H=H_{\text{after}}-H_{\text{before}}.
+</annotation></semantics></math></p>
+<h3 id="exact-immediate-reward-re">Exact immediate reward,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">r(e)</annotation></semantics></math></h3>
+<p>For an edge flip
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>,
+the <strong>exact immediate reward</strong> is</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>S</mi><mtext mathvariant="normal">before</mtext></msub><mo>−</mo><msub><mi>S</mi><mtext mathvariant="normal">after</mtext></msub></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{r(e)=S_{\text{before}}-S_{\text{after}}}.
+</annotation></semantics></math></p>
+<p>Therefore:</p>
+<ul>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>&gt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">r(e)&gt;0</annotation></semantics></math>:
+the score improves</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">r(e)=0</annotation></semantics></math>:
+the score is unchanged</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>&lt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">r(e)&lt;0</annotation></semantics></math>:
+the score worsens</li>
+</ul>
+<h3 id="improving-action">Improving action</h3>
+<p>An <strong>improving action</strong> has positive exact reward.</p>
+<h3 id="neutral-action">Neutral action</h3>
+<p>A <strong>neutral action</strong> has zero exact reward. It may still
+dramatically reorganize which constraints are active.</p>
+<p>Neutral does <strong>not</strong> mean structurally irrelevant.</p>
+<h3 id="worsening-or-uphill-action">Worsening or uphill action</h3>
+<p>A <strong>worsening</strong> or <strong>uphill action</strong> has
+negative exact reward and temporarily creates a higher Ramsey score.</p>
+<p>Such moves may be valuable if they reorganize constraints or escape a
+rigid basin.</p>
+<h3 id="score-increasing-move">Score-increasing move</h3>
+<p>A <strong>score-increasing move</strong> is another name for an
+uphill move:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>S</mi><mtext mathvariant="normal">after</mtext></msub><mo>&gt;</mo><msub><mi>S</mi><mtext mathvariant="normal">before</mtext></msub></mrow><annotation encoding="application/x-tex">S_{\text{after}}&gt;S_{\text{before}}</annotation></semantics></math>.</p>
+<h3 id="created-and-destroyed-violations">Created and destroyed
+violations</h3>
+<p>For an action, <strong>destroyed violations</strong> are
+monochromatic K5s eliminated by the move, while <strong>created
+violations</strong> are new monochromatic K5s introduced by it.</p>
+<p>The scalar reward keeps only the difference. For example, destroying
+7 and creating 7 has reward zero, as does destroying 0 and creating 0,
+despite radically different structural effects.</p>
+<hr />
+<h2 id="6-edge-role-profiles-n1-through-n10">6. Edge Role Profiles: N1
+Through N10</h2>
+<h3 id="same-color-multiplicity-k">Same-color multiplicity,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math></h3>
+<p>Consider an edge
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>
+inside one particular K5. Let
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
+be the number of the K5&#39;s ten edges having the same color as
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>.</p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
+ranges from 1 through 10.</p>
+<h3 id="edge-role-profile-n_1ldotsn_10">Edge role profile,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>N</mi><mn>1</mn></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>N</mi><mn>10</mn></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(N_1,\ldots,N_{10})</annotation></semantics></math></h3>
+<p>Every K43 edge belongs to 10,660 K5s. For an edge
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>,
+define</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mi>k</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">
+N_k(e)
+</annotation></semantics></math></p>
+<p>as the number of incident K5s in which exactly
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
+of the ten K5 edges have the same color as
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>.</p>
+<p>The full discrete role profile is</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>N</mi><mn>1</mn></msub><mo>,</mo><msub><mi>N</mi><mn>2</mn></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>N</mi><mn>10</mn></msub><mo stretchy="true" form="postfix">)</mo></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{(N_1,N_2,\ldots,N_{10})}.
+</annotation></semantics></math></p>
+<p>and</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mn>10</mn></munderover><msub><mi>N</mi><mi>k</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>10</mn><mo>,</mo><mn>660</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\sum_{k=1}^{10}N_k(e)=10,660.
+</annotation></semantics></math></p>
+<h3 id="n_1-unique-blocker-load"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>1</mn></msub><annotation encoding="application/x-tex">N_1</annotation></semantics></math>:
+unique-blocker load</h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mn>1</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">N_1(e)</annotation></semantics></math>
+counts K5s in which
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>
+is the only edge of its current color.</p>
+<p>Example: in a 9-blue/1-red K5, the lone red edge is the unique
+blocker preventing an all-blue violation.</p>
+<p>Flipping that edge would create a monochromatic K5. Thus
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>1</mn></msub><annotation encoding="application/x-tex">N_1</annotation></semantics></math>
+measures an exact form of blocker liability.</p>
+<h3 id="n_10-violation-participation"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>10</mn></msub><annotation encoding="application/x-tex">N_{10}</annotation></semantics></math>:
+violation participation</h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mn>10</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">N_{10}(e)</annotation></semantics></math>
+counts monochromatic K5s containing edge
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>.</p>
+<p>Flipping
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>
+destroys all of those same-color violations.</p>
+<h3 id="greedy-reward-identity">Greedy reward identity</h3>
+<p>For a single edge flip:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>N</mi><mn>10</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><msub><mi>N</mi><mn>1</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{r(e)=N_{10}(e)-N_1(e)}.
+</annotation></semantics></math></p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>10</mn></msub><annotation encoding="application/x-tex">N_{10}</annotation></semantics></math>
+counts violations destroyed;
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>1</mn></msub><annotation encoding="application/x-tex">N_1</annotation></semantics></math>
+counts opposite-color violations created.</p>
+<p>This identity explains exactly what the ordinary exact greedy
+algorithm sees and what it discards:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>2</mn></msub><annotation encoding="application/x-tex">N_2</annotation></semantics></math>
+through
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>9</mn></msub><annotation encoding="application/x-tex">N_9</annotation></semantics></math>
+do not affect immediate score reward.</p>
+<h3 id="blocker">Blocker</h3>
+<p>A <strong>blocker</strong> is an edge whose current color prevents a
+nearly monochromatic K5 from becoming an actual violation.</p>
+<p>A unique blocker is the single minority-color edge of a 9/1 K5.</p>
+<h3 id="blocker-liability">Blocker liability</h3>
+<p>The <strong>blocker liability</strong> of an edge is the number or
+structure of near-violations that depend critically on its current
+color.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>1</mn></msub><annotation encoding="application/x-tex">N_1</annotation></semantics></math>
+is the simplest exact form of this measurement.</p>
+<h3 id="violation-load">Violation load</h3>
+<p>An edge&#39;s <strong>violation load</strong> is the number of current
+monochromatic K5s containing it. For single edges this is
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>10</mn></msub><annotation encoding="application/x-tex">N_{10}</annotation></semantics></math>.</p>
+<p>The analogous <strong>vertex violation load</strong> counts
+monochromatic K5s containing a particular vertex.</p>
+<hr />
+<h2 id="7-flipability">7. Flipability</h2>
+<h3 id="local-discrete-flipability">Local discrete flipability</h3>
+<p>For an edge
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>
+inside one K5, with
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
+same-color edges in that K5, we defined the local discrete flipability
+as</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><msub><mi>f</mi><mtext mathvariant="normal">local</mtext></msub><mo>=</mo><mi>k</mi><mo>−</mo><mn>1</mn></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{f_{\text{local}}=k-1}.
+</annotation></semantics></math></p>
+<p>Examples:</p>
+<ul>
+<li>unique minority edge in a 9/1 K5:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">k=1</annotation></semantics></math>,
+flipability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>0</mn><annotation encoding="application/x-tex">0</annotation></semantics></math></li>
+<li>an edge with four same-color companions:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>k</mi><mo>=</mo><mn>5</mn></mrow><annotation encoding="application/x-tex">k=5</annotation></semantics></math>,
+flipability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>4</mn><annotation encoding="application/x-tex">4</annotation></semantics></math></li>
+<li>edge in a monochromatic K5:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>k</mi><mo>=</mo><mn>10</mn></mrow><annotation encoding="application/x-tex">k=10</annotation></semantics></math>,
+flipability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>9</mn><annotation encoding="application/x-tex">9</annotation></semantics></math></li>
+</ul>
+<h3 id="global-edge-flipability">Global edge flipability</h3>
+<p>The original global scalar flipability was</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><msub><mi>F</mi><mtext mathvariant="normal">flip</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mn>10</mn></munderover><mrow><mo stretchy="true" form="prefix">(</mo><mi>k</mi><mo>−</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><msub><mi>N</mi><mi>k</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{F_{\text{flip}}(e)=\sum_{k=1}^{10}(k-1)N_k(e)}.
+</annotation></semantics></math></p>
+<h3 id="important-limitation-of-scalar-flipability">Important limitation
+of scalar flipability</h3>
+<p>We discovered that this scalar collapses mostly to ordinary
+color-degree information. If
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>
+has color
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>c</mi><annotation encoding="application/x-tex">c</annotation></semantics></math>,
+let
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>M</mi><mi>c</mi></msub><annotation encoding="application/x-tex">M_c</annotation></semantics></math>
+be the total number of
+color-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>c</mi><annotation encoding="application/x-tex">c</annotation></semantics></math>
+edges and let
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>s</mi><mi>e</mi></msub><annotation encoding="application/x-tex">s_e</annotation></semantics></math>
+be the number of other
+color-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>c</mi><annotation encoding="application/x-tex">c</annotation></semantics></math>
+edges sharing an endpoint with
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>e</mi><annotation encoding="application/x-tex">e</annotation></semantics></math>.
+Then</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>F</mi><mtext mathvariant="normal">flip</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>741</mn><msub><mi>s</mi><mi>e</mi></msub><mo>+</mo><mn>39</mn><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>M</mi><mi>c</mi></msub><mo>−</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+F_{\text{flip}}(e)=741s_e+39(M_c-1).
+</annotation></semantics></math></p>
+<p>Therefore the full
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mn>1</mn></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>N</mi><mn>10</mn></msub></mrow><annotation encoding="application/x-tex">N_1,\ldots,N_{10}</annotation></semantics></math>
+vector retains substantially more K5-level information than the scalar
+flipability sum.</p>
+<h3 id="flipability-versus-flexibility">Flipability versus
+flexibility</h3>
+<p><strong>Flipability</strong> and <strong>flexibility</strong> are
+different concepts in this project.</p>
+<ul>
+<li>Flipability describes an edge&#39;s accumulated local same-color roles
+in K5s.</li>
+<li>Flexibility describes how much of the <em>action space</em> can be
+used without exceeding a specified score-damage budget.</li>
+</ul>
+<hr />
+<h2 id="8-flexibility">8. Flexibility</h2>
+<h3 id="damage-budget-b">Damage budget,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math></h3>
+<p>A <strong>damage budget</strong>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>b</mi><mo>≥</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">b\ge0</annotation></semantics></math>
+is the maximum temporary Ramsey-score increase we are willing to
+tolerate for one action.</p>
+<h3 id="flexibility-fb">Flexibility,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(b)</annotation></semantics></math></h3>
+<p>For one coloring, let
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">r(e)</annotation></semantics></math>
+be the exact reward of each of its 903 possible edge flips. We
+define</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><menclose notation="box"><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mfrac><mrow><mi>#</mi><mo stretchy="false" form="prefix">{</mo><mi>e</mi><mo>:</mo><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>≥</mo><mo>−</mo><mi>b</mi><mo stretchy="false" form="postfix">}</mo></mrow><mn>903</mn></mfrac></mrow></menclose><annotation encoding="application/x-tex">
+\boxed{
+F(b)=\frac{\#\{e:r(e)\ge-b\}}{903}
+}
+</annotation></semantics></math></p>
+<p>when all 903 structural actions are being considered.</p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(b)</annotation></semantics></math>
+is the fraction of actions that improve the score, leave it unchanged,
+or worsen it by no more than
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math>.</p>
+<h3 id="f0"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(0)</annotation></semantics></math></h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mfrac><mrow><mi>#</mi><mo stretchy="false" form="prefix">{</mo><mi>e</mi><mo>:</mo><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>≥</mo><mn>0</mn><mo stretchy="false" form="postfix">}</mo></mrow><mn>903</mn></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+F(0)=\frac{\#\{e:r(e)\ge0\}}{903}.
+</annotation></semantics></math></p>
+<p>It is the fraction of single-edge flips that do <strong>not</strong>
+worsen the Ramsey score.</p>
+<p>It includes both improving and neutral actions.</p>
+<h3 id="f1"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(1)</annotation></semantics></math></h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(1)</annotation></semantics></math>
+is the fraction of edge flips that worsen the score by at most one
+violation. It includes everything counted by
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(0)</annotation></semantics></math>
+plus moves having reward
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">-1</annotation></semantics></math>.</p>
+<h3 id="f2-f3-f4-f5-"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(2)</annotation></semantics></math>,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>3</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(3)</annotation></semantics></math>,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>4</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(4)</annotation></semantics></math>,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(5)</annotation></semantics></math>,
+...</h3>
+<p>The definition continues identically:</p>
+<ul>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(2)</annotation></semantics></math>
+allows at most +2 score damage</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>3</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(3)</annotation></semantics></math>
+allows at most +3</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>4</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(4)</annotation></semantics></math>
+allows at most +4</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(5)</annotation></semantics></math>
+allows at most +5</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>10</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(10)</annotation></semantics></math>
+allows at most +10</li>
+<li>and so on</li>
+</ul>
+<p>Since larger damage budgets include all smaller-budget actions,</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>≤</mo><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>≤</mo><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>≤</mo><mi>⋯</mi><mi>.</mi></mrow><annotation encoding="application/x-tex">
+F(0)\le F(1)\le F(2)\le\cdots.
+</annotation></semantics></math></p>
+<h3 id="flexibility-curve">Flexibility curve</h3>
+<p>The <strong>flexibility curve</strong> is the vector or function</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><mo stretchy="true" form="prefix">(</mo><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>3</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><mi>…</mi><mo stretchy="true" form="postfix">)</mo></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{(F(0),F(1),F(2),F(3),\ldots)}.
+</annotation></semantics></math></p>
+<p>We deliberately retain the curve instead of immediately reducing
+flexibility to another scalar.</p>
+<h3 id="flexibility-reserve">Flexibility reserve</h3>
+<p>A <strong>flexibility reserve</strong> is the current amount of
+maneuverability available to search. For example, an experiment may
+monitor
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(5)</annotation></semantics></math>
+and attempt to keep it above some threshold.</p>
+<h3 id="flexibility-as-search-capital">Flexibility as search
+capital</h3>
+<p>Calling flexibility <strong>search capital</strong> emphasizes that
+it is a resource that can be spent. A search does not necessarily want
+maximum flexibility forever; it wants to avoid wasting flexibility for
+poor score gains.</p>
+<h3 id="flexibility-as-opportunity">Flexibility as opportunity</h3>
+<p>Our matched-score release experiment suggested that flexibility is
+better interpreted as <strong>opportunity</strong> than as progress. A
+high-flexibility state gives the algorithm more inexpensive choices, but
+a greedy policy can immediately squander those choices.</p>
+<h3 id="counterfactual-flexibility">Counterfactual flexibility</h3>
+<p>The <strong>counterfactual flexibility</strong> of action
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>a</mi><annotation encoding="application/x-tex">a</annotation></semantics></math>
+is the flexibility curve of the state that would result if
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>a</mi><annotation encoding="application/x-tex">a</annotation></semantics></math>
+were taken:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>F</mi><mi>b</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mo>∣</mo><mi>a</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>F</mi><mi>b</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mi>′</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+F_b(S\mid a)=F_b(S&#39;).
+</annotation></semantics></math></p>
+<h3 id="flexibility-delta-delta-f">Flexibility delta,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>F</mi></mrow><annotation encoding="application/x-tex">\Delta F</annotation></semantics></math></h3>
+<p>For one action:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>F</mi><mtext mathvariant="normal">after</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><msub><mi>F</mi><mtext mathvariant="normal">before</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\Delta F(b)=F_{\text{after}}(b)-F_{\text{before}}(b).
+</annotation></semantics></math></p>
+<p>Positive
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>F</mi></mrow><annotation encoding="application/x-tex">\Delta F</annotation></semantics></math>
+means the move creates more maneuverability at that damage budget.</p>
+<h3 id="local-flexibility">Local flexibility</h3>
+<p><strong>Local flexibility</strong> is the one-step flexibility
+described by
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(b)</annotation></semantics></math>:
+how many acceptable moves are available right now.</p>
+<h3 id="multi-step-flexibility">Multi-step flexibility</h3>
+<p><strong>Multi-step flexibility</strong> concerns how many distinct
+states or useful trajectories can be reached over several actions while
+remaining within some score budget.</p>
+<p>It is more expensive to calculate but describes basin geometry more
+directly than one-step
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(b)</annotation></semantics></math>.</p>
+<h3 id="reachable-volume">Reachable volume</h3>
+<p>The <strong>reachable volume</strong> is the number or diversity of
+states reachable from a coloring under specified action, depth, and
+score constraints. It is one possible higher-order measure of
+flexibility.</p>
+<hr />
+<h2 id="9-rigidity-cages-basins-and-repairability">9. Rigidity, Cages,
+Basins, and Repairability</h2>
+<h3 id="rigidity">Rigidity</h3>
+<p><strong>Rigidity</strong> is our informal name for a state in which
+many edge colors have become structurally load-bearing, so changing them
+tends to create new violations or near-violations.</p>
+<p>Rigidity is not currently one single formal scalar.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>1</mn></msub><annotation encoding="application/x-tex">N_1</annotation></semantics></math>
+distributions, flexibility curves, repair costs, and action landscapes
+are all ways of measuring aspects of it.</p>
+<h3 id="cage">Cage</h3>
+<p>The <strong>cage</strong> is our descriptive term for the highly
+constrained structure built by repeated greedy score optimization.
+Greedy removes easy violations while progressively making remaining
+edges dangerous to change.</p>
+<h3 id="basin">Basin</h3>
+<p>A <strong>basin</strong> is a region of coloring space into which a
+search descends and from which improving moves become difficult or
+unavailable.</p>
+<h3 id="local-minimum">Local minimum</h3>
+<p>A <strong>single-edge local minimum</strong> is a state in which no
+permitted single-edge flip improves the score.</p>
+<p>This is not necessarily globally optimal. It only describes the
+selected neighborhood/action space.</p>
+<h3 id="plateau">Plateau</h3>
+<p>A <strong>plateau</strong> is a region in which many reachable states
+have the same objective value, so neutral moves can traverse the region
+without immediate score progress.</p>
+<h3 id="escape-barrier">Escape barrier</h3>
+<p>The <strong>escape barrier</strong> of a state is the smallest
+temporary score increase required along any path that eventually reaches
+a state with a better score.</p>
+<p>Conceptually:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munder><mo>min</mo><mtext mathvariant="normal">paths to a better state</mtext></munder><mrow><mo stretchy="true" form="prefix">(</mo><munder><mo>max</mo><mi>t</mi></munder><msub><mi>S</mi><mi>t</mi></msub><mo>−</mo><msub><mi>S</mi><mn>0</mn></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+B(S)=\min_{\text{paths to a better state}}\left(\max_t S_t-S_0\right).
+</annotation></semantics></math></p>
+<p>If
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">B(S)=0</annotation></semantics></math>,
+a neutral/non-worsening route to improvement exists. If
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>&gt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">B(S)&gt;0</annotation></semantics></math>,
+some temporary worsening is unavoidable along every escape path.</p>
+<h3 id="repair-handle">Repair handle</h3>
+<p>A <strong>repair handle</strong> is an edge of a current violation
+that can be flipped at relatively low cost to surrounding
+constraints.</p>
+<h3 id="repair-cost-of-a-violation-ck">Repair cost of a violation,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">C(K)</annotation></semantics></math></h3>
+<p>For a monochromatic K5
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>,
+we proposed</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><menclose notation="box"><mrow><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munder><mo>min</mo><mrow><mi>e</mi><mo>∈</mo><mi>K</mi></mrow></munder><msub><mi>N</mi><mn>1</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\boxed{C(K)=\min_{e\in K}N_1(e)}.
+</annotation></semantics></math></p>
+<p>This measures the minimum number of opposite-color violations that
+would be created by flipping one edge of that K5, before accounting for
+other same-color violations that the same flip may also destroy.</p>
+<p>If
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">C(K)=0</annotation></semantics></math>,
+the violation currently has a clean repair handle: at least one of its
+edges can be flipped without immediately creating an opposite-color
+monochromatic K5.</p>
+<h3 id="repair-landscape">Repair landscape</h3>
+<p>The <strong>repair landscape</strong> of a violation is the
+collection</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">{</mo><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>N</mi><mn>10</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><msub><mi>N</mi><mn>1</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="true" form="postfix">)</mo></mrow><mo>:</mo><mi>e</mi><mo>∈</mo><mi>K</mi><mo stretchy="false" form="postfix">}</mo></mrow><annotation encoding="application/x-tex">
+\{(N_{10}(e),N_1(e)):e\in K\}
+</annotation></semantics></math></p>
+<p>over its ten edges. It shows destruction leverage and creation
+liability for every local repair choice.</p>
+<h3 id="structural-disorder--frustration">Structural disorder /
+frustration</h3>
+<p><strong>Structural disorder</strong> or <strong>frustration</strong>
+describes the situation in which many overlapping constraints demand
+mutually awkward edge assignments. The terms are descriptive rather than
+a single formal project metric.</p>
+<hr />
+<h2 id="10-greedy-and-flexibility-aware-search">10. Greedy and
+Flexibility-Aware Search</h2>
+<h3 id="greedy-search">Greedy search</h3>
+<p>A <strong>greedy search</strong> chooses the action with the best
+immediate objective value at every step without explicitly optimizing
+long-term consequences.</p>
+<h3 id="exact-score-greedy">Exact-score greedy</h3>
+<p>Our exact single-edge greedy policy chooses an available edge
+maximizing</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>N</mi><mn>10</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><msub><mi>N</mi><mn>1</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+r(e)=N_{10}(e)-N_1(e).
+</annotation></semantics></math></p>
+<p>It therefore maximizes immediate net violation reduction, not simply
+raw violation participation.</p>
+<h3 id="score-first-greedy">Score-first greedy</h3>
+<p><strong>Score-first greedy</strong> is our name for treating
+immediate Ramsey score reduction as the primary action-selection
+rule.</p>
+<p>Our experiments show that it rapidly reduces score but also strongly
+reduces flexibility.</p>
+<h3 id="greedy-as-a-flexibility-sink">Greedy as a flexibility sink</h3>
+<p>Calling greedy a <strong>flexibility sink</strong> summarizes the
+experimental observation that even when given a higher-flexibility state
+at approximately the same score, ordinary greedy rapidly consumes the
+flexibility advantage and drives states toward a similar rigid
+score/flexibility regime.</p>
+<h3 id="flexibility-aware-policy">Flexibility-aware policy</h3>
+<p>A <strong>flexibility-aware policy</strong> considers the future
+action landscape in addition to immediate Ramsey score.</p>
+<p>Our first adaptive implementation switched from score-first behavior
+to flexibility preservation when a monitored
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(b)</annotation></semantics></math>
+fell below a configured floor.</p>
+<h3 id="fixed-flexibility-floor">Fixed flexibility floor</h3>
+<p>A <strong>flexibility floor</strong> is a threshold such as</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>≥</mo><mn>55</mn><mi>%</mi><mi>.</mi></mrow><annotation encoding="application/x-tex">
+F(5)\ge55\%.
+</annotation></semantics></math></p>
+<p>The controller attempts to restore flexibility after dropping below
+that level. This produced thermostat-like oscillation and was useful
+experimentally, but it is not assumed to be the final objective.</p>
+<h3 id="flexibility-first-descent">Flexibility-first descent</h3>
+<p><strong>Flexibility-first descent</strong> is the proposed strategy
+of modifying greedy behavior from the beginning:</p>
+<ol type="1">
+<li>require score progress whenever acceptable improving moves
+exist;</li>
+<li>among those moves, prefer the action that preserves the strongest
+future flexibility;</li>
+<li>when no improving move is available, gradually admit neutral and
+then increasingly uphill actions.</li>
+</ol>
+<p>This treats score improvement as a constraint and future
+maneuverability as a major selection criterion.</p>
+<h3 id="scoreflexibility-tradeoff">Score/flexibility tradeoff</h3>
+<p>Each action can be viewed as producing at least two consequences:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mi>Δ</mi><mi>S</mi><mo>,</mo><mi>Δ</mi><mi>F</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+(\Delta S,\Delta F).
+</annotation></semantics></math></p>
+<p>An action may improve both, worsen both, or trade one for the
+other.</p>
+<h3 id="flexibility-efficiency">Flexibility efficiency</h3>
+<p><strong>Flexibility efficiency</strong> informally means obtaining
+useful Ramsey score progress while consuming as little flexibility as
+possible.</p>
+<p>We have intentionally not committed to one scalar ratio because
+dividing these quantities could again destroy useful multidimensional
+information.</p>
+<hr />
+<h2 id="11-pareto-terminology">11. Pareto Terminology</h2>
+<h3 id="objective-vector">Objective vector</h3>
+<p>An <strong>objective vector</strong> records several consequences of
+an action rather than compressing them into one scalar. For example:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><msub><mi>F</mi><mn>0</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mi>′</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><msub><mi>F</mi><mn>1</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mi>′</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><msub><mi>F</mi><mn>2</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mi>′</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><msub><mi>F</mi><mn>5</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>S</mi><mi>′</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo><mi>…</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+(r(e),F_0(S&#39;),F_1(S&#39;),F_2(S&#39;),F_5(S&#39;),\ldots).
+</annotation></semantics></math></p>
+<h3 id="pareto-dominance">Pareto dominance</h3>
+<p>Suppose actions
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
+are judged on several quantities that we want to maximize.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+<strong>Pareto-dominates</strong>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
+if:</p>
+<ol type="1">
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+is at least as good as
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
+in every objective, and</li>
+<li><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+is strictly better in at least one objective.</li>
+</ol>
+<p>There is then no reason to choose
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
+if all listed objectives genuinely matter and no hidden consideration
+distinguishes them.</p>
+<h3 id="dominated-action">Dominated action</h3>
+<p>A <strong>dominated action</strong> is an action for which another
+candidate is at least as good in every considered objective and better
+in at least one.</p>
+<h3 id="pareto-frontier">Pareto frontier</h3>
+<p>The <strong>Pareto frontier</strong> is the set of nondominated
+actions.</p>
+<p>These actions represent genuine tradeoffs. For example, one might
+give greater score improvement while another preserves more flexibility,
+with neither being unambiguously better on both axes.</p>
+<h3 id="nondominated-action">Nondominated action</h3>
+<p>A <strong>nondominated action</strong> is a member of the Pareto
+frontier: no candidate simultaneously beats it on all considered
+objectives.</p>
+<hr />
+<h2 id="12-search-memory-and-exploration">12. Search Memory and
+Exploration</h2>
+<h3 id="search-memory">Search memory</h3>
+<p><strong>Search memory</strong> is information about previous actions
+or states that influences which actions are currently permitted or
+preferred.</p>
+<h3 id="tabu-search">Tabu search</h3>
+<p><strong>Tabu search</strong> temporarily forbids recently used
+actions or recently visited states so that local search does not
+immediately undo itself or fall into short cycles.</p>
+<h3 id="tabu-edge-tenure">Tabu edge tenure</h3>
+<p>The <strong>edge tenure</strong> is the number of subsequent steps
+for which a recently flipped edge remains tabu.</p>
+<h3 id="visited-state-window">Visited-state window</h3>
+<p>The <strong>visited-state window</strong> is the bounded number of
+recent exact colorings remembered so the search can reject or discourage
+revisiting them.</p>
+<h3 id="aspiration">Aspiration</h3>
+<p><strong>Aspiration</strong> permits an otherwise tabu action when
+that action is sufficiently valuable, such as when it creates a new best
+exact score.</p>
+<h3 id="cycle">Cycle</h3>
+<p>A <strong>cycle</strong> occurs when search returns to a state it has
+already visited and may begin repeating an action sequence.</p>
+<h3 id="random-restart">Random restart</h3>
+<p>A <strong>random restart</strong> abandons one search trajectory and
+begins from a new randomly generated state.</p>
+<h3 id="seed-coloring">Seed coloring</h3>
+<p>A <strong>seed coloring</strong> is the starting coloring supplied to
+a search attempt.</p>
+<p>Seeds may be random, archive-derived, cyclic, constructive, manually
+specified, or generated by another algorithm.</p>
+<h3 id="trajectory">Trajectory</h3>
+<p>A <strong>trajectory</strong> is the ordered sequence of states,
+actions, scores, or measurements produced by a search run.</p>
+<hr />
+<h2 id="13-construction-and-archive-terminology">13. Construction and
+Archive Terminology</h2>
+<h3 id="construction">Construction</h3>
+<p>A <strong>construction</strong> is an algorithm that creates a
+starting coloring rather than improving an already active coloring
+through ordinary search steps.</p>
+<h3 id="random-construction">Random construction</h3>
+<p>A <strong>random construction</strong> independently assigns red or
+blue to each host edge, normally with equal probability.</p>
+<p>A random K43 coloring has roughly 1,800–1,900 monochromatic K5s on
+average in our experiments.</p>
+<h3 id="cyclic--circulant-construction">Cyclic / circulant
+construction</h3>
+<p>A <strong>cyclic</strong> or <strong>circulant construction</strong>
+places vertices on a modular circle and colors an edge according to the
+modular/circular distance between its endpoints.</p>
+<p>This imposes strong symmetry and reduces the number of independent
+coloring decisions.</p>
+<h3 id="circular-distance">Circular distance</h3>
+<p>For vertices labeled modulo
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>,
+the <strong>circular distance</strong> between
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>
+is</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>min</mo><mrow><mo stretchy="true" form="prefix">(</mo><mrow><mo stretchy="true" form="prefix">|</mo><mi>i</mi><mo>−</mo><mi>j</mi><mo stretchy="true" form="postfix">|</mo></mrow><mo>,</mo><mi>n</mi><mo>−</mo><mrow><mo stretchy="true" form="prefix">|</mo><mi>i</mi><mo>−</mo><mi>j</mi><mo stretchy="true" form="postfix">|</mo></mrow><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\min(|i-j|,n-|i-j|).
+</annotation></semantics></math></p>
+<p>A cyclic coloring assigns colors to distance classes rather than to
+each edge independently.</p>
+<h3 id="quadratic-residue-coloring">Quadratic-residue coloring</h3>
+<p>A <strong>quadratic-residue coloring</strong> colors differences
+between modular vertex labels according to whether the difference
+belongs to a selected residue class, such as the nonzero squares modulo
+a prime. Such highly symmetric constructions are classical tools in
+Ramsey lower-bound constructions.</p>
+<h3 id="symmetry-reduction">Symmetry reduction</h3>
+<p><strong>Symmetry reduction</strong> recognizes that vertex renamings
+or color swaps can describe colorings that are structurally equivalent.
+Avoiding redundant equivalent states can reduce the effective search
+space.</p>
+<h3 id="vertex-renaming--graph-isomorphism">Vertex renaming / graph
+isomorphism</h3>
+<p>A <strong>vertex renaming</strong> permutes vertex labels without
+changing the abstract colored graph. Two colorings related only by such
+a permutation are isomorphic.</p>
+<h3 id="color-symmetry">Color symmetry</h3>
+<p>Because R(5,5) treats red and blue identically, swapping every red
+edge with blue and every blue edge with red produces an equivalent score
+structure.</p>
+<h3 id="archive">Archive</h3>
+<p>The <strong>archive</strong> is the persistent database of useful
+discovered colorings. It lets later experiments reuse structured states
+instead of starting from random graphs every time.</p>
+<h3 id="archive-record">Archive record</h3>
+<p>An <strong>archive record</strong> stores a coloring together with
+identifying and experimental metadata such as score, run name, or
+iteration.</p>
+<h3 id="population">Population</h3>
+<p>A <strong>population</strong> is a collection of candidate colorings
+considered together, for example as seeds for evolutionary, batch, or
+curriculum search.</p>
+<h3 id="ancestor--descendant-coloring">Ancestor / descendant
+coloring</h3>
+<p>A coloring is an <strong>ancestor</strong> of another if the latter
+was produced by continuing search or mutation from the former. Archive
+populations can contain many related descendants rather than
+statistically independent discoveries.</p>
+<h3 id="diversity">Diversity</h3>
+<p><strong>Diversity</strong> measures how structurally different
+candidate colorings are. A large archive can have low true diversity if
+most entries are minor descendants of the same few ancestors.</p>
+<hr />
+<h2 id="14-experimental-metrics-and-comparisons">14. Experimental
+Metrics and Comparisons</h2>
+<h3 id="matched-score-comparison">Matched-score comparison</h3>
+<p>A <strong>matched-score comparison</strong> compares two colorings
+having the same or nearly the same Ramsey score but different values of
+another structural metric.</p>
+<p>This is essential for determining whether a proposed metric contains
+information beyond score itself.</p>
+<h3 id="matched-score-flexibility-release">Matched-score flexibility
+release</h3>
+<p>Our <strong>matched-score flexibility release</strong> experiment
+constructed approximately score-550 graphs with different
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(5)</annotation></semantics></math>
+values, reset search memory, and then ran identical greedy search from
+each.</p>
+<p>It tests whether flexibility predicts future search behavior beyond
+current score.</p>
+<h3 id="baseline">Baseline</h3>
+<p>A <strong>baseline</strong> is the control algorithm against which a
+new strategy is compared. Exact greedy single-edge search has served as
+a major baseline in this project.</p>
+<h3 id="benchmark">Benchmark</h3>
+<p>A <strong>benchmark</strong> is a fixed experimental procedure, set
+of seeds, or evaluation population used to compare algorithms under
+controlled conditions.</p>
+<h3 id="control-surface">Control surface</h3>
+<p>A <strong>control surface</strong> is one major aspect of the search
+system that we can change independently to influence results.</p>
+<p>The control surfaces identified in this project are:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Control surface</th>
+<th>Question</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Construction</td>
+<td>Where does search begin?</td>
+</tr>
+<tr class="even">
+<td>Representation</td>
+<td>How is a coloring/state represented?</td>
+</tr>
+<tr class="odd">
+<td>Encoding</td>
+<td>What information is explicitly presented to an algorithm?</td>
+</tr>
+<tr class="even">
+<td>Embedding</td>
+<td>How does a learned model internally represent information?</td>
+</tr>
+<tr class="odd">
+<td>Action</td>
+<td>What transformations are permitted in one step?</td>
+</tr>
+<tr class="even">
+<td>Objective / scoring</td>
+<td>What does “better” mean during search?</td>
+</tr>
+<tr class="odd">
+<td>Reward</td>
+<td>What feedback does a learner receive?</td>
+</tr>
+<tr class="even">
+<td>Memory</td>
+<td>What past information influences future moves?</td>
+</tr>
+<tr class="odd">
+<td>Policy</td>
+<td>How is the next action selected?</td>
+</tr>
+<tr class="even">
+<td>Search</td>
+<td>How are sequences and alternatives explored?</td>
+</tr>
+<tr class="odd">
+<td>Model</td>
+<td>What machinery learns a policy or representation?</td>
+</tr>
+<tr class="even">
+<td>Learning algorithm</td>
+<td>How are model parameters updated?</td>
+</tr>
+<tr class="odd">
+<td>Curriculum</td>
+<td>Which states and difficulty levels are used for training?</td>
+</tr>
+<tr class="even">
+<td>Archive / population</td>
+<td>Which discoveries are preserved and reused?</td>
+</tr>
+<tr class="odd">
+<td>Symmetry</td>
+<td>Which apparently different states are equivalent?</td>
+</tr>
+<tr class="even">
+<td>Diversity</td>
+<td>Are we exploring genuinely different structures?</td>
+</tr>
+<tr class="odd">
+<td>Computation</td>
+<td>How much useful search can we afford?</td>
+</tr>
+<tr class="even">
+<td>Evaluation</td>
+<td>How do we determine whether an idea actually helped?</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="15-objectives-policies-and-search-architecture">15. Objectives,
+Policies, and Search Architecture</h2>
+<h3 id="objective">Objective</h3>
+<p>An <strong>objective</strong> defines what the search regards as
+desirable. The exact monochromatic-K5 count is one objective; a
+danger-weighted measure is another.</p>
+<p>An objective need not be identical to the final theorem
+condition.</p>
+<h3 id="scoring-function">Scoring function</h3>
+<p>A <strong>scoring function</strong> calculates a numerical
+description of state quality. The exact Ramsey score is</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>H</mi><mn>0</mn></msub><mo>+</mo><msub><mi>H</mi><mn>10</mn></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+H_0+H_{10}.
+</annotation></semantics></math></p>
+<h3 id="reward">Reward</h3>
+<p>A <strong>reward</strong> is feedback associated with an action or
+transition. In exact edge search it is the score reduction. In
+reinforcement learning it is the numerical feedback used to train
+behavior.</p>
+<h3 id="policy">Policy</h3>
+<p>A <strong>policy</strong> is a rule for choosing an action given a
+state.</p>
+<p>In reinforcement-learning notation:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>a</mi><mo>∣</mo><mi>s</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">
+\pi(a\mid s)
+</annotation></semantics></math></p>
+<p>describes the probability or preference of taking action
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>a</mi><annotation encoding="application/x-tex">a</annotation></semantics></math>
+when the system is in state
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>.</p>
+<p>A greedy policy, random policy, tabu-aware policy, and neural policy
+are all different policies.</p>
+<h3 id="search">Search</h3>
+<p><strong>Search</strong> is the process that repeatedly applies
+policies/actions to explore coloring space.</p>
+<h3 id="environment">Environment</h3>
+<p>The <strong>environment</strong> owns the active search state and
+applies selected actions. It also handles transition validation,
+termination, memory restrictions, and other search mechanics. The policy
+chooses; the environment executes.</p>
+<h3 id="search-episode--run">Search episode / run</h3>
+<p>A <strong>search episode</strong> or <strong>run</strong> is one
+complete trajectory beginning from a seed and ending when a stopping
+condition is reached.</p>
+<h3 id="iteration">Iteration</h3>
+<p>An <strong>iteration</strong> is one repeated unit of an experiment
+or training process. In PPO training, for example, an iteration may
+collect a rollout and then update the network.</p>
+<hr />
+<h2 id="16-neural-network-and-reinforcement-learning-definitions">16.
+Neural-Network and Reinforcement-Learning Definitions</h2>
+<h3 id="neural-network">Neural network</h3>
+<p>A <strong>neural network</strong> is a parameterized function
+composed of layers whose weights are learned from data or feedback.</p>
+<p>In this project the network was used to estimate action preferences
+and state value from graph-derived inputs.</p>
+<h3 id="parameter--weight">Parameter / weight</h3>
+<p>A <strong>parameter</strong> or <strong>weight</strong> is a learned
+numerical value inside a neural network. Training updates parameters;
+ordinary inference uses their current values without changing them.</p>
+<h3 id="feature">Feature</h3>
+<p>A <strong>feature</strong> is an input quantity or learned internal
+signal that carries information useful for prediction or action
+selection.</p>
+<h3 id="encoding">Encoding</h3>
+<p>An <strong>encoding</strong> transforms raw problem state into
+explicit numerical inputs suitable for an algorithm or model.</p>
+<p>Encoding is what we choose to show the model.</p>
+<h3 id="embedding">Embedding</h3>
+<p>An <strong>embedding</strong> is a learned vector representation in
+which objects or structures are mapped into a continuous feature
+space.</p>
+<p>Embedding is generally learned internally rather than being a raw
+hand-designed state description.</p>
+<h3 id="hidden-representation">Hidden representation</h3>
+<p>A <strong>hidden representation</strong> is the intermediate
+vector/tensor produced inside a neural network after transforming its
+inputs.</p>
+<h3 id="message-passing-layer">Message-passing layer</h3>
+<p>A <strong>message-passing layer</strong> updates a graph element&#39;s
+representation using information from related graph elements. Repeated
+layers allow information to propagate through graph structure.</p>
+<h3 id="attention">Attention</h3>
+<p><strong>Attention</strong> is a learned mechanism that dynamically
+weights the relevance of different inputs when constructing a
+representation. It is related in spirit to message passing because both
+aggregate information, but attention learns content-dependent weights
+rather than necessarily using a fixed neighborhood aggregation rule.</p>
+<h3 id="head">Head</h3>
+<p>A <strong>head</strong> is an output branch of a shared neural
+representation specialized for a particular prediction.</p>
+<h3 id="policy-head">Policy head</h3>
+<p>The <strong>policy head</strong> produces action logits/preferences.
+In the K43 edge policy it ultimately assigns a preference to candidate
+edge flips.</p>
+<h3 id="value-head">Value head</h3>
+<p>The <strong>value head</strong> estimates the expected future
+cumulative reward from the current state.</p>
+<h3 id="logit">Logit</h3>
+<p>A <strong>logit</strong> is an unnormalized action score produced by
+a neural network before conversion into probabilities.</p>
+<h3 id="categorical-policy-distribution">Categorical policy
+distribution</h3>
+<p>A <strong>categorical distribution</strong> converts action logits
+into probabilities over discrete actions and allows an action to be
+sampled.</p>
+<h3 id="reinforcement-learning-rl">Reinforcement learning (RL)</h3>
+<p><strong>Reinforcement learning</strong> trains an agent by
+interacting with an environment and using rewards to increase the
+probability of useful behavior.</p>
+<h3 id="state-s_t">State,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>s</mi><mi>t</mi></msub><annotation encoding="application/x-tex">s_t</annotation></semantics></math></h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>s</mi><mi>t</mi></msub><annotation encoding="application/x-tex">s_t</annotation></semantics></math>
+denotes the environment state at time step
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>.</p>
+<h3 id="action-a_t">Action,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>a</mi><mi>t</mi></msub><annotation encoding="application/x-tex">a_t</annotation></semantics></math></h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>a</mi><mi>t</mi></msub><annotation encoding="application/x-tex">a_t</annotation></semantics></math>
+denotes the action chosen at time step
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>.</p>
+<h3 id="pia_tmid-s_t"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>s</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\pi(a_t\mid s_t)</annotation></semantics></math></h3>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>s</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\pi(a_t\mid s_t)</annotation></semantics></math>
+is the policy&#39;s probability of choosing action
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>a</mi><mi>t</mi></msub><annotation encoding="application/x-tex">a_t</annotation></semantics></math>
+conditioned on being in state
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>s</mi><mi>t</mi></msub><annotation encoding="application/x-tex">s_t</annotation></semantics></math>.</p>
+<p>The vertical bar means “given” or “conditioned on.”</p>
+<h3 id="rollout">Rollout</h3>
+<p>A <strong>rollout</strong> is a recorded sequence of states, actions,
+rewards, action probabilities, and value estimates generated by running
+the current policy through the environment.</p>
+<h3 id="return">Return</h3>
+<p>The <strong>return</strong> is the discounted cumulative future
+reward used as a training target.</p>
+<h3 id="discount-factor-gamma">Discount factor,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>γ</mi><annotation encoding="application/x-tex">\gamma</annotation></semantics></math></h3>
+<p>The <strong>discount factor</strong> controls the relative importance
+of future rewards:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn><mo>≤</mo><mi>γ</mi><mo>≤</mo><mn>1</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+0\le\gamma\le1.
+</annotation></semantics></math></p>
+<p>Values near one make long-term rewards matter nearly as much as
+immediate ones.</p>
+<h3 id="value-vs">Value,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>V</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>s</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">V(s)</annotation></semantics></math></h3>
+<p>The <strong>value</strong> of state
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>
+is the model&#39;s estimate of expected future cumulative reward from that
+state under the current policy.</p>
+<p>It is not the Ramsey score.</p>
+<h3 id="advantage-a_t">Advantage,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>A</mi><mi>t</mi></msub><annotation encoding="application/x-tex">A_t</annotation></semantics></math></h3>
+<p>The <strong>advantage</strong> estimates how much better or worse
+action
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>a</mi><mi>t</mi></msub><annotation encoding="application/x-tex">a_t</annotation></semantics></math>
+was than the policy/value model expected from state
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>s</mi><mi>t</mi></msub><annotation encoding="application/x-tex">s_t</annotation></semantics></math>.</p>
+<p>Positive advantage means the sampled action performed better than the
+baseline expectation; negative advantage means worse.</p>
+<h3 id="gae--generalized-advantage-estimation">GAE / generalized
+advantage estimation</h3>
+<p><strong>Generalized Advantage Estimation (GAE)</strong> combines
+temporal-difference errors across time to produce lower-variance
+advantage estimates.</p>
+<h3 id="gae-lambda-lambda">GAE lambda,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math></h3>
+<p>The <strong>GAE lambda</strong> parameter controls the bias/variance
+tradeoff in how far advantage information is propagated through a
+rollout.</p>
+<h3 id="ppo">PPO</h3>
+<p><strong>Proximal Policy Optimization (PPO)</strong> is a
+reinforcement-learning algorithm that updates the policy using collected
+rollouts while limiting how far the new policy moves from the behavior
+that generated those rollouts.</p>
+<h3 id="ppo-probability-ratio">PPO probability ratio</h3>
+<p>PPO uses</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>ρ</mi><mi>t</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>π</mi><mtext mathvariant="normal">new</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>s</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><mrow><msub><mi>π</mi><mtext mathvariant="normal">old</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>s</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\rho_t=\frac{\pi_{\text{new}}(a_t\mid s_t)}{\pi_{\text{old}}(a_t\mid s_t)}.
+</annotation></semantics></math></p>
+<p>The ratio measures how much the new policy has changed the
+probability of the sampled action.</p>
+<h3 id="clip-ratio">Clip ratio</h3>
+<p>The <strong>PPO clip ratio</strong> limits the useful range of the
+probability ratio, preventing one training update from receiving
+unlimited benefit by making an action dramatically more or less
+probable.</p>
+<h3 id="clipped-fraction">Clipped fraction</h3>
+<p>The <strong>clipped fraction</strong> is the fraction of training
+samples whose probability ratios moved outside PPO&#39;s clipping
+interval.</p>
+<p>Large clipped fraction means many proposed policy changes are large
+enough for clipping to become active.</p>
+<h3 id="policy-loss">Policy loss</h3>
+<p>The <strong>policy loss</strong> is the optimization loss derived
+from PPO&#39;s clipped policy objective. Its sign by itself is not a score
+saying whether the current Ramsey policy is “good” or “bad.” It is
+primarily meaningful as part of the optimization/update process.</p>
+<h3 id="value-loss">Value loss</h3>
+<p>The <strong>value loss</strong> measures disagreement between the
+value head&#39;s predictions and the return targets, commonly using squared
+error.</p>
+<h3 id="entropy">Entropy</h3>
+<p><strong>Policy entropy</strong> measures how spread out the action
+probability distribution is.</p>
+<p>High entropy means the policy assigns probability broadly across
+actions. Low entropy means it is concentrated on fewer actions.</p>
+<p>For 903 equally probable actions the maximum entropy is
+approximately</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>ln</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>903</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>≈</mo><mn>6.806</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\ln(903)\approx6.806.
+</annotation></semantics></math></p>
+<h3 id="entropy-bonus--entropy-weight">Entropy bonus / entropy
+weight</h3>
+<p>An <strong>entropy bonus</strong> rewards exploration by discouraging
+the policy from collapsing too quickly onto a small number of actions.
+The entropy weight controls its contribution to the training loss.</p>
+<h3 id="kl-divergence">KL divergence</h3>
+<p><strong>Kullback-Leibler (KL) divergence</strong> measures how
+different one probability distribution is from another.</p>
+<p>In PPO it is used diagnostically to estimate how much the updated
+policy has moved from the rollout policy.</p>
+<h3 id="approximate-kl">Approximate KL</h3>
+<p><strong>Approximate KL</strong> is a computational estimate of policy
+change, often formed from differences between old and new action
+log-probabilities over rollout samples.</p>
+<h3 id="log-probability">Log probability</h3>
+<p>The <strong>log probability</strong> of an action is the natural
+logarithm of the policy probability assigned to that action. Log
+probabilities are numerically convenient for probability ratios and
+likelihood optimization.</p>
+<h3 id="learning-rate">Learning rate</h3>
+<p>The <strong>learning rate</strong> controls the size of
+neural-network parameter updates made by the optimizer.</p>
+<h3 id="gradient">Gradient</h3>
+<p>A <strong>gradient</strong> gives the direction and sensitivity of
+loss with respect to model parameters.</p>
+<h3 id="gradient-clipping">Gradient clipping</h3>
+<p><strong>Gradient clipping</strong> limits unusually large gradient
+magnitudes to reduce unstable parameter updates.</p>
+<h3 id="minibatch">Minibatch</h3>
+<p>A <strong>minibatch</strong> is a subset of collected training
+samples processed together during one optimizer update.</p>
+<h3 id="update-epoch">Update epoch</h3>
+<p>An <strong>update epoch</strong> is one pass through a collected
+rollout dataset during training. PPO commonly makes several passes over
+the same rollout.</p>
+<h3 id="checkpoint">Checkpoint</h3>
+<p>A <strong>checkpoint</strong> is a saved training state, typically
+including neural-network weights, optimizer state, configuration,
+iteration number, and sometimes random-number-generator state.</p>
+<p>It allows training or evaluation to resume from a prior point.</p>
+<h3 id="inference">Inference</h3>
+<p><strong>Inference</strong> means using a trained network to produce
+predictions/actions without updating its parameters.</p>
+<h3 id="training">Training</h3>
+<p><strong>Training</strong> means updating model parameters using an
+optimization algorithm and training data/rewards.</p>
+<h3 id="curriculum">Curriculum</h3>
+<p>A <strong>curriculum</strong> controls the distribution and
+difficulty of states used during training. Our phases used progressively
+stronger archived colorings so later models could learn from lower-score
+regions rather than only random graphs.</p>
+<hr />
+<h2 id="17-search-space-and-learning-concepts">17. Search-Space and
+Learning Concepts</h2>
+<h3 id="search-space">Search space</h3>
+<p>The <strong>search space</strong> is the set of all colorings or
+states the algorithm could potentially consider.</p>
+<p>For K43 with two colors and 903 independent edges, the raw coloring
+space contains</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msup><mn>2</mn><mn>903</mn></msup><annotation encoding="application/x-tex">
+2^{903}
+</annotation></semantics></math></p>
+<p>colorings before symmetry reduction.</p>
+<h3 id="neighborhood">Neighborhood</h3>
+<p>A state&#39;s <strong>neighborhood</strong> is the collection of states
+reachable by one allowed action. Under single-edge flipping, there are
+at most 903 immediate neighbors before memory restrictions.</p>
+<h3 id="action-space">Action space</h3>
+<p>The <strong>action space</strong> is the collection of
+transformations available to the policy. Changing the action definition
+changes the geometry of the search problem even when the underlying set
+of colorings is unchanged.</p>
+<h3 id="exploration">Exploration</h3>
+<p><strong>Exploration</strong> means trying actions or regions that are
+not currently known to be best, in order to discover new structures or
+escape local behavior.</p>
+<h3 id="exploitation">Exploitation</h3>
+<p><strong>Exploitation</strong> means using currently known information
+to choose actions expected to perform well immediately.</p>
+<h3 id="local-versus-global-optimum">Local versus global optimum</h3>
+<p>A <strong>local optimum</strong> is best only with respect to a
+specified neighborhood. A <strong>global optimum</strong> is best among
+all possible states.</p>
+<p>A single-edge local minimum is therefore not evidence that no better
+coloring exists.</p>
+<h3 id="phase--search-phase">Phase / search phase</h3>
+<p>A <strong>phase</strong> is an experimentally chosen regime using
+particular seed distributions, policies, models, or objectives. Our
+neural experiments used progressively lower-score archives as later
+training phases.</p>
+<h3 id="plateau-criterion">Plateau criterion</h3>
+<p>A <strong>plateau criterion</strong> is an empirical rule for
+deciding that continued use of a particular search/training method is no
+longer producing meaningful benchmark improvement.</p>
+<hr />
+<h2 id="18-key-experimental-lessons-encoded-as-terms">18. Key
+Experimental Lessons Encoded as Terms</h2>
+<h3 id="greedy-wall">Greedy wall</h3>
+<p>The <strong>greedy wall</strong> is the experimentally observed
+regime where single-edge exact greedy search has driven the score low
+enough that almost no improving edge flips remain.</p>
+<p>It is not a universal mathematical constant such as “score 300”; its
+location depends on state and search history.</p>
+<h3 id="flexibility-collapse">Flexibility collapse</h3>
+<p><strong>Flexibility collapse</strong> is the reduction of the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(b)</annotation></semantics></math>
+curve during aggressive greedy score descent.</p>
+<p>In our measured action landscapes,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(0)</annotation></semantics></math>
+fell from roughly half of the action space for random states to well
+below one percent near the low-score frontier.</p>
+<h3 id="constraint-reorganization">Constraint reorganization</h3>
+<p><strong>Constraint reorganization</strong> means changing which
+edges/K5s carry blocker and violation responsibilities, potentially
+without immediately reducing Ramsey score.</p>
+<h3 id="thermostat-behavior">Thermostat behavior</h3>
+<p>Our first fixed-floor flexibility policy displayed <strong>thermostat
+behavior</strong>:</p>
+<ol type="1">
+<li>greedy descent consumed flexibility;</li>
+<li>the policy crossed below its F(5) floor;</li>
+<li>reorganization restored flexibility;</li>
+<li>greedy resumed;</li>
+<li>the process repeated.</li>
+</ol>
+<p>This demonstrated control over flexibility but was not assumed to be
+the final policy.</p>
+<h3 id="same-score-structural-difference">Same-score structural
+difference</h3>
+<p>The matched-score experiment established that two colorings can have
+essentially identical Ramsey scores yet substantially different
+flexibility curves.</p>
+<p>Therefore Ramsey score does not uniquely characterize the local
+search landscape.</p>
+<h3 id="flexibility-opportunity-versus-progress">Flexibility opportunity
+versus progress</h3>
+<p><strong>Flexibility is opportunity, not progress</strong> summarizes
+the observation that having many inexpensive actions does not itself
+reduce Ramsey score. A policy must use that optionality effectively
+rather than immediately consume it.</p>
+<hr />
+<h2 id="19-compact-formula-reference">19. Compact Formula Reference</h2>
+<h3 id="k43-edge-count">K43 edge count</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mn>43</mn><mn>2</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>903</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\binom{43}{2}=903.
+</annotation></semantics></math></p>
+<h3 id="number-of-k5s-in-k43">Number of K5s in K43</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mn>43</mn><mn>5</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>962</mn><mo>,</mo><mn>598</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\binom{43}{5}=962,598.
+</annotation></semantics></math></p>
+<h3 id="k5s-containing-one-k43-edge">K5s containing one K43 edge</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mn>41</mn><mn>3</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>10</mn><mo>,</mo><mn>660</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\binom{41}{3}=10,660.
+</annotation></semantics></math></p>
+<h3 id="k5-edge-count">K5 edge count</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mn>5</mn><mn>2</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>10</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\binom{5}{2}=10.
+</annotation></semantics></math></p>
+<h3 id="ramsey-score">Ramsey score</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>G</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>H</mi><mn>0</mn></msub><mo>+</mo><msub><mi>H</mi><mn>10</mn></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+S(G)=H_0+H_{10}.
+</annotation></semantics></math></p>
+<h3 id="exact-single-edge-reward">Exact single-edge reward</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>S</mi><mtext mathvariant="normal">before</mtext></msub><mo>−</mo><msub><mi>S</mi><mtext mathvariant="normal">after</mtext></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+r(e)=S_{\text{before}}-S_{\text{after}}.
+</annotation></semantics></math></p>
+<h3 id="edge-role-profile-total">Edge role-profile total</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mn>10</mn></munderover><msub><mi>N</mi><mi>k</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>10</mn><mo>,</mo><mn>660</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\sum_{k=1}^{10}N_k(e)=10,660.
+</annotation></semantics></math></p>
+<h3 id="greedy-reward-identity-1">Greedy reward identity</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>N</mi><mn>10</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><msub><mi>N</mi><mn>1</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+r(e)=N_{10}(e)-N_1(e).
+</annotation></semantics></math></p>
+<h3 id="local-discrete-flipability-1">Local discrete flipability</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>f</mi><mtext mathvariant="normal">local</mtext></msub><mo>=</mo><mi>k</mi><mo>−</mo><mn>1</mn><mi>.</mi></mrow><annotation encoding="application/x-tex">
+f_{\text{local}}=k-1.
+</annotation></semantics></math></p>
+<h3 id="scalar-global-flipability">Scalar global flipability</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>F</mi><mtext mathvariant="normal">flip</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mn>10</mn></munderover><mrow><mo stretchy="true" form="prefix">(</mo><mi>k</mi><mo>−</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><msub><mi>N</mi><mi>k</mi></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+F_{\text{flip}}(e)=\sum_{k=1}^{10}(k-1)N_k(e).
+</annotation></semantics></math></p>
+<h3 id="flexibility">Flexibility</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mfrac><mrow><mi>#</mi><mo stretchy="false" form="prefix">{</mo><mi>e</mi><mo>:</mo><mi>r</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>≥</mo><mo>−</mo><mi>b</mi><mo stretchy="false" form="postfix">}</mo></mrow><mn>903</mn></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+F(b)=\frac{\#\{e:r(e)\ge-b\}}{903}.
+</annotation></semantics></math></p>
+<h3 id="flexibility-delta">Flexibility delta</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Δ</mi><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>F</mi><mtext mathvariant="normal">after</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><msub><mi>F</mi><mtext mathvariant="normal">before</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\Delta F(b)=F_{\text{after}}(b)-F_{\text{before}}(b).
+</annotation></semantics></math></p>
+<h3 id="repair-cost">Repair cost</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>K</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><munder><mo>min</mo><mrow><mi>e</mi><mo>∈</mo><mi>K</mi></mrow></munder><msub><mi>N</mi><mn>1</mn></msub><mrow><mo stretchy="true" form="prefix">(</mo><mi>e</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+C(K)=\min_{e\in K}N_1(e).
+</annotation></semantics></math></p>
+<h3 id="policy-notation">Policy notation</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>s</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\pi(a_t\mid s_t).
+</annotation></semantics></math></p>
+<h3 id="ppo-probability-ratio-1">PPO probability ratio</h3>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>ρ</mi><mi>t</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>π</mi><mtext mathvariant="normal">new</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>s</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><mrow><msub><mi>π</mi><mtext mathvariant="normal">old</mtext></msub><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>s</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\rho_t=\frac{\pi_{\text{new}}(a_t\mid s_t)}{\pi_{\text{old}}(a_t\mid s_t)}.
+</annotation></semantics></math></p>
+<hr />
+<h2 id="20-terminology-we-intentionally-keep-distinct">20. Terminology
+We Intentionally Keep Distinct</h2>
+<p>These pairs are easy to confuse but mean different things in the
+project.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Term A</th>
+<th>Term B</th>
+<th>Distinction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Score</td>
+<td>Search distance</td>
+<td>Score counts current violations; search distance concerns difficulty
+of reaching a solution.</td>
+</tr>
+<tr class="even">
+<td>Flipability</td>
+<td>Flexibility</td>
+<td>Flipability describes accumulated local edge roles; flexibility
+describes available low-damage actions.</td>
+</tr>
+<tr class="odd">
+<td>Objective</td>
+<td>Policy</td>
+<td>Objective says what is valuable; policy decides which action to
+take.</td>
+</tr>
+<tr class="even">
+<td>Reward</td>
+<td>Score</td>
+<td>Score describes a state; reward describes a transition/action.</td>
+</tr>
+<tr class="odd">
+<td>Violation</td>
+<td>Near-violation</td>
+<td>A violation is monochromatic; a near-violation is one or more
+recolorings away.</td>
+</tr>
+<tr class="even">
+<td><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>1</mn></msub><annotation encoding="application/x-tex">N_1</annotation></semantics></math></td>
+<td><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>10</mn></msub><annotation encoding="application/x-tex">N_{10}</annotation></semantics></math></td>
+<td><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>1</mn></msub><annotation encoding="application/x-tex">N_1</annotation></semantics></math>
+counts unique-blocker liability;
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mn>10</mn></msub><annotation encoding="application/x-tex">N_{10}</annotation></semantics></math>
+counts current violation participation.</td>
+</tr>
+<tr class="odd">
+<td>Neutral action</td>
+<td>Irrelevant action</td>
+<td>Neutral means zero immediate score change; it can still radically
+change structure.</td>
+</tr>
+<tr class="even">
+<td>Local minimum</td>
+<td>Global minimum</td>
+<td>Local refers to a chosen action neighborhood; global refers to the
+entire search space.</td>
+</tr>
+<tr class="odd">
+<td>Encoding</td>
+<td>Embedding</td>
+<td>Encoding is explicit input representation; embedding is generally a
+learned internal vector representation.</td>
+</tr>
+<tr class="even">
+<td>Policy head</td>
+<td>Value head</td>
+<td>Policy head scores actions; value head predicts expected future
+return.</td>
+</tr>
+<tr class="odd">
+<td>Training</td>
+<td>Inference</td>
+<td>Training changes model parameters; inference uses them.</td>
+</tr>
+<tr class="even">
+<td>Exploration</td>
+<td>Exploitation</td>
+<td>Exploration seeks new possibilities; exploitation uses current
+knowledge.</td>
+</tr>
+<tr class="odd">
+<td>Flexibility reserve</td>
+<td>Solution quality</td>
+<td>Flexibility provides optionality; it does not itself mean the
+coloring is closer to score zero.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="21-guiding-research-principle">21. Guiding Research
+Principle</h2>
+<p>The most important conceptual lesson behind many of these definitions
+is:</p>
+<blockquote>
+<p><strong>Do not compress structural information into a scalar until we
+understand what the scalar destroys.</strong></p>
+</blockquote>
+<p>Ramsey score is indispensable because score zero is the ultimate
+target, but it does not describe how constraints are arranged. The role
+profile
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>N</mi><mn>1</mn></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>N</mi><mn>10</mn></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(N_1,\ldots,N_{10})</annotation></semantics></math>,
+the flexibility curve
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(b)</annotation></semantics></math>,
+directional completion deficits, repair landscapes, action
+counterfactuals, and Pareto frontiers are all attempts to retain
+structure that a single number discards.</p>
+<p>The evolving search question is therefore not merely:</p>
+<blockquote>
+<p>Which action reduces the most violations right now?</p>
+</blockquote>
+<p>but:</p>
+<blockquote>
+<p>Which action makes genuine progress while leaving the coloring in a
+state from which future progress remains possible?</p>
+</blockquote>
+</body>
+</html>

@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -85,7 +89,17 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an owned immutable NumPy array.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an owned immutable NumPy array.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        array (numpy.ndarray): Source array or array-like value to copy.</span>
+<span class="sd">        dtype: Optional dtype to coerce the copy to. If ``None`` the</span>
+<span class="sd">            dtype of ``array`` is preserved.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: A new array that owns its memory, with the</span>
+<span class="sd">        ``writeable`` flag cleared so callers cannot mutate it in place.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
         <span class="n">array</span><span class="p">,</span>
         <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
@@ -105,12 +119,28 @@
 
 <span class="sd">        [..., 0] = color-zero / red K5 participation</span>
 <span class="sd">        [..., 1] = color-one / blue K5 participation</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        vertices (numpy.ndarray): Read-only ``int32`` array of shape</span>
+<span class="sd">            ``(n_vertices, 2)`` giving, for each host-graph vertex, the</span>
+<span class="sd">            exact number of monochromatic K5s of each color containing</span>
+<span class="sd">            that vertex.</span>
+<span class="sd">        edges (numpy.ndarray): Read-only ``int32`` array of shape</span>
+<span class="sd">            ``(n_edges, 2)`` giving, for each host-graph edge, the exact</span>
+<span class="sd">            number of monochromatic K5s of each color containing that</span>
+<span class="sd">            edge.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">vertices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
     <span class="n">edges</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate shapes and non-negativity, then freeze the arrays.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``vertices`` or ``edges`` does not have shape</span>
+<span class="sd">                ``(n, 2)``, or if any participation count is negative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">vertices</span> <span class="o">=</span> <span class="n">_owned_read_only</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
@@ -134,18 +164,22 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">red_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Color-zero (red) monochromatic K5 count per vertex.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">blue_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Color-one (blue) monochromatic K5 count per vertex.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">red_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Color-zero (red) monochromatic K5 count per edge.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">blue_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Color-one (blue) monochromatic K5 count per edge.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span></div>
 
 
@@ -154,7 +188,27 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipCausalAnalysis.RMonochromaticCliqueChange">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RMonochromaticCliqueChange</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One monochromatic K5 created or destroyed by the edge flip.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One monochromatic K5 created or destroyed by the edge flip.</span>
+
+<span class="sd">    Each instance is a single exact event in the causal event</span>
+<span class="sd">    decomposition of a flip: one forbidden clique either became</span>
+<span class="sd">    monochromatic (``delta`` of ``+1``) or stopped being monochromatic</span>
+<span class="sd">    (``delta`` of ``-1``) as a direct structural consequence of the</span>
+<span class="sd">    flipped edge(s).</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        clique_index (int): Index of the affected clique in the host</span>
+<span class="sd">            graph&#39;s clique index.</span>
+<span class="sd">        color (int): The monochromatic color involved, ``0`` (red) or</span>
+<span class="sd">            ``1`` (blue).</span>
+<span class="sd">        delta (int): ``+1`` if the clique became monochromatic in</span>
+<span class="sd">            ``color``, or ``-1`` if it stopped being monochromatic in</span>
+<span class="sd">            ``color``.</span>
+<span class="sd">        vertices (numpy.ndarray): Read-only ``uint8`` array of the</span>
+<span class="sd">            clique&#39;s vertex indices.</span>
+<span class="sd">        edges (numpy.ndarray): Read-only ``uint16`` array of the</span>
+<span class="sd">            clique&#39;s host-edge indices.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">clique_index</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">color</span><span class="p">:</span> <span class="nb">int</span>
@@ -163,6 +217,13 @@
     <span class="n">edges</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate ``color`` and ``delta``, then freeze the arrays.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``color`` is not ``0`` or ``1``, if ``delta``</span>
+<span class="sd">                is not ``-1`` or ``+1``, or if ``vertices``/``edges`` is</span>
+<span class="sd">                not one-dimensional.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;color must be zero or one.&quot;</span><span class="p">)</span>
 
@@ -192,10 +253,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">created</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Whether this event is a new monochromatic K5.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">==</span> <span class="mi">1</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">destroyed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Whether this event is a K5 that stopped being monochromatic.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span></div>
 
 
@@ -204,7 +267,40 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipCausalAnalysis.REdgeFlipCausalAnalysis">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">REdgeFlipCausalAnalysis</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete read-only causal footprint of one specified edge flip.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete read-only causal footprint of one specified edge flip.</span>
+
+<span class="sd">    Produced by :func:`analyze_edge_flip_causality`, which flips a copy</span>
+<span class="sd">    of a search state and records the state exactly before and after,</span>
+<span class="sd">    plus the exact set of monochromatic K5s created or destroyed. The</span>
+<span class="sd">    ``greedy_rewards_*`` arrays are, despite the name, the *exact*</span>
+<span class="sd">    immediate rewards (score reduction) that :func:`RAction.analyze_actions`</span>
+<span class="sd">    computes for every possible single-edge flip from that state — not a</span>
+<span class="sd">    heuristic approximation — captured once before the flip and once</span>
+<span class="sd">    after, so their difference shows how the flip reshaped the reward</span>
+<span class="sd">    landscape for every other edge.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        edge (int): Index of the host-graph edge that was flipped.</span>
+<span class="sd">        endpoints (tuple[int, int]): Vertex indices of the flipped edge.</span>
+<span class="sd">        old_color (int): Edge color before the flip.</span>
+<span class="sd">        new_color (int): Edge color after the flip (the complement of</span>
+<span class="sd">            ``old_color``).</span>
+<span class="sd">        score_before (int): Exact score of the state before the flip.</span>
+<span class="sd">        score_after (int): Exact score of the state after the flip.</span>
+<span class="sd">        participation_before (RMonochromaticParticipation): Exact</span>
+<span class="sd">            monochromatic K5 participation counts before the flip.</span>
+<span class="sd">        participation_after (RMonochromaticParticipation): Exact</span>
+<span class="sd">            monochromatic K5 participation counts after the flip.</span>
+<span class="sd">        clique_changes (tuple[RMonochromaticCliqueChange, ...]): Exact</span>
+<span class="sd">            event decomposition of every K5 created or destroyed by the</span>
+<span class="sd">            flip.</span>
+<span class="sd">        greedy_rewards_before (numpy.ndarray): Read-only ``int32`` array</span>
+<span class="sd">            of the exact immediate reward for every edge, evaluated</span>
+<span class="sd">            before the flip.</span>
+<span class="sd">        greedy_rewards_after (numpy.ndarray): Read-only ``int32`` array</span>
+<span class="sd">            of the exact immediate reward for every edge, evaluated</span>
+<span class="sd">            after the flip.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">endpoints</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
@@ -219,6 +315,12 @@
     <span class="n">greedy_rewards_after</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Normalize scalar fields and freeze the reward arrays.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``greedy_rewards_before`` and</span>
+<span class="sd">                ``greedy_rewards_after`` do not have equal shape.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">before_rewards</span> <span class="o">=</span> <span class="n">_owned_read_only</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_before</span><span class="p">,</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
@@ -243,10 +345,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">exact_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Exact score reduction produced by the flip (``score_before - score_after``).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_before</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_after</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">vertex_participation_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Per-vertex, per-color change in monochromatic K5 participation.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">participation_after</span><span class="o">.</span><span class="n">vertices</span>
             <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">vertices</span>
@@ -254,6 +358,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">edge_participation_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Per-edge, per-color change in monochromatic K5 participation.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">participation_after</span><span class="o">.</span><span class="n">edges</span>
             <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">edges</span>
@@ -261,10 +366,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">greedy_reward_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Per-edge change in exact immediate reward caused by the flip.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_after</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_before</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">changed_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Indices of vertices whose monochromatic K5 participation changed.&quot;&quot;&quot;</span>
         <span class="n">changed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">vertex_participation_delta</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">,</span>
             <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
@@ -273,6 +380,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">changed_structure_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Sorted unique indices of host edges touched by any clique change.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">clique_changes</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
 
@@ -284,6 +392,13 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">vertex_event_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Number of clique-change events touching each vertex.</span>
+
+<span class="sd">        Unlike :attr:`vertex_participation_delta`, this counts every</span>
+<span class="sd">        creation and destruction event regardless of color, so a vertex</span>
+<span class="sd">        involved in both a destroyed red K5 and a created blue K5 scores</span>
+<span class="sd">        two events even though its net delta may be zero.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
             <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">vertices</span><span class="p">),</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
@@ -296,6 +411,11 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">edge_event_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Number of clique-change events touching each host edge.</span>
+
+<span class="sd">        Counts events the same way as :attr:`vertex_event_counts`, but</span>
+<span class="sd">        indexed by host edge rather than vertex.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
             <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">edges</span><span class="p">),</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
@@ -313,7 +433,28 @@
 <span class="k">def</span> <span class="nf">monochromatic_participation</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RMonochromaticParticipation</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count red and blue monochromatic K5 participation exactly.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count red and blue monochromatic K5 participation exactly.</span>
+
+<span class="sd">    For each host edge, counts the monochromatic K5s of each color that</span>
+<span class="sd">    contain it directly from the indexed cliques, then recovers the</span>
+<span class="sd">    per-vertex counts by summing edge participation at each vertex&#39;s</span>
+<span class="sd">    incident edges and dividing by ``clique_size - 1`` (each K5</span>
+<span class="sd">    containing a vertex touches exactly that many of its incident</span>
+<span class="sd">    edges).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to measure. Not mutated.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RMonochromaticParticipation: Exact monochromatic K5</span>
+<span class="sd">        participation counts by vertex and by edge, for the current</span>
+<span class="sd">        coloring of ``state``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If the per-vertex incidence sums do not divide</span>
+<span class="sd">            evenly by ``clique_size - 1``, which would indicate an</span>
+<span class="sd">            inconsistency in the clique index.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">index</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span>
     <span class="n">counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span>
 
@@ -387,9 +528,27 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Analyze one edge flip without mutating the supplied search state.</span>
 
-<span class="sd">    The returned K5 changes form an exact event decomposition: replaying</span>
-<span class="sd">    their +/-1 color contributions reconstructs all vertex and edge</span>
-<span class="sd">    monochromatic-participation deltas.</span>
+<span class="sd">    Copies ``state``, flips ``edge`` on the copy, and records the exact</span>
+<span class="sd">    score, monochromatic participation, and per-edge immediate-reward</span>
+<span class="sd">    landscape before and after. The returned K5 changes form an exact</span>
+<span class="sd">    event decomposition: replaying their +/-1 color contributions</span>
+<span class="sd">    reconstructs all vertex and edge monochromatic-participation deltas</span>
+<span class="sd">    (verified internally before returning).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to analyze. Not mutated;</span>
+<span class="sd">            the flip is applied to an internal copy.</span>
+<span class="sd">        edge (int): Index of the host-graph edge to flip.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        REdgeFlipCausalAnalysis: Complete causal footprint of flipping</span>
+<span class="sd">        ``edge`` from ``state``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``edge`` is not an integer.</span>
+<span class="sd">        IndexError: If ``edge`` is outside the host graph.</span>
+<span class="sd">        RuntimeError: If the internal event-decomposition consistency</span>
+<span class="sd">            check fails (see :func:`_verify_event_decomposition`).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;edge must be an integer.&quot;</span><span class="p">)</span>
@@ -507,6 +666,19 @@
     <span class="n">color_one_count</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">edges_per_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the monochromatic color of a clique given its color-one edge count.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        color_one_count (int): Number of the clique&#39;s edges currently</span>
+<span class="sd">            colored one (blue).</span>
+<span class="sd">        edges_per_clique (int): Total number of edges in one clique</span>
+<span class="sd">            (ten for K5).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int | None: ``0`` if every edge is color zero (red), ``1`` if</span>
+<span class="sd">        every edge is color one (blue), or ``None`` if the clique is</span>
+<span class="sd">        not monochromatic.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">color_one_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">return</span> <span class="mi">0</span>
     <span class="k">if</span> <span class="n">color_one_count</span> <span class="o">==</span> <span class="n">edges_per_clique</span><span class="p">:</span>
@@ -517,7 +689,22 @@
 <span class="k">def</span> <span class="nf">_verify_event_decomposition</span><span class="p">(</span>
     <span class="n">analysis</span><span class="p">:</span> <span class="n">REdgeFlipCausalAnalysis</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify that causal events exactly reconstruct both load deltas.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify that causal events exactly reconstruct both load deltas.</span>
+
+<span class="sd">    Replays every recorded :class:`RMonochromaticCliqueChange` event</span>
+<span class="sd">    and checks that the resulting per-vertex and per-edge deltas match</span>
+<span class="sd">    :attr:`REdgeFlipCausalAnalysis.vertex_participation_delta` and</span>
+<span class="sd">    :attr:`REdgeFlipCausalAnalysis.edge_participation_delta` exactly.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        analysis (REdgeFlipCausalAnalysis): Analysis whose event</span>
+<span class="sd">            decomposition should be checked for consistency.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If replaying the clique-change events does not</span>
+<span class="sd">            exactly reconstruct either the vertex or the edge</span>
+<span class="sd">            participation delta.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">vertex_delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span>
         <span class="n">analysis</span><span class="o">.</span><span class="n">vertex_participation_delta</span>
     <span class="p">)</span>

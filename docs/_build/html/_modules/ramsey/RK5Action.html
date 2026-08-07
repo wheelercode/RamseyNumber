@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,16 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RK5Action</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Objective-neutral analysis and application of K5 recoloring actions.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Objective-neutral analysis and application of K5 recoloring actions.</span>
+
+<span class="sd">A K5 recoloring action (or &quot;K5 pattern macro action&quot;) replaces the colors</span>
+<span class="sd">of all ten edges of one currently monochromatic K5 at once, choosing among</span>
+<span class="sd">the 1,022 nonmonochromatic ten-edge patterns. This module computes the</span>
+<span class="sd">exact score consequences of every such pattern for one target K5 and</span>
+<span class="sd">applies a chosen pattern to a search state. It is objective-neutral: it</span>
+<span class="sd">reports exact score reductions only and leaves any objective-specific</span>
+<span class="sd">reward shaping (such as danger-weighted rewards) to :mod:`ramsey.RK5Policy`.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -114,6 +127,16 @@
 <span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span>
     <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Copy an array-like value and mark the copy read-only.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        values (NDArray): Source array or array-like value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray: An independently owned copy with ``flags.writeable`` set</span>
+<span class="sd">        to ``False``, safe to expose on a frozen dataclass without risking</span>
+<span class="sd">        aliasing the caller&#39;s mutable buffers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
     <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
@@ -129,7 +152,40 @@
     <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RK5PatternAnalysis</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exact consequences of all 1,022 allowed patterns for one bad K5.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exact consequences of all 1,022 allowed patterns for one bad K5.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        source_state (RSearchState): Search state this analysis was</span>
+<span class="sd">            computed against; used together with ``state_version`` by</span>
+<span class="sd">            :meth:`applies_to` to detect staleness.</span>
+<span class="sd">        state_version (int): Value of ``source_state.version`` at the time</span>
+<span class="sd">            of analysis.</span>
+<span class="sd">        target_clique (int): Index of the analyzed monochromatic K5.</span>
+<span class="sd">        target_edges (NDArray[np.uint16]): The clique&#39;s ten host-graph</span>
+<span class="sd">            edge indices, in the canonical clique-edge ordering used to</span>
+<span class="sd">            interpret pattern IDs.</span>
+<span class="sd">        old_pattern_id (int): The clique&#39;s current pattern ID (0 if</span>
+<span class="sd">            entirely color zero, 1023 if entirely color one).</span>
+<span class="sd">        pattern_ids (NDArray[np.uint16]): The 1,022 nonmonochromatic</span>
+<span class="sd">            pattern IDs that were evaluated, i.e. ``K5_ALLOWED_PATTERN_IDS``.</span>
+<span class="sd">        histogram_deltas (NDArray[np.int32]): Shape ``(1022, 11)``. Row</span>
+<span class="sd">            ``i`` is the net change to every bin of the global color-one</span>
+<span class="sd">            edge-count histogram that would result from recoloring the</span>
+<span class="sd">            target clique to ``pattern_ids[i]``.</span>
+<span class="sd">        exact_rewards (NDArray[np.int32]): Shape ``(1022,)``. Exact score</span>
+<span class="sd">            reduction for applying each candidate pattern, derived from</span>
+<span class="sd">            the change to the two monochromatic histogram bins.</span>
+<span class="sd">        resulting_scores (NDArray[np.int32]): Shape ``(1022,)``. The</span>
+<span class="sd">            exact score the state would have after applying each</span>
+<span class="sd">            candidate pattern.</span>
+<span class="sd">        changed_edge_counts (NDArray[np.uint8]): Shape ``(1022,)``.</span>
+<span class="sd">            Number of the ten target edges whose color differs between</span>
+<span class="sd">            ``old_pattern_id`` and each candidate pattern.</span>
+<span class="sd">        affected_clique_count (int): Number of distinct K5s (including the</span>
+<span class="sd">            target) that share at least one edge with the target clique</span>
+<span class="sd">            and were therefore considered when aggregating histogram</span>
+<span class="sd">            effects.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
     <span class="n">state_version</span><span class="p">:</span> <span class="nb">int</span>
@@ -147,6 +203,14 @@
     <span class="n">affected_clique_count</span><span class="p">:</span> <span class="nb">int</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate array shapes and freeze all fields to owned, read-only copies.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``histogram_deltas``, ``exact_rewards``,</span>
+<span class="sd">                ``resulting_scores``, ``changed_edge_counts``, or</span>
+<span class="sd">                ``target_edges`` does not have the shape implied by the</span>
+<span class="sd">                number of evaluated patterns and ``K5_EDGE_COUNT``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">pattern_ids</span> <span class="o">=</span> <span class="n">_read_only_copy</span><span class="p">(</span>
             <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pattern_ids</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
         <span class="p">)</span>
@@ -213,6 +277,19 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this analysis still describes the given state.</span>
+
+<span class="sd">        Both object identity and state version are checked, so a state</span>
+<span class="sd">        that has been mutated since analysis, or a different state</span>
+<span class="sd">        entirely, is correctly rejected.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Candidate search state to check.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if ``state`` is the same object this analysis</span>
+<span class="sd">            was computed from and has not since been mutated.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span></div>
 </div>
 
@@ -221,6 +298,15 @@
 <span class="k">def</span> <span class="nf">_require_k5_state</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate that a search state is configured for K5 forbidden cliques.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to check.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the state&#39;s clique size is not 5 or its edge count</span>
+<span class="sd">            per clique is not ``K5_EDGE_COUNT``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">clique_size</span> <span class="o">!=</span> <span class="mi">5</span> <span class="ow">or</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span> <span class="o">!=</span> <span class="n">K5_EDGE_COUNT</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;K5 pattern actions require a K5 search state.&quot;</span><span class="p">)</span>
 
@@ -230,7 +316,24 @@
 <span class="k">def</span> <span class="nf">pattern_colors</span><span class="p">(</span>
     <span class="n">pattern_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the ten edge colors encoded by one nonmonochromatic pattern.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the ten edge colors encoded by one nonmonochromatic pattern.</span>
+
+<span class="sd">    Bit ``j`` of ``pattern_id`` is the requested color (0 or 1) of target</span>
+<span class="sd">    edge ``j`` in the canonical clique-edge ordering.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pattern_id (int): A nonmonochromatic ten-bit pattern ID between 1</span>
+<span class="sd">            and 1022 inclusive (0 and 1023 are excluded because they are</span>
+<span class="sd">            monochromatic).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.uint8]: Shape ``(10,)`` array of edge colors (0 or 1)</span>
+<span class="sd">            decoded from ``pattern_id``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``pattern_id`` is not an integer.</span>
+<span class="sd">        ValueError: If ``pattern_id`` is outside ``[1, 1022]``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pattern_id</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
         <span class="n">pattern_id</span><span class="p">,</span>
         <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
@@ -257,7 +360,23 @@
 <span class="k">def</span> <span class="nf">monochromatic_k5_indices</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return indexes of every currently monochromatic K5.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return indexes of every currently monochromatic K5.</span>
+
+<span class="sd">    A K5 is monochromatic (a &quot;bad&quot; K5, contributing to the exact score)</span>
+<span class="sd">    when its color-one edge count is either zero (all color zero) or</span>
+<span class="sd">    ``state.edges_per_clique`` (all color one).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to inspect.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.uint32]: Indices of every currently monochromatic K5,</span>
+<span class="sd">        in ascending clique-index order.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``state`` is not configured for K5 forbidden</span>
+<span class="sd">            cliques.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_require_k5_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
     <span class="n">counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span>
@@ -287,6 +406,24 @@
 <span class="sd">    small number of shared-edge masks actually occur.  This reduces the</span>
 <span class="sd">    1,022-pattern calculation from tens of millions of clique-by-pattern</span>
 <span class="sd">    operations to a small grouped table without losing information.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to analyze. Must be configured</span>
+<span class="sd">            for K5 forbidden cliques.</span>
+<span class="sd">        target_clique (int): Index of a currently monochromatic K5 to</span>
+<span class="sd">            evaluate replacement patterns for.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RK5PatternAnalysis: The exact score, histogram, and changed-edge</span>
+<span class="sd">        consequences of every one of the 1,022 nonmonochromatic patterns</span>
+<span class="sd">        for ``target_clique``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``state`` is not configured for K5 forbidden</span>
+<span class="sd">            cliques, or if ``target_clique`` is not currently</span>
+<span class="sd">            monochromatic.</span>
+<span class="sd">        TypeError: If ``target_clique`` is not an integer.</span>
+<span class="sd">        IndexError: If ``target_clique`` is out of range.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_require_k5_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
@@ -449,7 +586,32 @@
     <span class="n">target_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">pattern_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply one nonmonochromatic ten-edge K5 pattern exactly.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply one nonmonochromatic ten-edge K5 pattern exactly.</span>
+
+<span class="sd">    Recolors the target clique&#39;s ten edges to the colors encoded by</span>
+<span class="sd">    ``pattern_id``, via :meth:`RSearchState.apply_edge_recoloring`, which</span>
+<span class="sd">    mutates ``state`` in place and keeps all incrementally maintained</span>
+<span class="sd">    data (histogram, score, action-profile cache, version) consistent.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to mutate. Must be configured</span>
+<span class="sd">            for K5 forbidden cliques.</span>
+<span class="sd">        target_clique (int): Index of the K5 to recolor.</span>
+<span class="sd">        pattern_id (int): Nonmonochromatic pattern ID between 1 and 1022,</span>
+<span class="sd">            as decoded by :func:`pattern_colors`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: The exact score reduction produced by the recoloring; a</span>
+<span class="sd">        positive value means the score improved.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``state`` is not configured for K5 forbidden</span>
+<span class="sd">            cliques.</span>
+<span class="sd">        TypeError: If ``target_clique`` is not an integer, or if</span>
+<span class="sd">            ``pattern_id`` is not an integer (raised by</span>
+<span class="sd">            :func:`pattern_colors`).</span>
+<span class="sd">        IndexError: If ``target_clique`` is out of range.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_require_k5_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_clique</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>

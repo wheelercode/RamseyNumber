@@ -16,7 +16,36 @@ from .RRollout import RRolloutBatch
 
 @dataclass(frozen=True, slots=True)
 class RPPOConfig:
-    """Immutable hyperparameters for PPO parameter updates."""
+    """
+    Immutable hyperparameters for PPO parameter updates.
+
+    Attributes:
+        update_epochs (int): Number of full passes over one rollout's
+            samples performed by :func:`ppo_update`, each pass using
+            a fresh random minibatch permutation.
+        minibatch_size (int): Number of rollout steps per gradient
+            step within an epoch.
+        clip_ratio (float): PPO clipping parameter ``epsilon``
+            bounding the probability ratio to
+            ``[1 - clip_ratio, 1 + clip_ratio]`` in the clipped
+            surrogate objective.
+        value_loss_weight (float): Coefficient applied to the mean
+            squared-error value loss when it is added to the policy
+            loss to form the total loss. Defaults to ``0.0``, which
+            disables the value loss term entirely.
+        entropy_weight (float): Coefficient applied to the policy
+            entropy bonus, subtracted from the total loss to
+            encourage exploration. Defaults to ``0.0``, which
+            disables the entropy bonus.
+        maximum_gradient_norm (float): Maximum global gradient norm
+            used to clip gradients before each optimizer step.
+        learning_rate (float): Learning rate passed to the Adam
+            optimizer created by :func:`create_optimizer`.
+        target_kl (float | None): Optional approximate-KL threshold.
+            When the mean approximate KL over an epoch's minibatches
+            exceeds this value, :func:`ppo_update` stops taking
+            further epochs early. ``None`` disables early stopping.
+    """
 
     update_epochs: int = 4
     minibatch_size: int = 16
@@ -28,6 +57,25 @@ class RPPOConfig:
     target_kl: float | None = None
 
     def __post_init__(self) -> None:
+        """
+        Validate, coerce, and normalize every configuration field in place.
+
+        ``update_epochs`` and ``minibatch_size`` must be positive
+        integers; ``clip_ratio``, ``value_loss_weight``,
+        ``entropy_weight``, ``maximum_gradient_norm``, and
+        ``learning_rate`` must be nonnegative numeric values, with
+        ``clip_ratio``, ``maximum_gradient_norm``, and
+        ``learning_rate`` further required to be strictly positive.
+        ``target_kl`` must be ``None`` or a positive numeric value.
+        Fields are rewritten with their coerced ``int``/``float``
+        values via ``object.__setattr__`` because the dataclass is
+        frozen.
+
+        Raises:
+            TypeError: If a field has the wrong type (including
+                ``bool`` where an integer or float is expected).
+            ValueError: If a field fails its range check.
+        """
         for name in (
             "update_epochs",
             "minibatch_size",
@@ -103,7 +151,39 @@ class RPPOConfig:
 
 @dataclass(frozen=True, slots=True)
 class RPPOMetrics:
-    """Aggregated diagnostics from one PPO update."""
+    """
+    Aggregated diagnostics from one PPO update.
+
+    Each scalar field is the mean of the corresponding per-minibatch
+    quantity across every minibatch processed by :func:`ppo_update`,
+    over however many epochs actually ran.
+
+    Attributes:
+        policy_loss (float): Mean clipped surrogate policy loss
+            (negated, so lower is better) across processed
+            minibatches.
+        value_loss (float): Mean squared-error value loss across
+            processed minibatches.
+        entropy (float): Mean policy entropy across processed
+            minibatches.
+        approximate_kl (float): Mean nonnegative approximate
+            KL-divergence estimate ``ratio - 1 - log(ratio)`` between
+            the old and updated policy, averaged across processed
+            minibatches.
+        clipped_fraction (float): Mean fraction of samples per
+            minibatch whose probability ratio fell outside
+            ``[1 - clip_ratio, 1 + clip_ratio]``.
+        gradient_norm (float): Mean global gradient norm observed
+            before clipping, across processed minibatches.
+        minibatch_updates (int): Total number of minibatch gradient
+            steps performed across all completed epochs.
+        epochs_completed (int): Number of epochs actually run, which
+            may be less than ``config.update_epochs`` when early
+            stopping triggers.
+        early_stopped (bool): Whether the update loop stopped before
+            ``config.update_epochs`` epochs because the mean
+            approximate KL for an epoch exceeded ``config.target_kl``.
+    """
 
     policy_loss: float
     value_loss: float
@@ -118,7 +198,13 @@ class RPPOMetrics:
     def as_dict(
         self,
     ) -> dict[str, float | int | bool]:
-        """Return metrics in a logging-friendly dictionary."""
+        """
+        Return metrics in a logging-friendly dictionary.
+
+        Returns:
+            dict[str, float | int | bool]: One entry per field of
+            this dataclass, keyed by field name.
+        """
 
         return {
             "policy_loss": self.policy_loss,
@@ -137,7 +223,20 @@ def create_optimizer(
     network: RPairPolicyValueNetwork,
     config: RPPOConfig,
 ) -> torch.optim.Adam:
-    """Create the standard Adam optimizer used by PPO."""
+    """
+    Create the standard Adam optimizer used by PPO.
+
+    Args:
+        network (RPairPolicyValueNetwork): Policy/value network whose
+            parameters will be optimized.
+        config (RPPOConfig): PPO configuration supplying
+            ``learning_rate``.
+
+    Returns:
+        torch.optim.Adam: Optimizer constructed over
+            ``network.parameters()`` with learning rate
+            ``config.learning_rate``.
+    """
 
     return torch.optim.Adam(
         network.parameters(),
@@ -156,7 +255,54 @@ def ppo_update(
     Train the policy/value network using one collected rollout.
 
     The rollout remains CPU-resident while the tensors required for
-    this update are copied to the requested training device.
+    this update are copied to the requested training device. For
+    ``config.update_epochs`` epochs, the rollout's steps are shuffled
+    into a new random permutation and split into minibatches of
+    ``config.minibatch_size`` steps. For each minibatch, the network
+    is re-evaluated on the stored ``pair_inputs``/``available_masks``
+    to obtain new action log-probabilities, a new value prediction,
+    and the action distribution's entropy, and the following clipped
+    PPO loss is minimized::
+
+        ratio = exp(new_log_prob - old_log_prob)
+        unclipped = ratio * advantage
+        clipped = clamp(ratio, 1 - clip_ratio, 1 + clip_ratio) * advantage
+        policy_loss = -mean(min(unclipped, clipped))
+        value_loss = mean((predicted_value - return) ** 2)
+        total_loss = policy_loss
+            + value_loss_weight * value_loss
+            - entropy_weight * entropy
+
+    ``total_loss`` is backpropagated, gradients are clipped to
+    ``config.maximum_gradient_norm`` by global norm, and one Adam
+    step is taken per minibatch. After each epoch, if
+    ``config.target_kl`` is set and the epoch's mean approximate KL
+    exceeds it, training stops early before starting another epoch.
+    The network is set to training mode (``network.train()``) for the
+    duration of the update.
+
+    Args:
+        network (RPairPolicyValueNetwork): Policy/value network being
+            trained. Must already reside on ``device``.
+        optimizer (torch.optim.Optimizer): Optimizer stepping
+            ``network``'s parameters, typically created by
+            :func:`create_optimizer`.
+        rollout (RRolloutBatch): CPU-resident rollout supplying
+            per-step inputs, masks, actions, old log-probabilities,
+            advantages, and returns.
+        device (torch.device | str): Device the rollout tensors are
+            copied to for the update; must match the device
+            ``network`` already resides on.
+        config (RPPOConfig): PPO hyperparameters controlling epochs,
+            minibatch size, clipping, loss weights, gradient clipping,
+            and early stopping.
+
+    Returns:
+        RPPOMetrics: Diagnostics averaged over every minibatch update
+        actually performed.
+
+    Raises:
+        ValueError: If ``rollout`` contains zero steps.
     """
 
     number_of_samples = rollout.number_of_steps

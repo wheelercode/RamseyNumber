@@ -18,7 +18,25 @@ from .RPolicy import RPolicy
 
 @dataclass(frozen=True, slots=True)
 class RFlexibilityPolicyConfig:
-    """Configure when and how the policy buys back flexibility."""
+    """Configure when and how the policy buys back flexibility.
+
+    Attributes:
+        budgets (tuple[int, ...]): Strictly increasing, non-negative
+            damage budgets used to build flexibility profiles. Defaults
+            to :data:`RFlexibility.DEFAULT_FLEXIBILITY_BUDGETS`.
+        monitor_budget (int): The single budget ``b`` whose F(b) is
+            monitored as the policy's maneuverability reserve; must be
+            one of the values in ``budgets``.
+        flexibility_floor (float): Threshold in ``[0.0, 1.0]`` on the
+            monitored F(``monitor_budget``). Above this floor the
+            policy follows ordinary exact greedy score.
+        maximum_temporary_damage (int): When the monitored flexibility
+            is below the floor, allow score-neutral actions and
+            temporary worsening up to this amount, then maximize future
+            F(``monitor_budget``). Positive-reward actions remain
+            candidates; they simply stop receiving automatic priority
+            over structurally more flexible alternatives.
+    """
 
     budgets: tuple[int, ...] = DEFAULT_FLEXIBILITY_BUDGETS
 
@@ -35,6 +53,18 @@ class RFlexibilityPolicyConfig:
     maximum_temporary_damage: int = 5
 
     def __post_init__(self) -> None:
+        """Validate and normalize all configuration fields.
+
+        Raises:
+            TypeError: If ``monitor_budget`` is not an integer, if
+                ``flexibility_floor`` is not numeric, or if
+                ``maximum_temporary_damage`` is not an integer.
+            ValueError: If ``budgets`` fails the canonical budget
+                validation (see :func:`RFlexibility.calculate_flexibility`),
+                if ``monitor_budget`` is not present in ``budgets``, if
+                ``flexibility_floor`` is outside ``[0.0, 1.0]``, or if
+                ``maximum_temporary_damage`` is negative.
+        """
         # Reuse the canonical budget validation.
         probe = calculate_flexibility(
             np.asarray([0], dtype=np.int32),
@@ -85,7 +115,26 @@ class RFlexibilityPolicyConfig:
 
 @dataclass(frozen=True, slots=True)
 class RFlexibilityPolicyDecision:
-    """Explain one adaptive policy choice for experiment reporting."""
+    """Explain one adaptive policy choice for experiment reporting.
+
+    Attributes:
+        edge (int): Index of the selected host-graph edge.
+        mode (str): ``"score"`` if the choice followed ordinary exact
+            greedy score, or ``"flexibility"`` if it was made to
+            maximize future maneuverability because the monitored
+            flexibility was below the configured floor.
+        immediate_reward (int): Exact immediate reward (score
+            reduction) of the selected edge.
+        current_flexibility (float): F(``monitor_budget``) measured
+            over the complete action space before selecting an edge.
+        resulting_flexibility (float | None): F(``monitor_budget``)
+            after taking the selected action, or ``None`` in
+            ``"score"`` mode where it was not computed.
+        candidate_count (int): Number of edges considered when making
+            the final selection (available best-reward edges in
+            ``"score"`` mode, or flexibility-landscape candidate edges
+            in ``"flexibility"`` mode).
+    """
 
     edge: int
     mode: str
@@ -100,7 +149,40 @@ def select_flexibility_action(
     rng: np.random.Generator,
     config: RFlexibilityPolicyConfig,
 ) -> RFlexibilityPolicyDecision:
-    """Select one edge while preserving a configurable flexibility reserve."""
+    """Select one edge while preserving a configurable flexibility reserve.
+
+    Measures the current structural flexibility F(``monitor_budget``)
+    over the complete action space (not just currently available
+    actions). If that flexibility is at or above
+    ``config.flexibility_floor``, the policy behaves as ordinary exact
+    greedy search: it picks uniformly among available edges achieving
+    the maximum immediate reward (``mode="score"``).
+
+    Otherwise, the policy treats flexibility as a resource to protect:
+    it restricts candidates to available edges whose reward is at least
+    ``-config.maximum_temporary_damage`` (falling back to the
+    least-damaging available edges if none qualify), simulates each
+    candidate flip, and selects the candidate that maximizes the
+    resulting F(``monitor_budget``), breaking ties by the largest
+    immediate reward and then uniformly at random (``mode="flexibility"``).
+
+    Args:
+        environment (REnvironment): Environment supplying the current
+            search state, action analysis, and available-action mask.
+        rng (numpy.random.Generator): Random source used to break ties
+            uniformly.
+        config (RFlexibilityPolicyConfig): Budgets, monitored budget,
+            flexibility floor, and temporary-damage allowance governing
+            the decision.
+
+    Returns:
+        RFlexibilityPolicyDecision: The selected edge together with the
+        mode used and the flexibility/reward measurements behind the
+        choice.
+
+    Raises:
+        RuntimeError: If no action is available in the current state.
+    """
     environment_analysis = environment.analyze_actions()
     action_analysis = environment_analysis.action_analysis
     rewards = action_analysis.immediate_rewards
@@ -178,20 +260,44 @@ def select_flexibility_action(
 
 @dataclass(slots=True)
 class RFlexibilityPolicy(RPolicy):
-    """RPolicy adapter for adaptive score/flexibility selection."""
+    """RPolicy adapter for adaptive score/flexibility selection.
+
+    Wraps :func:`select_flexibility_action` as an :class:`RPolicy`,
+    following ordinary exact greedy score while flexibility remains
+    ample and switching to flexibility-preserving selection when it
+    drops below the configured floor.
+
+    Attributes:
+        rng (numpy.random.Generator): Random source used to break ties
+            uniformly.
+        config (RFlexibilityPolicyConfig): Budgets, monitored budget,
+            flexibility floor, and temporary-damage allowance governing
+            the policy's decisions.
+    """
 
     rng: np.random.Generator
     config: RFlexibilityPolicyConfig = RFlexibilityPolicyConfig()
 
     @property
     def name(self) -> str:
+        """str: Stable identifier for this policy, ``"adaptive-flexibility"``."""
         return "adaptive-flexibility"
 
     @property
     def requires_full_analysis(self) -> bool:
+        """bool: Always ``True``; this policy needs the complete action analysis."""
         return True
 
     def select_action(self, environment: REnvironment) -> int:
+        """Select an edge using :func:`select_flexibility_action`.
+
+        Args:
+            environment (REnvironment): Environment supplying the
+                current search state and action analysis.
+
+        Returns:
+            int: Index of the selected host-graph edge.
+        """
         return select_flexibility_action(
             environment,
             self.rng,

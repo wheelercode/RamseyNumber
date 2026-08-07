@@ -21,6 +21,20 @@ from .RSearch import (
 class RExperimentConfig:
     """
     Immutable settings for a sequence of search attempts.
+
+    Attributes:
+        run_name (str): Nonempty label identifying this experiment run,
+            recorded with any archived colorings.
+        iterations (int): Number of search attempts to run, starting
+            at ``start_iteration``.
+        start_iteration (int): Iteration number of the first attempt.
+            Useful for resuming a run's numbering. Defaults to 0.
+        record_steps (bool): Whether each attempt's :class:`RSearch`
+            run keeps every intermediate ``RStepResult``. Defaults to
+            False.
+        stop_on_solution (bool): Whether to stop issuing further
+            iterations as soon as one attempt reaches an exact score
+            of zero. Defaults to True.
     """
 
     run_name: str
@@ -31,6 +45,16 @@ class RExperimentConfig:
     stop_on_solution: bool = True
 
     def __post_init__(self) -> None:
+        """Validate the configured field values.
+
+        Raises:
+            ValueError: If ``run_name`` is empty or whitespace-only,
+                ``iterations`` is not positive, or ``start_iteration``
+                is negative.
+            TypeError: If ``iterations`` or ``start_iteration`` is not
+                an integer, or if ``record_steps`` or
+                ``stop_on_solution`` is not a ``bool``.
+        """
         if not isinstance(self.run_name, str) or not self.run_name.strip():
             raise ValueError("run_name must be a nonempty string.")
 
@@ -69,6 +93,18 @@ class RExperimentConfig:
 class RExperimentIteration:
     """
     Outcome and archive metadata for one search attempt.
+
+    Attributes:
+        iteration (int): Iteration number of this attempt.
+        construction_name (str): Name of the construction that
+            produced the seed coloring.
+        search_result (RSearchResult): Complete outcome of the search
+            attempt.
+        archive_record (RArchiveRecord | None): Record describing
+            where/how the best coloring was archived, or ``None`` if
+            the experiment has no archive.
+        new_archive_best (bool): True if ``archive_record`` improved
+            on the archive's previous best score for this graph.
     """
 
     iteration: int
@@ -84,6 +120,14 @@ class RExperimentIteration:
 class RExperimentResult:
     """
     Immutable outcome of a complete experiment run.
+
+    Attributes:
+        run_name (str): Label identifying the experiment run.
+        requested_iterations (int): Number of iterations that were
+            requested via :class:`RExperimentConfig`; may exceed
+            ``completed_iterations`` if the run stopped early.
+        iteration_results (tuple[RExperimentIteration, ...]): Outcome
+            of each attempt actually completed, in order.
     """
 
     run_name: str
@@ -95,6 +139,9 @@ class RExperimentResult:
     def completed_iterations(self) -> int:
         """
         Return the number of attempts actually completed.
+
+        Returns:
+            int: Length of ``iteration_results``.
         """
         return len(self.iteration_results)
 
@@ -104,6 +151,13 @@ class RExperimentResult:
     ) -> RExperimentIteration:
         """
         Return the iteration having the lowest best score.
+
+        Returns:
+            RExperimentIteration: The iteration result whose
+            ``search_result.best_score`` is lowest.
+
+        Raises:
+            RuntimeError: If no iterations completed.
         """
         if not self.iteration_results:
             raise RuntimeError("Experiment contains no iteration results.")
@@ -117,6 +171,12 @@ class RExperimentResult:
     def best_score(self) -> int:
         """
         Return the lowest exact score found.
+
+        Returns:
+            int: ``best_iteration.search_result.best_score``.
+
+        Raises:
+            RuntimeError: If no iterations completed.
         """
         return self.best_iteration.search_result.best_score
 
@@ -124,10 +184,17 @@ class RExperimentResult:
     def solved(self) -> bool:
         """
         Return whether any iteration reached score zero.
+
+        Returns:
+            bool: True if ``best_score`` is zero.
+
+        Raises:
+            RuntimeError: If no iterations completed.
         """
         return self.best_score == 0
 
 
+#: Callback invoked with each :class:`RExperimentIteration` as it completes.
 RExperimentObserver = Callable[
     [RExperimentIteration],
     None,
@@ -150,6 +217,23 @@ class RExperiment:
         search: RSearch,
         archive: RArchive | None = None,
     ) -> None:
+        """Bind an experiment to a graph, construction, search, and archive.
+
+        Args:
+            graph (RGraph): Host graph attempts are run against; must
+                describe the same problem as ``search.environment.graph``.
+            construction (RConstruction): Seed-coloring generator used
+                once per iteration.
+            search (RSearch): Search coordinator run against each seed
+                coloring.
+            archive (RArchive | None): Optional store for best
+                colorings found by each iteration. When omitted, no
+                archiving occurs.
+
+        Raises:
+            ValueError: If ``search.environment.graph.problem`` does
+                not match ``graph.problem``.
+        """
         if search.environment.graph.problem != graph.problem:
             raise ValueError(
                 "Search environment problem does not " "match experiment graph."
@@ -162,22 +246,34 @@ class RExperiment:
 
     @property
     def graph(self) -> RGraph:
+        """
+        Return the host graph attempts are run against.
+        """
         return self._graph
 
     @property
     def construction(
         self,
     ) -> RConstruction:
+        """
+        Return the seed-coloring construction used each iteration.
+        """
         return self._construction
 
     @property
     def search(self) -> RSearch:
+        """
+        Return the search coordinator run against each seed coloring.
+        """
         return self._search
 
     @property
     def archive(
         self,
     ) -> RArchive | None:
+        """
+        Return the archive best colorings are saved to, if any.
+        """
         return self._archive
 
     def run(
@@ -189,9 +285,28 @@ class RExperiment:
         """
         Run the configured sequence of search attempts.
 
-        The observer, when supplied, is called after each completed
-        iteration. It can print progress, update a notebook, write
-        additional logs, or perform other external reporting.
+        For each iteration this constructs a seed coloring, runs it
+        through the search coordinator to termination or truncation,
+        optionally saves the best coloring to the archive, and reports
+        the outcome to ``observer``. The observer, when supplied, is
+        called after each completed iteration. It can print progress,
+        update a notebook, write additional logs, or perform other
+        external reporting. If ``config.stop_on_solution`` is true and
+        an iteration reaches an exact score of zero, no further
+        iterations are attempted.
+
+        Args:
+            config (RExperimentConfig): Settings governing how many
+                iterations to run and how to run them.
+            observer (RExperimentObserver | None): Optional callback
+                invoked with each completed iteration's result.
+
+        Returns:
+            RExperimentResult: Immutable summary of every completed
+            iteration.
+
+        Raises:
+            TypeError: If ``observer`` is supplied and is not callable.
         """
         if observer is not None and not callable(observer):
             raise TypeError("observer must be callable.")

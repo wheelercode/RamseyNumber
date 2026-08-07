@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -92,7 +96,25 @@
     <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RVertexBalancePolicyConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configure greedy selection among balance-improving transfers.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configure greedy selection among balance-improving transfers.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        use_danger_reward (bool): If ``True``, rank candidate transfers</span>
+<span class="sd">            by the decayed danger-energy reward computed from their</span>
+<span class="sd">            histogram deltas (see</span>
+<span class="sd">            :func:`~ramsey.RObjective.all_danger_rewards`). If</span>
+<span class="sd">            ``False``, rank by each transfer&#39;s exact score reward.</span>
+<span class="sd">            Defaults to ``True``.</span>
+<span class="sd">        danger_decay (float): Decay factor passed to the danger-reward</span>
+<span class="sd">            calculation; eagerly validated in :meth:`__post_init__`.</span>
+<span class="sd">            Defaults to ``0.25``.</span>
+<span class="sd">        prioritize_balance (bool): If ``True``, balance reduction is</span>
+<span class="sd">            the primary objective and the selected reward (danger or</span>
+<span class="sd">            exact) is used only as a tie-breaker among transfers that</span>
+<span class="sd">            achieve the maximum balance reward. If ``False``, the</span>
+<span class="sd">            selected reward chooses among all moves that still</span>
+<span class="sd">            strictly improve vertex balance. Defaults to ``True``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">use_danger_reward</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="n">danger_decay</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.25</span>
@@ -103,6 +125,14 @@
     <span class="n">prioritize_balance</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate configuration types and eagerly validate ``danger_decay``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``use_danger_reward`` or</span>
+<span class="sd">                ``prioritize_balance`` is not a ``bool``.</span>
+<span class="sd">            ValueError: If ``danger_decay`` is not a valid decay factor</span>
+<span class="sd">                for :func:`~ramsey.RObjective.danger_weights`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">use_danger_reward</span><span class="p">,</span>
             <span class="nb">bool</span><span class="p">,</span>
@@ -133,7 +163,21 @@
     <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RVertexBalanceSelection</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One balance transfer selected by the greedy policy.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One balance transfer selected by the greedy policy.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        transfer (RVertexBalanceTransfer): The selected transfer.</span>
+<span class="sd">        balance_reward (int): Exact reduction in vertex color-balance</span>
+<span class="sd">            energy the transfer produces.</span>
+<span class="sd">        exact_reward (int): Exact score reduction the transfer</span>
+<span class="sd">            produces.</span>
+<span class="sd">        objective_reward (float): Reward used to rank the transfer</span>
+<span class="sd">            among its eligible competitors -- either the danger-energy</span>
+<span class="sd">            reward or the exact score reward, depending on</span>
+<span class="sd">            configuration.</span>
+<span class="sd">        resulting_score (int): Exact score that would result from</span>
+<span class="sd">            applying the transfer.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">transfer</span><span class="p">:</span> <span class="n">RVertexBalanceTransfer</span>
     <span class="n">balance_reward</span><span class="p">:</span> <span class="nb">int</span>
@@ -149,7 +193,32 @@
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">RVertexBalancePolicyConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RVertexBalanceSelection</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Select one balance-improving pivot transfer without mutation.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Select one balance-improving pivot transfer without mutation.</span>
+
+<span class="sd">    Analyzes every candidate transfer for ``state``, computes each</span>
+<span class="sd">    transfer&#39;s objective reward (danger-energy or exact score</span>
+<span class="sd">    reduction, per ``config.use_danger_reward``), optionally restricts</span>
+<span class="sd">    eligibility to transfers achieving the maximum balance reward (per</span>
+<span class="sd">    ``config.prioritize_balance``), and returns the highest-reward</span>
+<span class="sd">    eligible transfer. The transfer is only selected, not applied; use</span>
+<span class="sd">    :func:`~ramsey.RVertexBalanceAction.apply_vertex_balance_transfer`</span>
+<span class="sd">    to mutate ``state``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to analyze.</span>
+<span class="sd">        config (RVertexBalancePolicyConfig | None): Selection</span>
+<span class="sd">            configuration. Defaults to a freshly constructed</span>
+<span class="sd">            ``RVertexBalancePolicyConfig()`` when ``None``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RVertexBalanceSelection: The selected transfer together with</span>
+<span class="sd">        its balance, exact, and objective rewards, and its resulting</span>
+<span class="sd">        score.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If ``state`` currently has no candidate</span>
+<span class="sd">            vertex-balance transfers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">config</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">config</span>
         <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>

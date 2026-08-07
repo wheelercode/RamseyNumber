@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -80,6 +84,15 @@
 
 
 <span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an owned, read-only copy of ``array``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        array (numpy.ndarray): Source array or array-like value to copy.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: A new array that owns its memory, with the</span>
+<span class="sd">        ``writeable`` flag cleared.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
     <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="k">return</span> <span class="n">result</span>
@@ -89,7 +102,24 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipability.REdgeFlipabilityAnalysis">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">REdgeFlipabilityAnalysis</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Per-edge K5 role profiles and discrete flipability totals.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Per-edge K5 role profiles and discrete flipability totals.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        source_state (RSearchState): Search state this analysis</span>
+<span class="sd">            describes.</span>
+<span class="sd">        state_version (int): Version of ``source_state`` at the time of</span>
+<span class="sd">            analysis, used by :meth:`applies_to` to detect staleness.</span>
+<span class="sd">        role_profiles (numpy.ndarray): Read-only ``uint16`` array of</span>
+<span class="sd">            shape ``(number_of_edges, edges_per_clique)``.</span>
+<span class="sd">            ``role_profiles[e, k - 1]`` is the number of K5s containing</span>
+<span class="sd">            edge ``e`` in which exactly ``k`` of the ten K5 edges have</span>
+<span class="sd">            ``e``&#39;s current color.</span>
+<span class="sd">        flipabilities (numpy.ndarray): Read-only ``int64`` array of</span>
+<span class="sd">            shape ``(number_of_edges,)``. The sum of discrete local</span>
+<span class="sd">            flipability (``k - 1``) across every K5 containing each</span>
+<span class="sd">            edge; see :func:`calculate_edge_flipability` for the exact</span>
+<span class="sd">            definition.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
     <span class="n">state_version</span><span class="p">:</span> <span class="nb">int</span>
@@ -104,6 +134,14 @@
     <span class="n">flipabilities</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate array shapes and non-negativity, then freeze them.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``role_profiles`` does not have shape</span>
+<span class="sd">                ``(number_of_edges, edges_per_clique)``, if</span>
+<span class="sd">                ``flipabilities`` does not have one value per edge, or</span>
+<span class="sd">                if any flipability value is negative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">number_of_edges</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span><span class="o">.</span><span class="n">number_of_edges</span>
         <span class="n">edges_per_clique</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span><span class="o">.</span><span class="n">edges_per_clique</span>
 
@@ -142,7 +180,16 @@
 <div class="viewcode-block" id="REdgeFlipabilityAnalysis.applies_to">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipability.REdgeFlipabilityAnalysis.applies_to">[docs]</a>
     <span class="k">def</span> <span class="nf">applies_to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this analysis still describes ``state``.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this analysis still describes ``state``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Candidate state to check.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if ``state`` is the same object as</span>
+<span class="sd">            :attr:`source_state` and has not been mutated since (its</span>
+<span class="sd">            version still matches :attr:`state_version`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span>
             <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span>
@@ -152,7 +199,16 @@
 <div class="viewcode-block" id="REdgeFlipabilityAnalysis.summary">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipability.REdgeFlipabilityAnalysis.summary">[docs]</a>
     <span class="k">def</span> <span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return compact distribution statistics for the state.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return compact distribution statistics for the state.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, int | float]: Mean, standard deviation, min, max,</span>
+<span class="sd">            and the 5th/50th/95th percentiles of :attr:`flipabilities`,</span>
+<span class="sd">            keyed by ``flipability_mean``, ``flipability_std``,</span>
+<span class="sd">            ``flipability_min``, ``flipability_max``,</span>
+<span class="sd">            ``flipability_p05``, ``flipability_p50``, and</span>
+<span class="sd">            ``flipability_p95``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">flipabilities</span>
 
         <span class="k">return</span> <span class="p">{</span>
@@ -192,6 +248,31 @@
 <span class="sd">    Every edge of the same complete host graph participates in the same</span>
 <span class="sd">    number of K5s, so the totals are directly comparable without an</span>
 <span class="sd">    arbitrary continuous weighting.</span>
+
+<span class="sd">    Note that flipability is a purely structural, color-agnostic count</span>
+<span class="sd">    of same-color neighbors within incident K5s. It does not measure</span>
+<span class="sd">    exact score reward (see ``RAction.analyze_actions``); an edge can</span>
+<span class="sd">    have high flipability while its exact reward for flipping is small</span>
+<span class="sd">    or negative, or vice versa.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state whose edges are analyzed.</span>
+<span class="sd">        analysis (RActionAnalysis | None): Optional pre-computed action</span>
+<span class="sd">            analysis for ``state`` to reuse its clique-count profiles</span>
+<span class="sd">            instead of recomputing them. Must satisfy</span>
+<span class="sd">            ``analysis.applies_to(state)`` when supplied.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        REdgeFlipabilityAnalysis: Per-edge K5 role profiles and the</span>
+<span class="sd">        discrete global flipability total for every host-graph edge.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the host graph&#39;s problem does not use exactly</span>
+<span class="sd">            two colors, if ``analysis`` is supplied but does not apply</span>
+<span class="sd">            to ``state``.</span>
+<span class="sd">        RuntimeError: If the computed role profiles do not account for</span>
+<span class="sd">            every clique incident to an edge (an internal consistency</span>
+<span class="sd">            check).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>

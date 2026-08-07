@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -88,7 +92,25 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.RFlexibilityPolicyConfig">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RFlexibilityPolicyConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configure when and how the policy buys back flexibility.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configure when and how the policy buys back flexibility.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        budgets (tuple[int, ...]): Strictly increasing, non-negative</span>
+<span class="sd">            damage budgets used to build flexibility profiles. Defaults</span>
+<span class="sd">            to :data:`RFlexibility.DEFAULT_FLEXIBILITY_BUDGETS`.</span>
+<span class="sd">        monitor_budget (int): The single budget ``b`` whose F(b) is</span>
+<span class="sd">            monitored as the policy&#39;s maneuverability reserve; must be</span>
+<span class="sd">            one of the values in ``budgets``.</span>
+<span class="sd">        flexibility_floor (float): Threshold in ``[0.0, 1.0]`` on the</span>
+<span class="sd">            monitored F(``monitor_budget``). Above this floor the</span>
+<span class="sd">            policy follows ordinary exact greedy score.</span>
+<span class="sd">        maximum_temporary_damage (int): When the monitored flexibility</span>
+<span class="sd">            is below the floor, allow score-neutral actions and</span>
+<span class="sd">            temporary worsening up to this amount, then maximize future</span>
+<span class="sd">            F(``monitor_budget``). Positive-reward actions remain</span>
+<span class="sd">            candidates; they simply stop receiving automatic priority</span>
+<span class="sd">            over structurally more flexible alternatives.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">budgets</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_FLEXIBILITY_BUDGETS</span>
 
@@ -105,6 +127,18 @@
     <span class="n">maximum_temporary_damage</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize all configuration fields.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``monitor_budget`` is not an integer, if</span>
+<span class="sd">                ``flexibility_floor`` is not numeric, or if</span>
+<span class="sd">                ``maximum_temporary_damage`` is not an integer.</span>
+<span class="sd">            ValueError: If ``budgets`` fails the canonical budget</span>
+<span class="sd">                validation (see :func:`RFlexibility.calculate_flexibility`),</span>
+<span class="sd">                if ``monitor_budget`` is not present in ``budgets``, if</span>
+<span class="sd">                ``flexibility_floor`` is outside ``[0.0, 1.0]``, or if</span>
+<span class="sd">                ``maximum_temporary_damage`` is negative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Reuse the canonical budget validation.</span>
         <span class="n">probe</span> <span class="o">=</span> <span class="n">calculate_flexibility</span><span class="p">(</span>
             <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
@@ -158,7 +192,26 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.RFlexibilityPolicyDecision">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RFlexibilityPolicyDecision</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Explain one adaptive policy choice for experiment reporting.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Explain one adaptive policy choice for experiment reporting.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        edge (int): Index of the selected host-graph edge.</span>
+<span class="sd">        mode (str): ``&quot;score&quot;`` if the choice followed ordinary exact</span>
+<span class="sd">            greedy score, or ``&quot;flexibility&quot;`` if it was made to</span>
+<span class="sd">            maximize future maneuverability because the monitored</span>
+<span class="sd">            flexibility was below the configured floor.</span>
+<span class="sd">        immediate_reward (int): Exact immediate reward (score</span>
+<span class="sd">            reduction) of the selected edge.</span>
+<span class="sd">        current_flexibility (float): F(``monitor_budget``) measured</span>
+<span class="sd">            over the complete action space before selecting an edge.</span>
+<span class="sd">        resulting_flexibility (float | None): F(``monitor_budget``)</span>
+<span class="sd">            after taking the selected action, or ``None`` in</span>
+<span class="sd">            ``&quot;score&quot;`` mode where it was not computed.</span>
+<span class="sd">        candidate_count (int): Number of edges considered when making</span>
+<span class="sd">            the final selection (available best-reward edges in</span>
+<span class="sd">            ``&quot;score&quot;`` mode, or flexibility-landscape candidate edges</span>
+<span class="sd">            in ``&quot;flexibility&quot;`` mode).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span>
@@ -176,7 +229,40 @@
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">RFlexibilityPolicyConfig</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RFlexibilityPolicyDecision</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Select one edge while preserving a configurable flexibility reserve.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Select one edge while preserving a configurable flexibility reserve.</span>
+
+<span class="sd">    Measures the current structural flexibility F(``monitor_budget``)</span>
+<span class="sd">    over the complete action space (not just currently available</span>
+<span class="sd">    actions). If that flexibility is at or above</span>
+<span class="sd">    ``config.flexibility_floor``, the policy behaves as ordinary exact</span>
+<span class="sd">    greedy search: it picks uniformly among available edges achieving</span>
+<span class="sd">    the maximum immediate reward (``mode=&quot;score&quot;``).</span>
+
+<span class="sd">    Otherwise, the policy treats flexibility as a resource to protect:</span>
+<span class="sd">    it restricts candidates to available edges whose reward is at least</span>
+<span class="sd">    ``-config.maximum_temporary_damage`` (falling back to the</span>
+<span class="sd">    least-damaging available edges if none qualify), simulates each</span>
+<span class="sd">    candidate flip, and selects the candidate that maximizes the</span>
+<span class="sd">    resulting F(``monitor_budget``), breaking ties by the largest</span>
+<span class="sd">    immediate reward and then uniformly at random (``mode=&quot;flexibility&quot;``).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        environment (REnvironment): Environment supplying the current</span>
+<span class="sd">            search state, action analysis, and available-action mask.</span>
+<span class="sd">        rng (numpy.random.Generator): Random source used to break ties</span>
+<span class="sd">            uniformly.</span>
+<span class="sd">        config (RFlexibilityPolicyConfig): Budgets, monitored budget,</span>
+<span class="sd">            flexibility floor, and temporary-damage allowance governing</span>
+<span class="sd">            the decision.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RFlexibilityPolicyDecision: The selected edge together with the</span>
+<span class="sd">        mode used and the flexibility/reward measurements behind the</span>
+<span class="sd">        choice.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If no action is available in the current state.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">environment_analysis</span> <span class="o">=</span> <span class="n">environment</span><span class="o">.</span><span class="n">analyze_actions</span><span class="p">()</span>
     <span class="n">action_analysis</span> <span class="o">=</span> <span class="n">environment_analysis</span><span class="o">.</span><span class="n">action_analysis</span>
     <span class="n">rewards</span> <span class="o">=</span> <span class="n">action_analysis</span><span class="o">.</span><span class="n">immediate_rewards</span>
@@ -257,22 +343,46 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.RFlexibilityPolicy">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RFlexibilityPolicy</span><span class="p">(</span><span class="n">RPolicy</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;RPolicy adapter for adaptive score/flexibility selection.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;RPolicy adapter for adaptive score/flexibility selection.</span>
+
+<span class="sd">    Wraps :func:`select_flexibility_action` as an :class:`RPolicy`,</span>
+<span class="sd">    following ordinary exact greedy score while flexibility remains</span>
+<span class="sd">    ample and switching to flexibility-preserving selection when it</span>
+<span class="sd">    drops below the configured floor.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rng (numpy.random.Generator): Random source used to break ties</span>
+<span class="sd">            uniformly.</span>
+<span class="sd">        config (RFlexibilityPolicyConfig): Budgets, monitored budget,</span>
+<span class="sd">            flexibility floor, and temporary-damage allowance governing</span>
+<span class="sd">            the policy&#39;s decisions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">RFlexibilityPolicyConfig</span> <span class="o">=</span> <span class="n">RFlexibilityPolicyConfig</span><span class="p">()</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;str: Stable identifier for this policy, ``&quot;adaptive-flexibility&quot;``.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;adaptive-flexibility&quot;</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">requires_full_analysis</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Always ``True``; this policy needs the complete action analysis.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">True</span>
 
 <div class="viewcode-block" id="RFlexibilityPolicy.select_action">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.RFlexibilityPolicy.select_action">[docs]</a>
     <span class="k">def</span> <span class="nf">select_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Select an edge using :func:`select_flexibility_action`.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment supplying the</span>
+<span class="sd">                current search state and action analysis.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Index of the selected host-graph edge.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">select_flexibility_action</span><span class="p">(</span>
             <span class="n">environment</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="p">,</span>

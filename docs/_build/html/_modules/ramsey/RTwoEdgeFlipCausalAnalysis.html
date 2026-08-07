@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -91,7 +95,48 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RTwoEdgeFlipCausalAnalysis.RTwoEdgeFlipCausalAnalysis">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RTwoEdgeFlipCausalAnalysis</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete read-only causal footprint of two specified edge flips.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete read-only causal footprint of two specified edge flips.</span>
+
+<span class="sd">    Produced by :func:`analyze_two_edge_flip_causality`, which flips a</span>
+<span class="sd">    copy of a search state at two distinct edges and records the state</span>
+<span class="sd">    exactly before and after both flips, plus the exact set of</span>
+<span class="sd">    monochromatic K5s created or destroyed by the pair. Unlike</span>
+<span class="sd">    :class:`REdgeFlipCausalAnalysis.REdgeFlipCausalAnalysis`, this</span>
+<span class="sd">    measures the *net* effect of the pair applied together: only the</span>
+<span class="sd">    original and final states are compared, so events caused solely by</span>
+<span class="sd">    the first flip and later undone or altered by the second are not</span>
+<span class="sd">    reported individually — :attr:`interaction_reward` isolates the</span>
+<span class="sd">    portion of the combined reward that is not explained by the two</span>
+<span class="sd">    flips&#39; independent, single-edge rewards.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        edges (tuple[int, int]): Indices of the two flipped host-graph</span>
+<span class="sd">            edges.</span>
+<span class="sd">        endpoints (tuple[tuple[int, int], tuple[int, int]]): Vertex</span>
+<span class="sd">            indices of each flipped edge.</span>
+<span class="sd">        old_colors (tuple[int, int]): Edge colors before the flips, one</span>
+<span class="sd">            per edge in ``edges``.</span>
+<span class="sd">        new_colors (tuple[int, int]): Edge colors after the flips (the</span>
+<span class="sd">            complement of each corresponding ``old_colors`` entry).</span>
+<span class="sd">        score_before (int): Exact score of the state before either flip.</span>
+<span class="sd">        score_after (int): Exact score of the state after both flips.</span>
+<span class="sd">        participation_before (RMonochromaticParticipation): Exact</span>
+<span class="sd">            monochromatic K5 participation counts before the flips.</span>
+<span class="sd">        participation_after (RMonochromaticParticipation): Exact</span>
+<span class="sd">            monochromatic K5 participation counts after the flips.</span>
+<span class="sd">        clique_changes (tuple[RMonochromaticCliqueChange, ...]): Exact</span>
+<span class="sd">            net event decomposition of every K5 created or destroyed</span>
+<span class="sd">            comparing the original state directly to the final state.</span>
+<span class="sd">        greedy_rewards_before (numpy.ndarray): Read-only ``int32`` array</span>
+<span class="sd">            of the exact immediate reward for every edge, evaluated</span>
+<span class="sd">            before either flip.</span>
+<span class="sd">        greedy_rewards_after (numpy.ndarray): Read-only ``int32`` array</span>
+<span class="sd">            of the exact immediate reward for every edge, evaluated</span>
+<span class="sd">            after both flips.</span>
+<span class="sd">        individual_rewards (tuple[int, int]): Exact immediate reward</span>
+<span class="sd">            each edge would have produced flipped alone from the</span>
+<span class="sd">            original state, one per edge in ``edges``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">edges</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
     <span class="n">endpoints</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span>
@@ -107,6 +152,18 @@
     <span class="n">individual_rewards</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize all fields, then freeze the reward arrays.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``edges`` does not contain two distinct edge</span>
+<span class="sd">                indices, if ``endpoints`` does not contain two vertex</span>
+<span class="sd">                pairs, if ``old_colors``/``new_colors`` does not contain</span>
+<span class="sd">                two binary colors, if a ``new_colors`` entry is not the</span>
+<span class="sd">                complement of the matching ``old_colors`` entry, if</span>
+<span class="sd">                ``individual_rewards`` does not contain two values, or</span>
+<span class="sd">                if ``greedy_rewards_before`` and ``greedy_rewards_after``</span>
+<span class="sd">                do not have equal shape.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">edges</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span> <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">)</span>
         <span class="n">endpoints</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
             <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">vertex</span><span class="p">)</span> <span class="k">for</span> <span class="n">vertex</span> <span class="ow">in</span> <span class="n">pair</span><span class="p">)</span>
@@ -163,21 +220,28 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">exact_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Score improvement produced by flipping both edges together.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Exact score improvement produced by flipping both edges together.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_before</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_after</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">interaction_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pair reward beyond the sum of the two independent rewards.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Pair reward beyond the sum of the two independent single-edge rewards.</span>
+
+<span class="sd">        Positive values mean the pair together does strictly better</span>
+<span class="sd">        than the two flips would independently; negative values mean</span>
+<span class="sd">        the flips interfere with each other (e.g. one flip destroys a</span>
+<span class="sd">        K5 that the other flip would otherwise also have destroyed).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">exact_reward</span> <span class="o">-</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">individual_rewards</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">shared_vertex</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Whether the two host edges share an endpoint.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Whether the two host edges share an endpoint.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">endpoints</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">endpoints</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">vertex_participation_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Per-vertex, per-color change in monochromatic K5 participation.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">participation_after</span><span class="o">.</span><span class="n">vertices</span>
             <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">vertices</span>
@@ -185,6 +249,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">edge_participation_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Per-edge, per-color change in monochromatic K5 participation.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">participation_after</span><span class="o">.</span><span class="n">edges</span>
             <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">edges</span>
@@ -192,10 +257,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">greedy_reward_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Per-edge change in exact immediate reward caused by the pair.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_after</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_before</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">changed_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Indices of vertices whose monochromatic K5 participation changed.&quot;&quot;&quot;</span>
         <span class="n">changed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">vertex_participation_delta</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">,</span>
             <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
@@ -204,6 +271,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">changed_structure_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Sorted unique indices of host edges touched by any clique change.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">clique_changes</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
 
@@ -215,6 +283,13 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">vertex_event_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Number of net clique-change events touching each vertex.</span>
+
+<span class="sd">        Counts every creation and destruction event in</span>
+<span class="sd">        :attr:`clique_changes` regardless of color, so a vertex involved</span>
+<span class="sd">        in both a destroyed red K5 and a created blue K5 scores two</span>
+<span class="sd">        events even though its net delta may be zero.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
             <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">vertices</span><span class="p">),</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
@@ -227,6 +302,11 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">edge_event_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: Number of net clique-change events touching each host edge.</span>
+
+<span class="sd">        Counts events the same way as :attr:`vertex_event_counts`, but</span>
+<span class="sd">        indexed by host edge rather than vertex.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
             <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">edges</span><span class="p">),</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
@@ -249,10 +329,35 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Analyze two simultaneous edge flips without mutating the supplied state.</span>
 
-<span class="sd">    Clique changes are measured from the original state directly to the final</span>
-<span class="sd">    state. Intermediate events caused by only the first flip are intentionally</span>
-<span class="sd">    excluded, so the returned event decomposition is the exact net causal</span>
-<span class="sd">    footprint of the pair.</span>
+<span class="sd">    Copies ``state``, flips ``first_edge`` and then ``second_edge`` on</span>
+<span class="sd">    the copy, and records the exact score, monochromatic participation,</span>
+<span class="sd">    and per-edge immediate-reward landscape before either flip and</span>
+<span class="sd">    after both. Clique changes are measured from the original state</span>
+<span class="sd">    directly to the final state. Intermediate events caused by only the</span>
+<span class="sd">    first flip are intentionally excluded, so the returned event</span>
+<span class="sd">    decomposition is the exact net causal footprint of the pair (see</span>
+<span class="sd">    :attr:`RTwoEdgeFlipCausalAnalysis.interaction_reward` for the</span>
+<span class="sd">    departure from the sum of the two flips&#39; independent rewards).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to analyze. Not mutated;</span>
+<span class="sd">            the flips are applied to an internal copy.</span>
+<span class="sd">        first_edge (int): Index of the first host-graph edge to flip.</span>
+<span class="sd">        second_edge (int): Index of the second host-graph edge to flip.</span>
+<span class="sd">            Must differ from ``first_edge``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RTwoEdgeFlipCausalAnalysis: Complete net causal footprint of</span>
+<span class="sd">        flipping both ``first_edge`` and ``second_edge`` from ``state``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``first_edge`` or ``second_edge`` is not an</span>
+<span class="sd">            integer.</span>
+<span class="sd">        IndexError: If ``first_edge`` or ``second_edge`` is outside the</span>
+<span class="sd">            host graph.</span>
+<span class="sd">        ValueError: If ``first_edge`` and ``second_edge`` are equal.</span>
+<span class="sd">        RuntimeError: If the internal event-decomposition consistency</span>
+<span class="sd">            check fails (see :func:`_verify_event_decomposition`).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">first_edge</span> <span class="o">=</span> <span class="n">_validated_edge</span><span class="p">(</span>
         <span class="n">state</span><span class="p">,</span>
@@ -394,6 +499,21 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate that ``edge`` is an in-range integer edge index.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state defining the valid edge</span>
+<span class="sd">            range.</span>
+<span class="sd">        edge (int): Candidate edge index to validate.</span>
+<span class="sd">        name (str): Parameter name to use in error messages.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: ``edge`` coerced to a plain ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``edge`` is not an integer (or is a ``bool``).</span>
+<span class="sd">        IndexError: If ``edge`` is outside the host graph.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be an integer.&quot;</span><span class="p">)</span>
 
@@ -408,7 +528,22 @@
 <span class="k">def</span> <span class="nf">_verify_event_decomposition</span><span class="p">(</span>
     <span class="n">analysis</span><span class="p">:</span> <span class="n">RTwoEdgeFlipCausalAnalysis</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify that pair events exactly reconstruct both load deltas.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify that pair events exactly reconstruct both load deltas.</span>
+
+<span class="sd">    Replays every recorded :class:`RMonochromaticCliqueChange` event</span>
+<span class="sd">    and checks that the resulting per-vertex and per-edge deltas match</span>
+<span class="sd">    :attr:`RTwoEdgeFlipCausalAnalysis.vertex_participation_delta` and</span>
+<span class="sd">    :attr:`RTwoEdgeFlipCausalAnalysis.edge_participation_delta` exactly.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        analysis (RTwoEdgeFlipCausalAnalysis): Analysis whose event</span>
+<span class="sd">            decomposition should be checked for consistency.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If replaying the clique-change events does not</span>
+<span class="sd">            exactly reconstruct either the vertex or the edge</span>
+<span class="sd">            participation delta.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">vertex_delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span>
         <span class="n">analysis</span><span class="o">.</span><span class="n">vertex_participation_delta</span>
     <span class="p">)</span>

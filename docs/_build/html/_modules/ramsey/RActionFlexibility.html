@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,19 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RActionFlexibility</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Counterfactual flexibility produced by candidate edge flips.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Counterfactual flexibility produced by candidate edge flips.</span>
+
+<span class="sd">Where :mod:`ramsey.RAction` computes the *immediate* exact score reward of</span>
+<span class="sd">every edge flip, this module looks one flip ahead: for a set of candidate</span>
+<span class="sd">edges it actually applies each flip to a scratch copy of the search state,</span>
+<span class="sd">recomputes the action analysis, measures the resulting local flexibility</span>
+<span class="sd">(the fraction of subsequent actions available within various damage</span>
+<span class="sd">budgets, see :mod:`ramsey.RFlexibility`), and undoes the flip. The result</span>
+<span class="sd">is an exact score/flexibility landscape over candidate actions, together</span>
+<span class="sd">with the Pareto-optimal subset that jointly maximizes exact score reward</span>
+<span class="sd">and every resulting flexibility budget without imposing an arbitrary</span>
+<span class="sd">scalar weighting between them.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -86,13 +102,35 @@
 
 
 <span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Copy an array, mark the copy read-only, and return it.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        array (NDArray): Source array; may be any array-like value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray: An independently owned, read-only copy.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
     <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="k">return</span> <span class="n">result</span>
 
 
 <span class="k">def</span> <span class="nf">_pareto_mask</span><span class="p">(</span><span class="n">objectives</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return rows not dominated when every objective is maximized.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return rows not dominated when every objective is maximized.</span>
+
+<span class="sd">    A row is dominated when some other row is at least as good in</span>
+<span class="sd">    every objective column and strictly better in at least one.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        objectives (NDArray[np.float64]): Array of shape</span>
+<span class="sd">            ``(number_of_candidates, number_of_objectives)`` where every</span>
+<span class="sd">            column is an objective to maximize.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.bool_]: Boolean mask of shape</span>
+<span class="sd">        ``(number_of_candidates,)``, ``True`` for rows on the Pareto</span>
+<span class="sd">        front (not dominated by any other row).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">number_of_rows</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">objectives</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">number_of_rows</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">)</span>
 
@@ -116,7 +154,33 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RActionFlexibility.RActionFlexibilityLandscape">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RActionFlexibilityLandscape</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Score/flexibility consequences for a selected set of edge flips.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Score/flexibility consequences for a selected set of edge flips.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        source_state (RSearchState): Search state the landscape was</span>
+<span class="sd">            computed from.</span>
+<span class="sd">        state_version (int): ``source_state.version`` at computation</span>
+<span class="sd">            time, used to detect staleness.</span>
+<span class="sd">        current (RFlexibilityProfile): Flexibility profile of</span>
+<span class="sd">            ``source_state`` itself, before any candidate flip.</span>
+<span class="sd">        candidate_edges (NDArray[np.int32]): Host-edge indices that were</span>
+<span class="sd">            evaluated, shape ``(number_of_candidates,)``.</span>
+<span class="sd">        score_rewards (NDArray[np.int32]): Exact immediate score reward</span>
+<span class="sd">            of flipping each candidate edge, shape</span>
+<span class="sd">            ``(number_of_candidates,)``.</span>
+<span class="sd">        resulting_fractions (NDArray[np.float64]): Flexibility fraction</span>
+<span class="sd">            ``F(budget)`` after applying each candidate flip, shape</span>
+<span class="sd">            ``(number_of_candidates, number_of_budgets)`` with columns</span>
+<span class="sd">            aligned to ``current.budgets``.</span>
+<span class="sd">        flexibility_deltas (NDArray[np.float64]): ``resulting_fractions``</span>
+<span class="sd">            minus ``current.fractions``, i.e. the change in flexibility</span>
+<span class="sd">            each candidate flip would produce, same shape as</span>
+<span class="sd">            ``resulting_fractions``.</span>
+<span class="sd">        pareto_mask (NDArray[np.bool_]): ``True`` for candidates that are</span>
+<span class="sd">            Pareto-optimal when jointly maximizing ``score_rewards`` and</span>
+<span class="sd">            every column of ``resulting_fractions``, shape</span>
+<span class="sd">            ``(number_of_candidates,)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
     <span class="n">state_version</span><span class="p">:</span> <span class="nb">int</span>
@@ -128,6 +192,14 @@
     <span class="n">pareto_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate array shapes and freeze all array fields.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If any of ``candidate_edges``, ``score_rewards``,</span>
+<span class="sd">                ``pareto_mask``, ``resulting_fractions``, or</span>
+<span class="sd">                ``flexibility_deltas`` does not match the shape implied</span>
+<span class="sd">                by ``candidate_edges`` and ``current.budgets``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">number_of_candidates</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">candidate_edges</span><span class="p">)</span>
         <span class="n">number_of_budgets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">budgets</span><span class="p">)</span>
 
@@ -165,17 +237,41 @@
 <div class="viewcode-block" id="RActionFlexibilityLandscape.applies_to">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RActionFlexibility.RActionFlexibilityLandscape.applies_to">[docs]</a>
     <span class="k">def</span> <span class="nf">applies_to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this landscape still describes ``state``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Candidate state to check freshness</span>
+<span class="sd">                against.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if ``state`` is the exact object this</span>
+<span class="sd">            landscape was computed from and has not been mutated since.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span></div>
 
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">pareto_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return actions nondominated in score and the full F vector.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;NDArray[np.int32]: Actions nondominated in score and the full F vector.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">candidate_edges</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">pareto_mask</span><span class="p">]</span>
 
 <div class="viewcode-block" id="RActionFlexibilityLandscape.budget_index">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RActionFlexibility.RActionFlexibilityLandscape.budget_index">[docs]</a>
     <span class="k">def</span> <span class="nf">budget_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">budget</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the column index of one flexibility budget.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            budget (int): Damage budget value to locate among</span>
+<span class="sd">                ``current.budgets``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Column index of ``budget`` in ``current.budgets``,</span>
+<span class="sd">            usable to index ``resulting_fractions`` and</span>
+<span class="sd">            ``flexibility_deltas``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If ``budget`` is not present in the landscape.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">budgets</span> <span class="o">==</span> <span class="n">budget</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">indexes</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -195,15 +291,48 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">candidate_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RActionFlexibilityLandscape</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Calculate the exact future flexibility produced by candidate flips.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate the exact future flexibility produced by candidate flips.</span>
 
-<span class="sd">    The source state is never mutated. A private scratch state reuses the</span>
-<span class="sd">    incremental action-profile machinery, making exact counterfactuals much</span>
-<span class="sd">    cheaper than rebuilding K5 incidence information for every candidate.</span>
+<span class="sd">    For every candidate edge, this actually applies the flip to a scratch</span>
+<span class="sd">    copy of ``state``, recomputes the full action analysis, measures the</span>
+<span class="sd">    resulting flexibility profile, and flips the edge back — so</span>
+<span class="sd">    ``resulting_fractions`` reflects the exact one-move-ahead flexibility</span>
+<span class="sd">    landscape rather than an approximation. The source state is never</span>
+<span class="sd">    mutated. The scratch state reuses the incremental action-profile</span>
+<span class="sd">    machinery (materialized once up front via ``scratch.action_profiles``),</span>
+<span class="sd">    making the repeated flip/analyze/undo cycle much cheaper than rebuilding</span>
+<span class="sd">    K5 incidence information from scratch for every candidate.</span>
 
-<span class="sd">    Pareto dominance maximizes exact score reward and every resulting F(b)</span>
-<span class="sd">    component simultaneously. No arbitrary scalar weighting is introduced.</span>
+<span class="sd">    Pareto dominance (see :func:`_pareto_mask`) maximizes exact score</span>
+<span class="sd">    reward and every resulting ``F(b)`` component simultaneously. No</span>
+<span class="sd">    arbitrary scalar weighting between score and flexibility is</span>
+<span class="sd">    introduced.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to evaluate candidate flips</span>
+<span class="sd">            against; never mutated.</span>
+<span class="sd">        analysis (RActionAnalysis | None): Action analysis for</span>
+<span class="sd">            ``state``. If ``None``, it is computed via</span>
+<span class="sd">            :func:`ramsey.RAction.analyze_actions`.</span>
+<span class="sd">        budgets (Iterable[int]): Damage budgets defining the flexibility</span>
+<span class="sd">            curve; forwarded to :func:`calculate_flexibility`.</span>
+<span class="sd">        candidate_mask (NDArray[np.bool_] | None): Boolean mask of shape</span>
+<span class="sd">            ``(state.number_of_edges,)`` selecting which edges to</span>
+<span class="sd">            evaluate as candidates. If ``None``, every edge is a</span>
+<span class="sd">            candidate.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RActionFlexibilityLandscape: Exact score and flexibility</span>
+<span class="sd">        consequences of every candidate flip, including the Pareto</span>
+<span class="sd">        front over score reward and resulting flexibility.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``analysis`` does not apply to ``state``, if</span>
+<span class="sd">            ``candidate_mask`` has the wrong shape, or if no candidate</span>
+<span class="sd">            edges are selected.</span>
+<span class="sd">        RuntimeError: If the scratch state fails to restore to</span>
+<span class="sd">            ``state``&#39;s original score and colors after the flip/undo</span>
+<span class="sd">            cycle for every candidate (an internal consistency check).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">analysis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">analysis</span> <span class="o">=</span> <span class="n">analyze_actions</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>

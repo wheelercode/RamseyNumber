@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,20 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.nn.RModel</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Permutation-equivariant pairwise policy and value models.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Permutation-equivariant pairwise policy and value models.</span>
+
+<span class="sd">Defines the learned policy/value network used by</span>
+<span class="sd">:class:`~ramsey.nn.RNeuralPolicy.RNeuralPolicy` and trained by PPO.</span>
+<span class="sd">The network operates on the vertex-pair feature tensors produced by</span>
+<span class="sd">:mod:`ramsey.nn.REncoding` and is equivariant to vertex relabeling: it</span>
+<span class="sd">has no notion of vertex identity beyond the pair features it is given,</span>
+<span class="sd">so the same weights apply regardless of how the host graph&#39;s vertices</span>
+<span class="sd">happen to be numbered. Its outputs — an edge-flip action distribution</span>
+<span class="sd">and a scalar value estimate — are learned, heuristic approximations</span>
+<span class="sd">guiding search; they are not exact computations of score reduction or</span>
+<span class="sd">outcome, unlike the exact action-analysis machinery elsewhere in the</span>
+<span class="sd">package.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -85,8 +102,35 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RModel.RModelConfig">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RModelConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Immutable architecture settings for the pairwise model.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Immutable architecture settings for the pairwise model.</span>
+
+<span class="sd">    Validated and normalized in :meth:`__post_init__`; values are</span>
+<span class="sd">    coerced to their canonical Python type (``int``/``float``) and</span>
+<span class="sd">    stored back onto the frozen instance via ``object.__setattr__``.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        input_size (int): Number of input feature channels per vertex</span>
+<span class="sd">            pair, i.e. the size of the last axis of the pair-input</span>
+<span class="sd">            tensor. Defaults to ``PAIR_INPUT_CHANNELS`` from</span>
+<span class="sd">            :mod:`ramsey.nn.REncoding`. Must be at least 1.</span>
+<span class="sd">        hidden_size (int): Width of the hidden pair representation</span>
+<span class="sd">            used throughout the message-passing layers and heads. Must</span>
+<span class="sd">            be at least 1.</span>
+<span class="sd">        number_of_layers (int): Number of stacked</span>
+<span class="sd">            :class:`RPairMessageLayer` blocks. May be 0, in which case</span>
+<span class="sd">            the network applies only the input projection before the</span>
+<span class="sd">            policy and value heads.</span>
+<span class="sd">        dropout (float): Dropout probability applied inside each</span>
+<span class="sd">            :class:`RPairMessageLayer`. Must satisfy</span>
+<span class="sd">            ``0.0 &lt;= dropout &lt; 1.0``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``input_size``, ``hidden_size``, or</span>
+<span class="sd">            ``number_of_layers`` is not an integer, or ``dropout`` is</span>
+<span class="sd">            not numeric.</span>
+<span class="sd">        ValueError: If ``input_size`` or ``hidden_size`` is less than</span>
+<span class="sd">            1, ``number_of_layers`` is negative, or ``dropout`` is</span>
+<span class="sd">            outside ``[0.0, 1.0)``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">input_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">PAIR_INPUT_CHANNELS</span>
@@ -95,6 +139,11 @@
     <span class="n">dropout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize field types and ranges in place.</span>
+
+<span class="sd">        See the class docstring for the exact constraints enforced on</span>
+<span class="sd">        each field.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">integer_fields</span> <span class="o">=</span> <span class="p">(</span>
             <span class="s2">&quot;input_size&quot;</span><span class="p">,</span>
             <span class="s2">&quot;hidden_size&quot;</span><span class="p">,</span>
@@ -148,14 +197,40 @@
 <div class="viewcode-block" id="RPairMessageLayer">
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RModel.RPairMessageLayer">[docs]</a>
 <span class="k">class</span> <span class="nc">RPairMessageLayer</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Update every pair representation through all third vertices.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Update every pair representation through all third vertices.</span>
 
-<span class="sd">    For pair (i, j), information is aggregated through paths:</span>
+<span class="sd">    For pair ``(i, j)``, information is aggregated through paths::</span>
 
-<span class="sd">        i → k → j</span>
+<span class="sd">        i -&gt; k -&gt; j</span>
 
-<span class="sd">    for every vertex k.</span>
+<span class="sd">    for every vertex ``k``, via a bilinear (einsum) interaction</span>
+<span class="sd">    between projected pair features, followed by a message</span>
+<span class="sd">    feed-forward block and a position-wise feed-forward block, each</span>
+<span class="sd">    wrapped in a residual connection and layer normalization. Because</span>
+<span class="sd">    the aggregation is defined identically for every ``(i, j, k)``</span>
+<span class="sd">    triple with no reference to fixed vertex identity, the layer&#39;s</span>
+<span class="sd">    output is equivariant to a permutation of vertex labels. The</span>
+<span class="sd">    output is explicitly symmetrized so that pair ``(i, j)`` and pair</span>
+<span class="sd">    ``(j, i)`` always carry identical features, matching the</span>
+<span class="sd">    undirected nature of host-graph edges.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        relation_projection (torch.nn.Linear): Linear projection of</span>
+<span class="sd">            pair features used to form both sides of the bilinear</span>
+<span class="sd">            third-vertex interaction.</span>
+<span class="sd">        message_projection (torch.nn.Sequential): Two-layer GELU</span>
+<span class="sd">            feed-forward block applied to the aggregated message before</span>
+<span class="sd">            it is added back into the pair features.</span>
+<span class="sd">        feed_forward (torch.nn.Sequential): Position-wise two-layer</span>
+<span class="sd">            GELU feed-forward block (expanding to twice ``hidden_size``</span>
+<span class="sd">            and back) applied after the message update.</span>
+<span class="sd">        message_norm (torch.nn.LayerNorm): Layer normalization applied</span>
+<span class="sd">            after the residual message update.</span>
+<span class="sd">        feed_forward_norm (torch.nn.LayerNorm): Layer normalization</span>
+<span class="sd">            applied after the residual feed-forward update.</span>
+<span class="sd">        dropout (torch.nn.Dropout): Dropout applied to the outputs of</span>
+<span class="sd">            ``message_projection`` and ``feed_forward`` before they are</span>
+<span class="sd">            added back as residuals.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -163,6 +238,14 @@
         <span class="n">hidden_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">dropout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct the projections, feed-forward blocks, and norms.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hidden_size (int): Width of the pair feature representation</span>
+<span class="sd">                consumed and produced by this layer.</span>
+<span class="sd">            dropout (float): Dropout probability applied to the</span>
+<span class="sd">                message and feed-forward residual branches.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">relation_projection</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span>
@@ -206,17 +289,31 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">pair_features</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return updated pair features.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return updated, symmetrized pair features.</span>
 
-<span class="sd">        pair_features has shape:</span>
+<span class="sd">        Projects ``pair_features`` and aggregates messages over every</span>
+<span class="sd">        third vertex ``k`` via the bilinear interaction</span>
+<span class="sd">        ``message[b, i, j, d] = sum_k projected[b, i, k, d] * projected[b, k, j, d]``,</span>
+<span class="sd">        scaled by ``1 / sqrt(n_vertices)``. The message is passed</span>
+<span class="sd">        through ``message_projection``, added back as a residual, and</span>
+<span class="sd">        normalized; the result is then passed through ``feed_forward``,</span>
+<span class="sd">        added back as a residual, and normalized again. The final</span>
+<span class="sd">        output is symmetrized as</span>
+<span class="sd">        ``0.5 * (pair_features + pair_features.transpose(1, 2))`` to</span>
+<span class="sd">        preserve the fact that host-graph edges are undirected.</span>
 
-<span class="sd">            (</span>
-<span class="sd">                batch,</span>
-<span class="sd">                n_vertices,</span>
-<span class="sd">                n_vertices,</span>
-<span class="sd">                hidden_size,</span>
-<span class="sd">            )</span>
+<span class="sd">        Args:</span>
+<span class="sd">            pair_features (torch.Tensor): Pair feature tensor of shape</span>
+<span class="sd">                ``(batch, n_vertices, n_vertices, hidden_size)``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Updated pair features of the same shape as</span>
+<span class="sd">            ``pair_features``, symmetric under transposing the two</span>
+<span class="sd">            vertex axes.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``pair_features`` does not have four</span>
+<span class="sd">                dimensions.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">pair_features</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">4</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;pair_features must have &quot;</span> <span class="s2">&quot;four dimensions.&quot;</span><span class="p">)</span>
@@ -260,16 +357,43 @@
 <div class="viewcode-block" id="RPairPolicyValueNetwork">
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RModel.RPairPolicyValueNetwork">[docs]</a>
 <span class="k">class</span> <span class="nc">RPairPolicyValueNetwork</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Permutation-equivariant edge-policy and graph-value network.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Permutation-equivariant edge-policy and graph-value network.</span>
 
-<span class="sd">    Outputs</span>
-<span class="sd">    -------</span>
-<span class="sd">    logits:</span>
-<span class="sd">        One action logit for every edge.</span>
+<span class="sd">    Projects the per-vertex-pair input features into a hidden</span>
+<span class="sd">    representation, refines that representation through a stack of</span>
+<span class="sd">    :class:`RPairMessageLayer` blocks, then reads out per-edge action</span>
+<span class="sd">    logits from a policy head and a single scalar value estimate per</span>
+<span class="sd">    graph from a value head. The network has no learned parameters</span>
+<span class="sd">    tied to specific vertex or edge identities, so its predictions are</span>
+<span class="sd">    equivariant to vertex relabeling; this makes the same trained</span>
+<span class="sd">    weights applicable to any host graph with the number of vertices</span>
+<span class="sd">    and edges the network was constructed for. Both outputs are</span>
+<span class="sd">    learned approximations used to guide search (a PPO policy</span>
+<span class="sd">    distribution and a bootstrapped value estimate) rather than exact</span>
+<span class="sd">    measurements of the effect of an action.</span>
 
-<span class="sd">    values:</span>
-<span class="sd">        One global value estimate for every graph.</span>
+<span class="sd">    Attributes:</span>
+<span class="sd">        config (RModelConfig): Architecture settings this network was</span>
+<span class="sd">            constructed with.</span>
+<span class="sd">        n_vertices (int): Number of vertices in the host graph this</span>
+<span class="sd">            network was built for.</span>
+<span class="sd">        number_of_edges (int): Number of edges in the host graph this</span>
+<span class="sd">            network was built for; also the size of the action space.</span>
+<span class="sd">        edge_vertices (torch.Tensor): Registered buffer of shape</span>
+<span class="sd">            ``(number_of_edges, 2)`` and dtype ``torch.long`` giving the</span>
+<span class="sd">            two endpoint vertices of each edge, in the host graph&#39;s</span>
+<span class="sd">            edge order. Moves automatically with the module between</span>
+<span class="sd">            devices and is included in ``state_dict()``.</span>
+<span class="sd">        input_projection (torch.nn.Sequential): Projects raw pair</span>
+<span class="sd">            input features (of size ``config.input_size``) to the</span>
+<span class="sd">            hidden representation (of size ``config.hidden_size``).</span>
+<span class="sd">        layers (torch.nn.ModuleList): Stack of ``config.number_of_layers``</span>
+<span class="sd">            :class:`RPairMessageLayer` blocks refining the pair</span>
+<span class="sd">            representation.</span>
+<span class="sd">        policy_head (torch.nn.Sequential): Maps each edge&#39;s hidden pair</span>
+<span class="sd">            representation to a single scalar action logit.</span>
+<span class="sd">        value_head (torch.nn.Sequential): Maps pooled graph-level</span>
+<span class="sd">            features to a single scalar value estimate.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">unavailable_logit</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0e9</span>
@@ -279,6 +403,16 @@
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">RModelConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct the network&#39;s layers for one fixed host graph.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph whose vertex count, edge count,</span>
+<span class="sd">                and edge ordering (``graph.edges``) fix the network&#39;s</span>
+<span class="sd">                input/output dimensions and the ``edge_vertices``</span>
+<span class="sd">                buffer used to gather per-edge features.</span>
+<span class="sd">            config (RModelConfig | None): Architecture settings. Uses</span>
+<span class="sd">                ``RModelConfig()`` defaults when ``None``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span> <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">RModelConfig</span><span class="p">()</span>
@@ -348,9 +482,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">trainable_parameter_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of trainable scalar parameters.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Total number of scalar parameters with ``requires_grad``.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
             <span class="n">parameter</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
             <span class="k">for</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span>
@@ -367,30 +499,46 @@
         <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return action logits and one value estimate per graph.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return action logits and one value estimate per graph.</span>
 
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        pair_input:</span>
-<span class="sd">            Shape:</span>
+<span class="sd">        Projects and refines the pair features through</span>
+<span class="sd">        ``input_projection`` and each layer in ``layers``, gathers the</span>
+<span class="sd">        refined feature vector at each edge&#39;s ``(i, j)`` position using</span>
+<span class="sd">        ``edge_vertices``, and applies ``policy_head`` to obtain one</span>
+<span class="sd">        logit per edge. Logits at unavailable actions are overwritten</span>
+<span class="sd">        with ``unavailable_logit`` (effectively ``-inf`` for sampling</span>
+<span class="sd">        or softmax purposes) so that an action distribution built from</span>
+<span class="sd">        these logits never selects them. Graph-level features are</span>
+<span class="sd">        formed by mean- and max-pooling the edge features over the</span>
+<span class="sd">        edge axis only (diagonal, non-edge matrix positions are</span>
+<span class="sd">        excluded from pooling because gathering is restricted to</span>
+<span class="sd">        ``edge_vertices``), concatenated, and passed through</span>
+<span class="sd">        ``value_head`` to obtain one scalar value per graph.</span>
 
-<span class="sd">                (</span>
-<span class="sd">                    batch,</span>
-<span class="sd">                    n_vertices,</span>
-<span class="sd">                    n_vertices,</span>
-<span class="sd">                    input_size,</span>
-<span class="sd">                )</span>
+<span class="sd">        Args:</span>
+<span class="sd">            pair_input (torch.Tensor): Pair feature tensor of shape</span>
+<span class="sd">                ``(batch, n_vertices, n_vertices, config.input_size)``,</span>
+<span class="sd">                as produced by</span>
+<span class="sd">                :func:`~ramsey.nn.REncoding.build_network_input`.</span>
+<span class="sd">            available_mask (torch.Tensor): Boolean tensor of shape</span>
+<span class="sd">                ``(batch, number_of_edges)`` where ``True`` marks the</span>
+<span class="sd">                corresponding edge as a currently available action.</span>
 
-<span class="sd">        available_mask:</span>
-<span class="sd">            Shape:</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[torch.Tensor, torch.Tensor]: A pair</span>
+<span class="sd">            ``(logits, values)``. ``logits`` has shape</span>
+<span class="sd">            ``(batch, number_of_edges)``, with unavailable actions</span>
+<span class="sd">            forced to ``unavailable_logit``. ``values`` has shape</span>
+<span class="sd">            ``(batch,)``, one scalar value estimate per graph in the</span>
+<span class="sd">            batch.</span>
 
-<span class="sd">                (</span>
-<span class="sd">                    batch,</span>
-<span class="sd">                    number_of_edges,</span>
-<span class="sd">                )</span>
-
-<span class="sd">            True means the corresponding action is available.</span>
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``pair_input`` does not have shape</span>
+<span class="sd">                ``(batch, n_vertices, n_vertices, config.input_size)``</span>
+<span class="sd">                or ``available_mask`` does not have shape</span>
+<span class="sd">                ``(batch, number_of_edges)``.</span>
+<span class="sd">            TypeError: If ``available_mask`` does not have boolean</span>
+<span class="sd">                dtype.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_inputs</span><span class="p">(</span>
             <span class="n">pair_input</span><span class="p">,</span>
@@ -445,8 +593,23 @@
         <span class="n">pair_input</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
         <span class="n">available_mask</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Validate batch, graph, feature, and mask dimensions.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate batch, graph, feature, and mask dimensions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            pair_input (torch.Tensor): Candidate pair-input tensor to</span>
+<span class="sd">                validate against ``(batch, n_vertices, n_vertices,</span>
+<span class="sd">                config.input_size)``.</span>
+<span class="sd">            available_mask (torch.Tensor): Candidate action-mask</span>
+<span class="sd">                tensor to validate against</span>
+<span class="sd">                ``(pair_input.shape[0], number_of_edges)`` with boolean</span>
+<span class="sd">                dtype.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``pair_input`` does not have four</span>
+<span class="sd">                dimensions with the expected trailing shape, or if</span>
+<span class="sd">                ``available_mask`` does not have the expected shape.</span>
+<span class="sd">            TypeError: If ``available_mask`` does not have boolean</span>
+<span class="sd">                dtype.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">expected_pair_tail</span> <span class="o">=</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">,</span>

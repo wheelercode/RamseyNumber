@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -84,6 +88,20 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Choose one encoded action uniformly from a nonempty array.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        actions (np.ndarray): One-dimensional array of encoded action</span>
+<span class="sd">            (edge) indices to choose among.</span>
+<span class="sd">        rng (np.random.Generator): Random generator used to make the</span>
+<span class="sd">            selection.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: One action index drawn uniformly at random from</span>
+<span class="sd">        ``actions``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``actions`` is not one-dimensional.</span>
+<span class="sd">        RuntimeError: If ``actions`` is empty.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">actions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
         <span class="n">actions</span><span class="p">,</span>
@@ -107,14 +125,19 @@
 
 <span class="sd">    Search policies decide which available action to take. State</span>
 <span class="sd">    mutation, action validation, termination, and history restrictions</span>
-<span class="sd">    remain responsibilities of REnvironment.</span>
+<span class="sd">    remain responsibilities of ``REnvironment``.</span>
+
+<span class="sd">    Concrete policies must implement :attr:`name` and</span>
+<span class="sd">    :meth:`select_action`, and may override</span>
+<span class="sd">    :attr:`requires_full_analysis` when they consume the environment&#39;s</span>
+<span class="sd">    cached action analysis to make their selection.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return a stable human-readable policy name.</span>
+<span class="sd">        str: Stable human-readable policy name.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span>
 
@@ -123,9 +146,14 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return whether the policy requires complete action analysis.</span>
 
-<span class="sd">        RSearch uses this value when applying the selected action.</span>
+<span class="sd">        ``RSearch`` uses this value when applying the selected action.</span>
 <span class="sd">        Policies that require complete analysis can reuse the cached</span>
 <span class="sd">        analysis during the environment step.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if the policy calls</span>
+<span class="sd">            ``environment.analyze_actions()`` inside</span>
+<span class="sd">            :meth:`select_action`; ``False`` by default.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">False</span>
 
@@ -138,6 +166,14 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return one currently available encoded edge index.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment to query for</span>
+<span class="sd">                available actions and, if needed, their analysis.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Encoded edge index of the action chosen from the</span>
+<span class="sd">            environment&#39;s currently available actions.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 </div>
@@ -150,12 +186,19 @@
 <span class="k">class</span> <span class="nc">RRandomPolicy</span><span class="p">(</span><span class="n">RPolicy</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Select uniformly from the currently available actions.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rng (np.random.Generator): Random generator used to make the</span>
+<span class="sd">            uniform selection.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: The literal name ``&quot;random&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;random&quot;</span>
 
 <div class="viewcode-block" id="RRandomPolicy.select_action">
@@ -164,6 +207,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return one action chosen uniformly from the available actions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment queried for its</span>
+<span class="sd">                currently available actions.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Encoded edge index chosen uniformly at random.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">_choose_uniformly</span><span class="p">(</span>
             <span class="n">environment</span><span class="o">.</span><span class="n">available_actions</span><span class="p">(),</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="p">,</span>
@@ -185,12 +238,26 @@
 <span class="sd">    - the exact reduction in monochromatic score.</span>
 
 <span class="sd">    Ties are broken uniformly at random.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rng (np.random.Generator): Random generator used to break</span>
+<span class="sd">            ties.</span>
+<span class="sd">        use_objective_reward (bool): If ``True``, rank actions by the</span>
+<span class="sd">            environment&#39;s shaped objective reward. If ``False``, rank</span>
+<span class="sd">            actions by the exact score reduction from the environment&#39;s</span>
+<span class="sd">            full action analysis. Defaults to ``True``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
     <span class="n">use_objective_reward</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate that ``use_objective_reward`` is a boolean.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``use_objective_reward`` is not a ``bool``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">use_objective_reward</span><span class="p">,</span>
             <span class="nb">bool</span><span class="p">,</span>
@@ -199,6 +266,10 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: ``&quot;greedy-objective&quot;`` or ``&quot;greedy-exact-score&quot;``,</span>
+<span class="sd">        depending on ``use_objective_reward``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_objective_reward</span><span class="p">:</span>
             <span class="k">return</span> <span class="s2">&quot;greedy-objective&quot;</span>
 
@@ -206,6 +277,13 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">requires_full_analysis</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return ``True``: greedy selection always needs complete</span>
+<span class="sd">        action analysis to rank the available actions.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: Always ``True``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">True</span>
 
 <div class="viewcode-block" id="RGreedyPolicy.select_action">
@@ -214,6 +292,26 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the available action with the greatest current reward.</span>
+
+<span class="sd">        Analyzes every action in ``environment``, masks out actions</span>
+<span class="sd">        that are not currently available, and selects the</span>
+<span class="sd">        maximum-reward action among those remaining. When</span>
+<span class="sd">        ``use_objective_reward`` is ``True`` the ranking uses the</span>
+<span class="sd">        environment&#39;s shaped objective reward; otherwise it uses the</span>
+<span class="sd">        exact score reduction from the full action analysis. Ties for</span>
+<span class="sd">        the maximum reward are broken uniformly at random using</span>
+<span class="sd">        ``rng``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment to analyze and</span>
+<span class="sd">                select an action from.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Encoded edge index of the selected best-reward</span>
+<span class="sd">            action.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">analysis</span> <span class="o">=</span> <span class="n">environment</span><span class="o">.</span><span class="n">analyze_actions</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_objective_reward</span><span class="p">:</span>

@@ -1,4 +1,13 @@
-"""Visualization of colorings, searches, and experiment results."""
+"""Visualization of colorings, searches, and experiment results.
+
+Provides matplotlib-based plots for three kinds of data: the color-one
+edge-count histogram of one coloring's cliques (how close cliques are to
+monochromatic, and how many actually are), the score trajectory of one
+search run, and the initial/final/best score trajectory across the
+iterations of one experiment. Every plotting function returns the
+``(Figure, Axes)`` pair it drew on, and accepts an optional existing
+``Axes`` so plots can be composed into larger figures.
+"""
 
 from __future__ import annotations
 
@@ -30,9 +39,44 @@ def plot_clique_histogram(
     """
     Plot a binary clique histogram with exact count annotations.
 
-    Counts appear inside sufficiently tall bars. Counts belonging
-    to short or zero-height bars appear above the bar so they remain
-    visible.
+    Draws one bar per possible color-one edge count (0 through
+    ``edges_per_clique``), with bar height equal to the number of cliques
+    of ``clique_size`` vertices having that many color-one edges. Bars
+    are colored along a diverging colormap from one end of the axis to
+    the other, so the two monochromatic extremes (all edges color zero,
+    at the left, and all edges color one, at the right) sit visually
+    opposite each other; those two bars additionally get a thicker,
+    color-coded outline to call out the exact violation counts they
+    represent. Counts appear inside sufficiently tall bars. Counts
+    belonging to short or zero-height bars appear above the bar so they
+    remain visible.
+
+    Args:
+        histogram (NDArray[np.integer]): Clique count by color-one edge
+            count, shape ``(comb(clique_size, 2) + 1,)``.
+        clique_size (int): Number of vertices per clique (e.g. 5 for K5),
+            used to compute the expected number of histogram bins and
+            axis labels.
+        ax (Axes | None): Existing axes to draw on. If ``None``, a new
+            figure and axes are created.
+        log_scale (bool): If ``True`` (the default), use a logarithmic
+            y-axis, with the lower limit set just below the smallest
+            positive count so zero-height bars remain distinguishable
+            from small ones.
+        title (str | None): Plot title. If ``None``, a title reporting
+            the total monochromatic count is generated.
+        minimum_inside_height_pixels (float): Minimum rendered bar height,
+            in pixels, for a count label to be placed inside the bar
+            rather than above it. Defaults to 18.0.
+
+    Returns:
+        tuple[plt.Figure, Axes]: The figure and axes the histogram was
+        drawn on.
+
+    Raises:
+        ValueError: If ``histogram`` does not have the shape implied by
+            ``clique_size``, if it contains negative counts, or if
+            ``minimum_inside_height_pixels`` is negative.
     """
     edges_per_clique = comb(
         clique_size,
@@ -236,6 +280,24 @@ def plot_coloring_histogram(
 ]:
     """
     Calculate and plot a symmetric binary coloring histogram.
+
+    Computes the color-one edge-count histogram for ``coloring`` via
+    :func:`ramsey.RScoring.binary_histogram` and renders it with
+    :func:`plot_clique_histogram`.
+
+    Args:
+        coloring (RColoring): Coloring to summarize. Its problem must use
+            exactly two colors and be symmetric.
+        **plot_options: Forwarded to :func:`plot_clique_histogram` (e.g.
+            ``ax``, ``log_scale``, ``title``).
+
+    Returns:
+        tuple[plt.Figure, Axes]: The figure and axes the histogram was
+        drawn on.
+
+    Raises:
+        ValueError: If ``coloring``'s problem is not a symmetric
+            two-color problem.
     """
     problem = coloring.graph.problem
 
@@ -262,6 +324,29 @@ def plot_search_scores(
 ]:
     """
     Plot current and episode-best scores across a search.
+
+    Draws two lines against environment step number: the current
+    monochromatic score at each recorded step (which may rise and fall
+    as the policy explores), and the running best score seen so far
+    (monotonically non-increasing). Both series start from
+    ``result.initial_score`` at step 0.
+
+    Args:
+        result (RSearchResult): Search result to plot. Must have been run
+            with ``record_steps=True`` if any steps were completed.
+        ax (Axes | None): Existing axes to draw on. If ``None``, a new
+            figure and axes are created.
+        title (str | None): Plot title. If ``None``, defaults to
+            ``f"{result.policy_name} search"``.
+
+    Returns:
+        tuple[plt.Figure, Axes]: The figure and axes the scores were
+        drawn on.
+
+    Raises:
+        ValueError: If ``result.steps_completed`` is positive but
+            ``result.step_results`` is empty (the search was not run
+            with ``record_steps=True``).
     """
     if result.steps_completed > 0 and not result.step_results:
         raise ValueError(
@@ -342,6 +427,23 @@ def plot_experiment_scores(
 ]:
     """
     Plot initial, final, and best scores by experiment iteration.
+
+    Draws three lines against experiment iteration number: each
+    iteration's starting score, its ending score, and the best score
+    reached during that iteration's search. Useful for comparing outcomes
+    across the independent restarts or reconfigurations that make up one
+    experiment.
+
+    Args:
+        result (RExperimentResult): Experiment result to plot.
+        ax (Axes | None): Existing axes to draw on. If ``None``, a new
+            figure and axes are created.
+        title (str | None): Plot title. If ``None``, defaults to
+            ``result.run_name``.
+
+    Returns:
+        tuple[plt.Figure, Axes]: The figure and axes the scores were
+        drawn on.
     """
     if ax is None:
         figure, ax = plt.subplots(
@@ -418,6 +520,17 @@ def plot_kn_histogram(
 ]:
     """
     Compatibility alias for the original histogram function name.
+
+    Args:
+        histogram (NDArray[np.integer]): Clique count by color-one edge
+            count, forwarded to :func:`plot_clique_histogram`.
+        k_size (int): Number of vertices per clique, forwarded to
+            :func:`plot_clique_histogram` as ``clique_size``.
+        **plot_options: Forwarded to :func:`plot_clique_histogram`.
+
+    Returns:
+        tuple[plt.Figure, Axes]: The figure and axes the histogram was
+        drawn on.
     """
     return plot_clique_histogram(
         histogram,

@@ -1,4 +1,12 @@
-"""Interchangeable construction of immutable seed colorings."""
+"""Interchangeable construction strategies for immutable seed colorings.
+
+Defines the :class:`RConstruction` abstract interface together with several
+concrete strategies (random, cyclic, fixed, and archive-backed) that each
+build one immutable :class:`~ramsey.RColoring.RColoring` for a supplied
+:class:`~ramsey.RGraph.RGraph`. Search code selects a construction and calls
+``construct()`` without needing to know the mechanism used to produce the
+seed coloring.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +23,10 @@ from .RArchive import (
 from .RColoring import RColoring
 from .RGraph import RGraph
 
+# Circular distances (in the 43-vertex cycle) assigned red and blue,
+# respectively, by Exoo's published Cyclic(43) construction. Together
+# EXOO_RED_DISTANCES and EXOO_BLUE_DISTANCES partition every distance
+# from 1 to 21.
 EXOO_RED_DISTANCES = frozenset(
     {
         1,
@@ -49,14 +61,18 @@ EXOO_BLUE_DISTANCES = frozenset(
 
 class RConstruction(ABC):
     """
-    Create one immutable seed coloring for a supplied graph.
+    Abstract strategy that produces one immutable seed coloring.
+
+    Concrete subclasses implement :meth:`construct` to build a single
+    coloring for a supplied graph, together with a stable :attr:`name`
+    identifying the strategy.
     """
 
     @property
     @abstractmethod
     def name(self) -> str:
         """
-        Return a stable construction name.
+        str: Stable identifier for this construction strategy.
         """
         ...
 
@@ -66,14 +82,21 @@ class RConstruction(ABC):
         graph: RGraph,
     ) -> RColoring:
         """
-        Construct one coloring of the supplied graph.
+        Build one seed coloring for the supplied graph.
+
+        Args:
+            graph (RGraph): Host graph whose edges the returned coloring
+                assigns colors to.
+
+        Returns:
+            RColoring: A freshly constructed coloring bound to ``graph``.
         """
         ...
 
     @property
     def last_source_name(self) -> str:
         """
-        Return the construction that produced the most recent seed.
+        str: Name of the construction that produced the most recent seed.
 
         Ordinary constructions produce their own stable name. Composite
         constructions override this property to identify the selected child.
@@ -84,19 +107,36 @@ class RConstruction(ABC):
 @dataclass(slots=True)
 class RRandomConstruction(RConstruction):
     """
-    Assign every edge color independently and uniformly.
+    Assign every edge a color independently and uniformly.
+
+    Attributes:
+        rng (numpy.random.Generator): Source of randomness used to draw
+            each edge's color.
     """
 
     rng: np.random.Generator
 
     @property
     def name(self) -> str:
+        """
+        str: Always ``"random"``.
+        """
         return "random"
 
     def construct(
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Color every edge of ``graph`` with an independent uniform draw.
+
+        Args:
+            graph (RGraph): Host graph to color.
+
+        Returns:
+            RColoring: A coloring whose edge colors are drawn i.i.d.
+            uniformly from the problem's ``n_colors`` color values.
+        """
         colors = self.rng.integers(
             0,
             graph.problem.n_colors,
@@ -115,14 +155,30 @@ class RCyclicConstruction(RConstruction):
     """
     Color edges according to circular vertex distance.
 
-    colors_by_distance[d - 1] specifies the color assigned to
-    every edge having circular distance d.
+    ``colors_by_distance[d - 1]`` specifies the color assigned to every
+    edge having circular distance ``d``, i.e. ``min(|u - v|, n_vertices -
+    |u - v|)`` for endpoints ``u`` and ``v``. This reproduces circulant
+    Ramsey colorings such as Exoo's cyclic K43 construction.
+
+    Attributes:
+        colors_by_distance (tuple[int, ...]): Color index assigned to each
+            circular distance, indexed from distance 1 through
+            ``n_vertices // 2``. Coerced to a tuple of ``int`` in
+            ``__post_init__``.
+        construction_name (str): Stable name reported by :attr:`name`.
     """
 
     colors_by_distance: tuple[int, ...]
     construction_name: str = "cyclic"
 
     def __post_init__(self) -> None:
+        """
+        Coerce ``colors_by_distance`` to ``int`` and validate arguments.
+
+        Raises:
+            ValueError: If ``colors_by_distance`` is empty or
+                ``construction_name`` is empty.
+        """
         colors = tuple(int(color) for color in self.colors_by_distance)
 
         if not colors:
@@ -139,12 +195,37 @@ class RCyclicConstruction(RConstruction):
 
     @property
     def name(self) -> str:
+        """
+        str: The configured ``construction_name``.
+        """
         return self.construction_name
 
     def construct(
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Color ``graph`` by circular vertex distance.
+
+        For every edge, computes the circular distance between its two
+        endpoints and looks up the corresponding entry of
+        ``colors_by_distance``.
+
+        Args:
+            graph (RGraph): Host graph to color. Its vertex count must be
+                even, with exactly ``n_vertices // 2`` distinct circular
+                distances.
+
+        Returns:
+            RColoring: A coloring determined entirely by circular
+            distance.
+
+        Raises:
+            ValueError: If the number of circular distances implied by
+                ``graph`` does not match ``len(colors_by_distance)``, or
+                if ``colors_by_distance`` contains a color index outside
+                the problem's color set.
+        """
         n_vertices = graph.problem.n_vertices
 
         expected_distances = n_vertices // 2
@@ -190,7 +271,22 @@ class RCyclicConstruction(RConstruction):
         cls,
     ) -> "RCyclicConstruction":
         """
-        Return Exoo's original cyclic K43 construction.
+        Build Exoo's original cyclic K43 construction.
+
+        Assigns blue (color 1) to every circular distance in
+        :data:`EXOO_BLUE_DISTANCES` and red (color 0) to every distance in
+        :data:`EXOO_RED_DISTANCES`; together these sets partition every
+        circular distance from 1 to 21 in the 43-vertex cycle.
+
+        Returns:
+            RCyclicConstruction: A construction named
+            ``"exoo-cyclic-k43"`` reproducing the published coloring.
+
+        Raises:
+            RuntimeError: If :data:`EXOO_RED_DISTANCES` and
+                :data:`EXOO_BLUE_DISTANCES` do not together partition
+                every distance from 1 to 21 (an internal consistency
+                check on the module-level constants).
         """
         valid_distances = EXOO_RED_DISTANCES | EXOO_BLUE_DISTANCES
 
@@ -212,27 +308,56 @@ class RCyclicConstruction(RConstruction):
 @dataclass(frozen=True, slots=True)
 class RFixedConstruction(RConstruction):
     """
-    Return a fixed coloring.
+    Return a fixed coloring on every call.
 
-    If an equivalent RGraph instance is supplied, the coloring is
+    Useful for replaying a known coloring as a seed. If a graph describing
+    the same Ramsey problem is supplied, the stored coloring's colors are
     rebound to that graph without changing any colors.
+
+    Attributes:
+        coloring (RColoring): The coloring whose colors are replayed.
+        construction_name (str): Stable name reported by :attr:`name`.
     """
 
     coloring: RColoring
     construction_name: str = "fixed"
 
     def __post_init__(self) -> None:
+        """
+        Validate that ``construction_name`` is nonempty.
+
+        Raises:
+            ValueError: If ``construction_name`` is empty.
+        """
         if not self.construction_name:
             raise ValueError("construction_name cannot be empty.")
 
     @property
     def name(self) -> str:
+        """
+        str: The configured ``construction_name``.
+        """
         return self.construction_name
 
     def construct(
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Rebind the stored coloring's colors onto ``graph``.
+
+        Args:
+            graph (RGraph): Host graph to bind the fixed colors to. Must
+                describe the same Ramsey problem as ``self.coloring``.
+
+        Returns:
+            RColoring: A new coloring over ``graph`` using
+            ``self.coloring.colors`` unchanged.
+
+        Raises:
+            ValueError: If ``graph.problem`` does not equal the problem
+                of the stored ``coloring``.
+        """
         if self.coloring.graph.problem != graph.problem:
             raise ValueError(
                 "Fixed coloring problem does not " "match the supplied graph."
@@ -248,6 +373,23 @@ class RFixedConstruction(RConstruction):
 class RArchiveConstruction(RConstruction):
     """
     Sample seed colorings uniformly from an archive score range.
+
+    Queries an :class:`~ramsey.RArchive.RArchive` for every archived
+    coloring whose exact score falls within ``[minimum_score,
+    maximum_score]`` (either bound may be omitted), optionally capped to
+    the best ``limit`` records, and selects uniformly at random among
+    them on every call to :meth:`construct`.
+
+    Attributes:
+        archive (RArchive): Archive queried for eligible colorings.
+        rng (numpy.random.Generator): Source of randomness used to select
+            among eligible records.
+        minimum_score (int | None): Inclusive lower score bound, or
+            ``None`` for no lower bound.
+        maximum_score (int | None): Inclusive upper score bound, or
+            ``None`` for no upper bound.
+        limit (int | None): Maximum number of best-scoring eligible
+            records to consider, or ``None`` for no cap.
     """
 
     archive: RArchive
@@ -263,6 +405,18 @@ class RArchiveConstruction(RConstruction):
     )
 
     def __post_init__(self) -> None:
+        """
+        Validate ``archive``, ``rng``, and the score/limit bounds.
+
+        Raises:
+            TypeError: If ``archive`` does not implement
+                :class:`RArchive`, or ``rng`` is not a NumPy
+                ``Generator``.
+            ValueError: If ``minimum_score`` and ``maximum_score`` are
+                both supplied with ``minimum_score`` greater than
+                ``maximum_score``, or if a score/limit value fails
+                integer validation.
+        """
         if not isinstance(self.archive, RArchive):
             raise TypeError("archive must implement RArchive.")
 
@@ -299,6 +453,10 @@ class RArchiveConstruction(RConstruction):
 
     @property
     def name(self) -> str:
+        """
+        str: Name encoding the configured score range, e.g.
+        ``"archive-score-0-to-5"`` or ``"archive-score-any-to-any"``.
+        """
         lower = (
             "any"
             if self.minimum_score is None
@@ -316,7 +474,8 @@ class RArchiveConstruction(RConstruction):
     @property
     def last_record(self) -> RArchiveRecord | None:
         """
-        Return the record selected by the most recent construction.
+        RArchiveRecord | None: The archive record selected by the most
+        recent call to :meth:`construct`, or ``None`` beforehand.
         """
         return self._last_record
 
@@ -326,6 +485,15 @@ class RArchiveConstruction(RConstruction):
     ) -> list[RArchiveRecord]:
         """
         Return the current archive pool eligible for sampling.
+
+        Args:
+            graph (RGraph): Host graph identifying which Ramsey
+                problem's archive to query.
+
+        Returns:
+            list[RArchiveRecord]: Every archived record within the
+            configured score range (and ``limit``) for ``graph``'s
+            problem.
         """
         return self.archive.colorings_in_score_range(
             minimum_score=self.minimum_score,
@@ -338,6 +506,20 @@ class RArchiveConstruction(RConstruction):
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Sample one archived coloring uniformly at random.
+
+        Args:
+            graph (RGraph): Host graph to bind the sampled coloring to.
+
+        Returns:
+            RColoring: The coloring loaded from the selected archive
+            record.
+
+        Raises:
+            RuntimeError: If no archived coloring falls within the
+                configured score range for ``graph``'s problem.
+        """
         records = self.eligible_records(graph)
 
         if not records:
@@ -367,6 +549,20 @@ class RArchiveConstruction(RConstruction):
 class RMixedConstruction(RConstruction):
     """
     Select among seed constructions using fixed probabilities.
+
+    On each call to :meth:`construct`, one child construction is drawn
+    according to fixed ``probabilities`` (which must be nonnegative,
+    finite, and sum to one) and delegated to for building the seed
+    coloring.
+
+    Attributes:
+        constructions (tuple[RConstruction, ...]): Candidate child
+            constructions.
+        probabilities (tuple[float, ...]): Selection probability for each
+            entry of ``constructions``, aligned by index.
+        rng (numpy.random.Generator): Source of randomness used to
+            select the child construction.
+        construction_name (str): Stable name reported by :attr:`name`.
     """
 
     constructions: tuple[RConstruction, ...]
@@ -381,6 +577,19 @@ class RMixedConstruction(RConstruction):
     )
 
     def __post_init__(self) -> None:
+        """
+        Normalize and validate the constructions, probabilities, and rng.
+
+        Raises:
+            TypeError: If any entry of ``constructions`` does not
+                implement :class:`RConstruction`, any probability is
+                non-numeric, or ``rng`` is not a NumPy ``Generator``.
+            ValueError: If ``constructions`` is empty, ``probabilities``
+                does not have one entry per construction, any
+                probability is non-finite or negative, the probabilities
+                do not sum to one, or ``construction_name`` is empty or
+                whitespace.
+        """
         self.constructions = tuple(self.constructions)
         self.probabilities = tuple(self.probabilities)
 
@@ -446,16 +655,35 @@ class RMixedConstruction(RConstruction):
 
     @property
     def name(self) -> str:
+        """
+        str: The configured ``construction_name``.
+        """
         return self.construction_name
 
     @property
     def last_source_name(self) -> str:
+        """
+        str: The ``last_source_name`` of the child construction selected
+        by the most recent call to :meth:`construct`, or
+        ``construction_name`` beforehand.
+        """
         return self._last_source_name
 
     def construct(
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Select one child construction by ``probabilities`` and delegate.
+
+        Args:
+            graph (RGraph): Host graph passed through to the selected
+                child construction.
+
+        Returns:
+            RColoring: The coloring produced by the selected child
+            construction.
+        """
         selected_index = int(
             self.rng.choice(
                 len(self.constructions),
@@ -482,6 +710,17 @@ class RArchiveSnapshotConstruction(RConstruction):
     The eligible records are queried once, shuffled once, and then
     consumed exactly once each. Records subsequently added to the
     archive cannot enter this seed pool.
+
+    Attributes:
+        archive (RArchive): Archive queried for the snapshot.
+        rng (numpy.random.Generator): Source of randomness used to
+            shuffle the snapshot.
+        minimum_score (int | None): Inclusive lower score bound, or
+            ``None`` for no lower bound.
+        maximum_score (int | None): Inclusive upper score bound, or
+            ``None`` for no upper bound.
+        limit (int | None): Maximum number of best-scoring eligible
+            records to include in the snapshot, or ``None`` for no cap.
     """
 
     archive: RArchive
@@ -515,6 +754,18 @@ class RArchiveSnapshotConstruction(RConstruction):
     )
 
     def __post_init__(self) -> None:
+        """
+        Validate ``archive``, ``rng``, and the score/limit bounds.
+
+        Raises:
+            TypeError: If ``archive`` does not implement
+                :class:`RArchive`, or ``rng`` is not a NumPy
+                ``Generator``.
+            ValueError: If ``minimum_score`` and ``maximum_score`` are
+                both supplied with ``minimum_score`` greater than
+                ``maximum_score``, or if a score/limit value fails
+                integer validation.
+        """
         if not isinstance(self.archive, RArchive):
             raise TypeError(
                 "archive must implement RArchive."
@@ -560,6 +811,10 @@ class RArchiveSnapshotConstruction(RConstruction):
 
     @property
     def name(self) -> str:
+        """
+        str: Name encoding the configured score range, e.g.
+        ``"archive-snapshot-score-0-to-5"``.
+        """
         lower = (
             "any"
             if self.minimum_score is None
@@ -581,14 +836,25 @@ class RArchiveSnapshotConstruction(RConstruction):
     def last_record(
         self,
     ) -> RArchiveRecord | None:
+        """
+        RArchiveRecord | None: The record selected by the most recent
+        call to :meth:`construct`, or ``None`` beforehand.
+        """
         return self._last_record
 
     @property
     def prepared(self) -> bool:
+        """
+        bool: Whether the snapshot has been queried and shuffled yet.
+        """
         return self._records is not None
 
     @property
     def snapshot_size(self) -> int:
+        """
+        int: Total number of records in the frozen snapshot, or 0
+        before preparation.
+        """
         if self._records is None:
             return 0
 
@@ -596,6 +862,10 @@ class RArchiveSnapshotConstruction(RConstruction):
 
     @property
     def remaining_count(self) -> int:
+        """
+        int: Number of snapshot records not yet consumed, or 0 before
+        preparation.
+        """
         if self._records is None:
             return 0
 
@@ -610,6 +880,24 @@ class RArchiveSnapshotConstruction(RConstruction):
     ) -> int:
         """
         Freeze and shuffle the currently eligible archive records.
+
+        Idempotent once prepared for a given problem: a later call for
+        the same problem simply returns the existing snapshot size
+        without re-querying the archive.
+
+        Args:
+            graph (RGraph): Host graph identifying which Ramsey
+                problem's archive to query.
+
+        Returns:
+            int: Number of records in the (possibly newly created)
+            snapshot.
+
+        Raises:
+            ValueError: If the snapshot was already prepared for a
+                different Ramsey problem than ``graph.problem``.
+            RuntimeError: If no archived coloring falls within the
+                configured score range for ``graph``'s problem.
         """
         if self._records is not None:
             if graph.problem != self._problem:
@@ -652,6 +940,24 @@ class RArchiveSnapshotConstruction(RConstruction):
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Consume and return the next unconsumed snapshot record.
+
+        Prepares the snapshot on first use (see :meth:`prepare`), then
+        hands out the next record in the frozen shuffled order.
+
+        Args:
+            graph (RGraph): Host graph to bind the loaded coloring to.
+
+        Returns:
+            RColoring: The coloring loaded from the next snapshot
+            record.
+
+        Raises:
+            RuntimeError: If no archived coloring falls within the
+                configured score range for ``graph``'s problem, or if
+                every snapshot record has already been consumed.
+        """
         self.prepare(graph)
 
         if self._records is None:
@@ -689,7 +995,21 @@ def _optional_nonnegative_integer(
     value: int | None,
 ) -> int | None:
     """
-    Validate an optional nonnegative integer.
+    Validate and coerce an optional nonnegative integer parameter.
+
+    Args:
+        name (str): Parameter name used in raised error messages.
+        value (int | None): Candidate value; ``None`` is passed through
+            unchanged.
+
+    Returns:
+        int | None: ``None`` if ``value`` is ``None``, otherwise
+        ``value`` coerced to ``int``.
+
+    Raises:
+        TypeError: If ``value`` is neither ``None`` nor an integer
+            (``bool`` values are rejected).
+        ValueError: If ``value`` is negative.
     """
     if value is None:
         return None
@@ -713,7 +1033,21 @@ def _optional_positive_integer(
     value: int | None,
 ) -> int | None:
     """
-    Validate an optional positive integer.
+    Validate and coerce an optional positive integer parameter.
+
+    Args:
+        name (str): Parameter name used in raised error messages.
+        value (int | None): Candidate value; ``None`` is passed through
+            unchanged.
+
+    Returns:
+        int | None: ``None`` if ``value`` is ``None``, otherwise
+        ``value`` coerced to ``int``.
+
+    Raises:
+        TypeError: If ``value`` is neither ``None`` nor an integer
+            (``bool`` values are rejected).
+        ValueError: If ``value`` is zero or negative.
     """
     value = _optional_nonnegative_integer(
         name,

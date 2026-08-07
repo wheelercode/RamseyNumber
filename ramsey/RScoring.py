@@ -18,6 +18,21 @@ from .RColoring import RColoring
 class RScoreReport:
     """
     Exact monochromatic score and per-color supporting data.
+
+    Immutable snapshot produced by :func:`evaluate_coloring`: the total
+    number of forbidden monochromatic cliques, the count attributed to
+    each color, and each color's full clique edge-count histogram.
+
+    Attributes:
+        total (int): Total number of forbidden monochromatic cliques,
+            summed over all colors.
+        by_color (tuple[int, ...]): Number of forbidden monochromatic
+            cliques found for each color index.
+        histograms (tuple[NDArray[np.int64], ...]): Per-color histogram
+            of clique counts, one entry per color. ``histograms[c][k]``
+            is the number of indexed cliques of color ``c``'s forbidden
+            size that contain exactly ``k`` edges of color ``c``. Each
+            array is an owned, read-only copy.
     """
 
     total: int
@@ -28,6 +43,14 @@ class RScoreReport:
     ]
 
     def __post_init__(self) -> None:
+        """
+        Validate array lengths, normalize dtypes, and freeze all fields.
+
+        Raises:
+            ValueError: If ``by_color`` and ``histograms`` have
+                different lengths, or if ``total`` does not equal the
+                sum of ``by_color``.
+        """
         if len(self.by_color) != len(self.histograms):
             raise ValueError("by_color and histograms must " "have equal lengths.")
 
@@ -72,6 +95,18 @@ class RScoreReport:
     ) -> NDArray[np.int64]:
         """
         Return the edge-count histogram calculated for one color.
+
+        Args:
+            color (int): Color index to look up.
+
+        Returns:
+            NDArray[np.int64]: Read-only histogram where entry ``k`` is
+            the number of indexed cliques of that color containing
+            exactly ``k`` edges of that color.
+
+        Raises:
+            IndexError: If ``color`` is outside the range of stored
+                histograms.
         """
         if color < 0 or color >= len(self.histograms):
             raise IndexError(f"Invalid color index: {color}")
@@ -86,6 +121,22 @@ def count_color_edges_per_clique(
 ) -> NDArray[np.uint8]:
     """
     Count selected-color edges in every indexed clique.
+
+    Args:
+        coloring (RColoring): Coloring to inspect.
+        clique_size (int): Clique size to look up in the coloring's
+            graph's subgraph index.
+        color (int): Color index whose edges are counted within each
+            clique.
+
+    Returns:
+        NDArray[np.uint8]: One count per indexed clique of size
+        ``clique_size``, equal to the number of that clique's edges
+        currently colored ``color``.
+
+    Raises:
+        IndexError: If ``color`` is not a valid color index for the
+            coloring's problem.
     """
     if color < 0 or color >= coloring.graph.problem.n_colors:
         raise IndexError(f"Invalid color index: {color}")
@@ -105,6 +156,18 @@ def clique_histogram(
 ) -> NDArray[np.int64]:
     """
     Group indexed cliques by their selected-color edge count.
+
+    Args:
+        coloring (RColoring): Coloring to inspect.
+        clique_size (int): Clique size to look up in the coloring's
+            graph's subgraph index.
+        color (int): Color index whose edges are counted within each
+            clique.
+
+    Returns:
+        NDArray[np.int64]: Histogram of length ``edges_per_clique + 1``
+        where entry ``k`` is the number of indexed cliques containing
+        exactly ``k`` edges of ``color``.
     """
     counts = count_color_edges_per_clique(
         coloring=coloring,
@@ -126,6 +189,21 @@ def binary_histogram(
 ) -> NDArray[np.int64]:
     """
     Return the legacy histogram for a symmetric two-color problem.
+
+    Args:
+        coloring (RColoring): Coloring to inspect; must belong to a
+            symmetric, two-color problem.
+        edge_color (int): Color index whose edges are counted within
+            each clique. Defaults to ``1``.
+
+    Returns:
+        NDArray[np.int64]: Histogram of clique counts by ``edge_color``
+        edge count, computed over the problem's single required clique
+        size.
+
+    Raises:
+        ValueError: If the coloring's problem is not a symmetric
+            two-color problem.
     """
     problem = coloring.graph.problem
 
@@ -146,6 +224,21 @@ def evaluate_coloring(
 ) -> RScoreReport:
     """
     Calculate every forbidden monochromatic count exactly.
+
+    For a symmetric two-color problem, only one color's histogram is
+    computed directly; the other color's histogram is its exact
+    reversal, since exchanging color roles reverses the meaning of the
+    all-color-zero and all-color-one histogram bins. For problems with
+    more than two colors, or asymmetric problems, each color's
+    histogram is computed independently over that color's own
+    forbidden clique size.
+
+    Args:
+        coloring (RColoring): Coloring to score.
+
+    Returns:
+        RScoreReport: Exact total score, per-color counts, and
+        per-color histograms for ``coloring``.
     """
     problem = coloring.graph.problem
 
@@ -206,5 +299,12 @@ def score_coloring(
 ) -> int:
     """
     Return the total number of forbidden monochromatic cliques.
+
+    Args:
+        coloring (RColoring): Coloring to score.
+
+    Returns:
+        int: Total count of monochromatic forbidden cliques across all
+        colors, equal to ``evaluate_coloring(coloring).total``.
     """
     return evaluate_coloring(coloring).total

@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RArchive</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Persistent coloring, provenance, and leaderboard storage.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Persistent archive interface and SQLite-backed store for exact colorings.</span>
+
+<span class="sd">Defines :class:`RArchive`, the abstract persistence contract used to save</span>
+<span class="sd">and query exact colorings discovered during search, and</span>
+<span class="sd">:class:`RSQLiteArchive`, a concrete implementation backed by a SQLite</span>
+<span class="sd">database that deduplicates colorings by an exact content hash and tracks</span>
+<span class="sd">provenance (which run/iteration produced each observation) and a</span>
+<span class="sd">leaderboard ordered by score.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -88,8 +100,33 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchiveRecord">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RArchiveRecord</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Metadata for one unique archived coloring.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Metadata for one unique archived coloring.</span>
+
+<span class="sd">    Represents a single deduplicated row of the archive: the exact score</span>
+<span class="sd">    and provenance of a coloring, without the coloring data itself. Two</span>
+<span class="sd">    colorings that hash identically are merged into one record, with</span>
+<span class="sd">    ``times_seen`` counting every observation and ``run_name``/</span>
+<span class="sd">    ``iteration`` reflecting the most recent one.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        coloring_id (int): Archive-assigned primary key identifying the</span>
+<span class="sd">            stored coloring, used to retrieve the full coloring via</span>
+<span class="sd">            :meth:`RArchive.load_coloring`.</span>
+<span class="sd">        state_hash (str): Exact content hash used to deduplicate</span>
+<span class="sd">            colorings; identical colorings for the same problem share a</span>
+<span class="sd">            record.</span>
+<span class="sd">        score (int): Exact score of the coloring, i.e. the total count of</span>
+<span class="sd">            forbidden monochromatic cliques (lower is better).</span>
+<span class="sd">        color_zero_count (int): Count of forbidden cliques monochromatic</span>
+<span class="sd">            in color zero.</span>
+<span class="sd">        color_one_count (int): Count of forbidden cliques monochromatic</span>
+<span class="sd">            in color one.</span>
+<span class="sd">        run_name (str): Name of the most recent run that observed this</span>
+<span class="sd">            coloring.</span>
+<span class="sd">        iteration (int): Iteration index, within ``run_name``, of the</span>
+<span class="sd">            most recent observation.</span>
+<span class="sd">        times_seen (int): Total number of times this exact coloring has</span>
+<span class="sd">            been saved to the archive, across all runs.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">coloring_id</span><span class="p">:</span> <span class="nb">int</span>
@@ -113,8 +150,21 @@
     <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RArchivedColoring</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    One restored coloring with its stored metadata and histogram.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One restored coloring with its stored metadata and histogram.</span>
+
+<span class="sd">    Returned by :meth:`RArchive.load_coloring` when reconstructing a</span>
+<span class="sd">    previously archived coloring against a caller-supplied, compatible</span>
+<span class="sd">    host graph.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        record (RArchiveRecord): Archive metadata for this coloring</span>
+<span class="sd">            (score, provenance, and deduplication information).</span>
+<span class="sd">        coloring (RColoring): Restored coloring on the caller&#39;s graph.</span>
+<span class="sd">        histogram (numpy.ndarray): Read-only ``int64`` array of length</span>
+<span class="sd">            ``edges_per_clique + 1`` giving, for each possible per-clique</span>
+<span class="sd">            same-color edge count, the number of indexed cliques with</span>
+<span class="sd">            that count for the archived color (the &quot;legacy&quot; binary</span>
+<span class="sd">            histogram, see :func:`ramsey.RScoring.binary_histogram`).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">record</span><span class="p">:</span> <span class="n">RArchiveRecord</span>
@@ -122,6 +172,13 @@
     <span class="n">histogram</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Copy the supplied histogram and freeze it against mutation.</span>
+
+<span class="sd">        A defensive copy is taken so that the stored histogram is</span>
+<span class="sd">        independent of any array the caller continues to hold, and the</span>
+<span class="sd">        copy&#39;s ``writeable`` flag is cleared so callers cannot corrupt</span>
+<span class="sd">        archived metadata in place.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">histogram</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">histogram</span><span class="p">,</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
@@ -140,8 +197,14 @@
 <div class="viewcode-block" id="RArchive">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive">[docs]</a>
 <span class="k">class</span> <span class="nc">RArchive</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Persistent storage interface for exact Ramsey colorings.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Persistent storage interface for exact Ramsey colorings.</span>
+
+<span class="sd">    Implementations save colorings discovered during search or</span>
+<span class="sd">    construction, deduplicate them by exact content, and expose</span>
+<span class="sd">    leaderboard-style queries (best score, best colorings, colorings</span>
+<span class="sd">    within a score range) that batch drivers such as</span>
+<span class="sd">    :class:`ramsey.RArchiveBatch.RArchiveBatch` use to decide when a</span>
+<span class="sd">    score band has been sufficiently populated.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="RArchive.save_coloring">
@@ -154,8 +217,22 @@
         <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveRecord</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Save or observe one exact coloring.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save or observe one exact coloring.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring (RColoring): Coloring to persist. Implementations</span>
+<span class="sd">                compute score and deduplication data from the coloring</span>
+<span class="sd">                itself rather than trusting caller-supplied metadata.</span>
+<span class="sd">            run_name (str): Name of the run performing the save, used as</span>
+<span class="sd">                provenance.</span>
+<span class="sd">            iteration (int): Iteration index, within ``run_name``, at</span>
+<span class="sd">                which the coloring was produced.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RArchiveRecord: Metadata for the archived coloring. If an</span>
+<span class="sd">            identical coloring already exists, this reflects the merged</span>
+<span class="sd">            record (incremented ``times_seen``, updated provenance)</span>
+<span class="sd">            rather than a newly created one.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -168,8 +245,19 @@
         <span class="n">coloring_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchivedColoring</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Restore one coloring using a compatible graph.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore one coloring using a compatible graph.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring_id (int): Archive-assigned identifier of the</span>
+<span class="sd">                coloring to restore.</span>
+<span class="sd">            graph (RGraph): Host graph the restored coloring will be</span>
+<span class="sd">                attached to. Must describe the same problem (vertex</span>
+<span class="sd">                count, clique size, edge count) as the one the coloring</span>
+<span class="sd">                was originally archived under.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RArchivedColoring: The restored coloring together with its</span>
+<span class="sd">            archive metadata and histogram.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -181,8 +269,15 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the lowest stored score.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the lowest stored score.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict the search to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int | None: The minimum score among matching colorings, or</span>
+<span class="sd">            ``None`` if the archive (or the matching subset) is empty.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -195,8 +290,17 @@
         <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return metadata for the best stored colorings.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return metadata for the best stored colorings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            limit (int): Maximum number of records to return.</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict results to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[RArchiveRecord]: Records ordered by ascending score</span>
+<span class="sd">            (and, for ties, ascending coloring ID), truncated to</span>
+<span class="sd">            ``limit`` entries.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -212,8 +316,21 @@
         <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return records in an inclusive score range.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return records in an inclusive score range.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            minimum_score (int | None): Inclusive lower bound on score,</span>
+<span class="sd">                or ``None`` for no lower bound.</span>
+<span class="sd">            maximum_score (int | None): Inclusive upper bound on score,</span>
+<span class="sd">                or ``None`` for no upper bound.</span>
+<span class="sd">            limit (int | None): Maximum number of records to return, or</span>
+<span class="sd">                ``None`` for no limit.</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict results to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[RArchiveRecord]: Matching records ordered by ascending</span>
+<span class="sd">            score (and, for ties, ascending coloring ID).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -228,8 +345,19 @@
         <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Count unique colorings in an inclusive score range.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Count unique colorings in an inclusive score range.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            minimum_score (int | None): Inclusive lower bound on score,</span>
+<span class="sd">                or ``None`` for no lower bound.</span>
+<span class="sd">            maximum_score (int | None): Inclusive upper bound on score,</span>
+<span class="sd">                or ``None`` for no upper bound.</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict the count to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of unique stored colorings whose score falls</span>
+<span class="sd">            within the inclusive bounds.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -241,8 +369,14 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of unique stored colorings.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of unique stored colorings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict the count to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of unique stored colorings.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 </div>
@@ -252,17 +386,42 @@
 <div class="viewcode-block" id="RSQLiteArchive">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive">[docs]</a>
 <span class="k">class</span> <span class="nc">RSQLiteArchive</span><span class="p">(</span><span class="n">RArchive</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    SQLite archive compatible with the original coloring database.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;SQLite archive compatible with the original coloring database.</span>
+
+<span class="sd">    Colorings are stored in a single ``colorings`` table keyed by an</span>
+<span class="sd">    exact ``state_hash`` (see :meth:`_compatible_state_hash`) so that</span>
+<span class="sd">    identical colorings collapse to one row (``ON CONFLICT`` updates</span>
+<span class="sd">    ``times_seen`` and the most recent provenance instead of inserting a</span>
+<span class="sd">    duplicate). Only symmetric two-color problems are supported, since</span>
+<span class="sd">    the schema (and the legacy ``red_kn_count``/``blue_kn_count``</span>
+<span class="sd">    columns) predates general multi-color/asymmetric problems.</span>
 
 <span class="sd">    Binary colorings are packed into bits. A K43 coloring therefore</span>
 <span class="sd">    occupies 113 bytes rather than 903 bytes.</span>
+
+<span class="sd">    The connection uses WAL journaling and ``synchronous = NORMAL`` so</span>
+<span class="sd">    that concurrent readers (e.g. other processes in</span>
+<span class="sd">    :class:`ramsey.RArchiveBatchParallel.RArchiveBatchParallel`) are not</span>
+<span class="sd">    blocked by writers, while writes that change the ``colorings`` table</span>
+<span class="sd">    are wrapped in a transaction via ``with self.connection:``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">database_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Open (creating if necessary) a SQLite archive database.</span>
+
+<span class="sd">        Creates the parent directory of ``database_path`` if it does not</span>
+<span class="sd">        exist, opens the SQLite connection with row access by column</span>
+<span class="sd">        name, enables foreign keys, switches to WAL journaling with</span>
+<span class="sd">        ``synchronous = NORMAL`` for better concurrent read/write</span>
+<span class="sd">        behavior, and ensures the ``colorings`` schema and indexes exist.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            database_path (str | Path): Filesystem path to the SQLite</span>
+<span class="sd">                database file. Created if it does not already exist.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">database_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">database_path</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">database_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span>
@@ -285,8 +444,15 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_create_schema</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">_create_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Create the compatible coloring table and indexes.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create the compatible coloring table and indexes.</span>
+
+<span class="sd">        Creates, if not already present, the ``colorings`` table (keyed</span>
+<span class="sd">        by ``coloring_id`` with a unique ``state_hash``) and two indexes</span>
+<span class="sd">        supporting the leaderboard queries: one on ``(score,</span>
+<span class="sd">        coloring_id)`` for problem-agnostic score queries, and one on</span>
+<span class="sd">        ``(n_vertices, k_size, score, coloring_id)`` for queries scoped</span>
+<span class="sd">        to a specific problem. Idempotent: safe to call on an existing</span>
+<span class="sd">        database.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
@@ -350,15 +516,37 @@
         <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveRecord</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Save or observe one exact coloring.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save or observe one exact coloring.</span>
 
 <span class="sd">        The histogram and score are calculated from the coloring</span>
 <span class="sd">        inside the archive boundary. Callers cannot accidentally</span>
 <span class="sd">        supply metadata belonging to a different coloring.</span>
 
-<span class="sd">        If the coloring already exists, its observation count and</span>
-<span class="sd">        most recent provenance are updated.</span>
+<span class="sd">        If the coloring already exists (same ``state_hash``), its</span>
+<span class="sd">        ``times_seen`` counter is incremented and its ``last_run``/</span>
+<span class="sd">        ``last_iteration`` provenance is updated to this call&#39;s values,</span>
+<span class="sd">        rather than inserting a new row.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring (RColoring): Coloring to persist. Must belong to a</span>
+<span class="sd">                symmetric two-color problem.</span>
+<span class="sd">            run_name (str): Nonempty name of the run performing the</span>
+<span class="sd">                save, used as provenance.</span>
+<span class="sd">            iteration (int): Nonnegative iteration index, within</span>
+<span class="sd">                ``run_name``, at which the coloring was produced.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RArchiveRecord: Metadata for the archived (or re-observed)</span>
+<span class="sd">            coloring, read back from the database after the write.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``coloring``&#39;s problem is not a symmetric</span>
+<span class="sd">                two-color problem, ``run_name`` is empty, or</span>
+<span class="sd">                ``iteration`` is negative.</span>
+<span class="sd">            TypeError: If ``iteration`` is not an integer.</span>
+<span class="sd">            RuntimeError: If the archive has been closed, or if the row</span>
+<span class="sd">                cannot be re-read immediately after being written (this</span>
+<span class="sd">                should not occur under normal operation).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
@@ -463,8 +651,28 @@
         <span class="n">coloring_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchivedColoring</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Restore one coloring using a compatible graph.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore one coloring using a compatible graph.</span>
+
+<span class="sd">        Unpacks the stored bit-packed coloring back into a per-edge</span>
+<span class="sd">        color array (matching ``graph``&#39;s edge ordering) and decodes the</span>
+<span class="sd">        stored histogram bytes back into an ``int64`` array.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring_id (int): Archive-assigned identifier of the</span>
+<span class="sd">                coloring to restore.</span>
+<span class="sd">            graph (RGraph): Host graph the restored coloring will be</span>
+<span class="sd">                attached to.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RArchivedColoring: The restored coloring, its archive</span>
+<span class="sd">            metadata, and its histogram.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the archive has been closed.</span>
+<span class="sd">            KeyError: If no coloring with ``coloring_id`` exists.</span>
+<span class="sd">            ValueError: If ``graph``&#39;s problem (vertex count, clique</span>
+<span class="sd">                size, or edge count) does not match the problem the</span>
+<span class="sd">                coloring was archived under.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
@@ -527,11 +735,21 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the lowest stored score.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the lowest stored score.</span>
 
 <span class="sd">        If graph is supplied, only colorings belonging to that</span>
 <span class="sd">        problem are considered.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict the search to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int | None: The minimum score among matching colorings, or</span>
+<span class="sd">            ``None`` if no matching coloring is stored.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the archive has been closed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
@@ -562,10 +780,24 @@
         <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return metadata for the best stored colorings.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return metadata for the best stored colorings.</span>
 
 <span class="sd">        Results are ordered by score and then coloring ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            limit (int): Maximum number of records to return. Must be a</span>
+<span class="sd">                positive integer.</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict results to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[RArchiveRecord]: Up to ``limit`` records ordered by</span>
+<span class="sd">            ascending score, then ascending coloring ID.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the archive has been closed.</span>
+<span class="sd">            TypeError: If ``limit`` is not an integer.</span>
+<span class="sd">            ValueError: If ``limit`` is not positive.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
@@ -608,11 +840,20 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of unique stored colorings.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of unique stored colorings.</span>
 
 <span class="sd">        If graph is supplied, only colorings belonging to that</span>
 <span class="sd">        problem are counted.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict the count to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of unique stored colorings.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the archive has been closed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
@@ -643,8 +884,29 @@
         <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return records ordered by score within inclusive bounds.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return records ordered by score within inclusive bounds.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            minimum_score (int | None): Inclusive lower bound on score,</span>
+<span class="sd">                or ``None`` for no lower bound.</span>
+<span class="sd">            maximum_score (int | None): Inclusive upper bound on score,</span>
+<span class="sd">                or ``None`` for no upper bound.</span>
+<span class="sd">            limit (int | None): Maximum number of records to return, or</span>
+<span class="sd">                ``None`` for no limit.</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict results to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[RArchiveRecord]: Matching records ordered by ascending</span>
+<span class="sd">            score, then ascending coloring ID.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the archive has been closed.</span>
+<span class="sd">            TypeError: If ``minimum_score``, ``maximum_score``, or</span>
+<span class="sd">                ``limit`` is not an integer or ``None``.</span>
+<span class="sd">            ValueError: If ``minimum_score`` exceeds ``maximum_score``,</span>
+<span class="sd">                if either score bound is negative, or if ``limit`` is</span>
+<span class="sd">                not positive.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
@@ -696,8 +958,26 @@
         <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Count bounded records without loading their metadata.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Count bounded records without loading their metadata.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            minimum_score (int | None): Inclusive lower bound on score,</span>
+<span class="sd">                or ``None`` for no lower bound.</span>
+<span class="sd">            maximum_score (int | None): Inclusive upper bound on score,</span>
+<span class="sd">                or ``None`` for no upper bound.</span>
+<span class="sd">            graph (RGraph | None): If supplied, restrict the count to</span>
+<span class="sd">                colorings belonging to this graph&#39;s problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of unique stored colorings whose score falls</span>
+<span class="sd">            within the inclusive bounds.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the archive has been closed.</span>
+<span class="sd">            TypeError: If ``minimum_score`` or ``maximum_score`` is not</span>
+<span class="sd">                an integer or ``None``.</span>
+<span class="sd">            ValueError: If ``minimum_score`` exceeds ``maximum_score``</span>
+<span class="sd">                or either bound is negative.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
@@ -725,8 +1005,10 @@
 <div class="viewcode-block" id="RSQLiteArchive.close">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.close">[docs]</a>
     <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Commit outstanding work and close the archive.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Commit outstanding work and close the archive.</span>
+
+<span class="sd">        Idempotent: calling this more than once has no effect after the</span>
+<span class="sd">        first call.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
@@ -737,6 +1019,14 @@
     <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RSQLiteArchive&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Enter a context block, verifying the archive is open.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RSQLiteArchive: This archive instance.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the archive has already been closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span>
 
@@ -746,6 +1036,7 @@
         <span class="n">exception_value</span><span class="p">,</span>
         <span class="n">traceback</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Close the archive on exit from a context block.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
     <span class="nd">@staticmethod</span>
@@ -755,11 +1046,23 @@
         <span class="n">k_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">edge_count</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Create the exact identifier used by ColoringDatabase.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create the exact identifier used by ColoringDatabase.</span>
 
 <span class="sd">        Retaining this format allows existing database files to</span>
 <span class="sd">        recognize identical colorings saved through the new API.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            packed_coloring (bytes): Bit-packed coloring bytes, as</span>
+<span class="sd">                returned by :meth:`ramsey.RColoring.RColoring.packed`.</span>
+<span class="sd">            n_vertices (int): Number of vertices in the host graph.</span>
+<span class="sd">            k_size (int): Required clique size for the (symmetric,</span>
+<span class="sd">                two-color) problem.</span>
+<span class="sd">            edge_count (int): Number of edges in the host graph.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: SHA-256 hex digest of the problem header concatenated</span>
+<span class="sd">            with the packed coloring bytes, used as the ``state_hash``</span>
+<span class="sd">            deduplication key.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">header</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_vertices</span><span class="si">}</span><span class="s2">:&quot;</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">k_size</span><span class="si">}</span><span class="s2">:&quot;</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">edge_count</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;ascii&quot;</span><span class="p">)</span>
 
@@ -769,8 +1072,15 @@
     <span class="k">def</span> <span class="nf">_row_to_record</span><span class="p">(</span>
         <span class="n">row</span><span class="p">:</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">Row</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveRecord</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Convert one SQLite row into immutable metadata.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert one SQLite row into immutable metadata.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            row (sqlite3.Row): Row from the ``colorings`` table.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RArchiveRecord: Immutable metadata built from the row&#39;s</span>
+<span class="sd">            columns, using the row&#39;s ``last_run``/``last_iteration``</span>
+<span class="sd">            values as ``run_name``/``iteration``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">RArchiveRecord</span><span class="p">(</span>
             <span class="n">coloring_id</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;coloring_id&quot;</span><span class="p">]),</span>
@@ -787,8 +1097,20 @@
     <span class="k">def</span> <span class="nf">_problem_key</span><span class="p">(</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the problem fields supported by the compatible schema.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the problem fields supported by the compatible schema.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph whose problem is being</span>
+<span class="sd">                identified.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[int, int]: The graph&#39;s vertex count and required</span>
+<span class="sd">            clique size, i.e. the ``(n_vertices, k_size)`` pair used to</span>
+<span class="sd">            scope archive queries to a specific problem.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the graph&#39;s problem is not a symmetric</span>
+<span class="sd">                two-color problem.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">problem</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
 
@@ -809,8 +1131,18 @@
         <span class="nb">str</span><span class="p">,</span>
         <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Build the optional SQL problem filter.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build the optional SQL problem filter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph | None): If supplied, the resulting clause</span>
+<span class="sd">                restricts to this graph&#39;s problem; otherwise no</span>
+<span class="sd">                filtering is applied.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[str, tuple[int, ...]]: A ``WHERE`` clause (or an empty</span>
+<span class="sd">            string if ``graph`` is ``None``) and its bound parameters,</span>
+<span class="sd">            ready to be interpolated into a query and passed to</span>
+<span class="sd">            ``execute``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">graph</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="p">()</span>
@@ -838,8 +1170,27 @@
         <span class="nb">str</span><span class="p">,</span>
         <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Build a validated SQL problem-and-score filter.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a validated SQL problem-and-score filter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph | None): If supplied, the resulting clause</span>
+<span class="sd">                restricts to this graph&#39;s problem.</span>
+<span class="sd">            minimum_score (int | None): Inclusive lower bound on score,</span>
+<span class="sd">                or ``None`` for no lower bound.</span>
+<span class="sd">            maximum_score (int | None): Inclusive upper bound on score,</span>
+<span class="sd">                or ``None`` for no upper bound.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[str, tuple[int, ...]]: A ``WHERE`` clause (empty if no</span>
+<span class="sd">            filters apply) and its bound parameters, ready to be</span>
+<span class="sd">            interpolated into a query and passed to ``execute``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``minimum_score`` or ``maximum_score`` is not</span>
+<span class="sd">                an integer or ``None``.</span>
+<span class="sd">            ValueError: If ``minimum_score`` exceeds ``maximum_score``,</span>
+<span class="sd">                or if either score bound is negative, or if ``graph``&#39;s</span>
+<span class="sd">                problem is not a symmetric two-color problem.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">minimum_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_optional_nonnegative_integer</span><span class="p">(</span>
             <span class="s2">&quot;minimum_score&quot;</span><span class="p">,</span>
@@ -907,8 +1258,18 @@
         <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Validate run metadata stored with a coloring.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate run metadata stored with a coloring.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            run_name (str): Candidate run name; must be a nonempty</span>
+<span class="sd">                string.</span>
+<span class="sd">            iteration (int): Candidate iteration index; must be a</span>
+<span class="sd">                nonnegative integer.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``run_name`` is empty (or whitespace-only) or</span>
+<span class="sd">                ``iteration`` is negative.</span>
+<span class="sd">            TypeError: If ``iteration`` is not an integer.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">run_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">run_name</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;run_name must be a nonempty string.&quot;</span><span class="p">)</span>
@@ -927,8 +1288,19 @@
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Validate an optional nonnegative integer.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate an optional nonnegative integer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name (str): Parameter name, used in error messages.</span>
+<span class="sd">            value (int | None): Candidate value, or ``None``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int | None: ``None`` if ``value`` is ``None``, otherwise</span>
+<span class="sd">            ``value`` coerced to ``int``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``value`` is not ``None`` and not an integer.</span>
+<span class="sd">            ValueError: If ``value`` is negative.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
@@ -951,8 +1323,19 @@
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Validate an optional positive integer.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate an optional positive integer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name (str): Parameter name, used in error messages.</span>
+<span class="sd">            value (int | None): Candidate value, or ``None``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int | None: ``None`` if ``value`` is ``None``, otherwise</span>
+<span class="sd">            ``value`` coerced to ``int``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``value`` is not ``None`` and not an integer.</span>
+<span class="sd">            ValueError: If ``value`` is negative or zero.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">value</span> <span class="o">=</span> <span class="n">RSQLiteArchive</span><span class="o">.</span><span class="n">_validate_optional_nonnegative_integer</span><span class="p">(</span>
             <span class="n">name</span><span class="p">,</span>
@@ -967,8 +1350,10 @@
         <span class="k">return</span> <span class="n">value</span>
 
     <span class="k">def</span> <span class="nf">_require_open</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Reject operations after the archive has been closed.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reject operations after the archive has been closed.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the archive has been closed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Archive is closed.&quot;</span><span class="p">)</span></div>

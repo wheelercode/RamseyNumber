@@ -1,4 +1,13 @@
-"""Objective-neutral analysis and application of K5 recoloring actions."""
+"""Objective-neutral analysis and application of K5 recoloring actions.
+
+A K5 recoloring action (or "K5 pattern macro action") replaces the colors
+of all ten edges of one currently monochromatic K5 at once, choosing among
+the 1,022 nonmonochromatic ten-edge patterns. This module computes the
+exact score consequences of every such pattern for one target K5 and
+applies a chosen pattern to a search state. It is objective-neutral: it
+reports exact score reductions only and leaves any objective-specific
+reward shaping (such as danger-weighted rewards) to :mod:`ramsey.RK5Policy`.
+"""
 
 from __future__ import annotations
 
@@ -46,6 +55,16 @@ K5_POPCOUNT.flags.writeable = False
 def _read_only_copy(
     values: NDArray,
 ) -> NDArray:
+    """Copy an array-like value and mark the copy read-only.
+
+    Args:
+        values (NDArray): Source array or array-like value.
+
+    Returns:
+        NDArray: An independently owned copy with ``flags.writeable`` set
+        to ``False``, safe to expose on a frozen dataclass without risking
+        aliasing the caller's mutable buffers.
+    """
     result = np.asarray(values).copy()
 
     result.flags.writeable = False
@@ -59,7 +78,40 @@ def _read_only_copy(
     eq=False,
 )
 class RK5PatternAnalysis:
-    """Exact consequences of all 1,022 allowed patterns for one bad K5."""
+    """Exact consequences of all 1,022 allowed patterns for one bad K5.
+
+    Attributes:
+        source_state (RSearchState): Search state this analysis was
+            computed against; used together with ``state_version`` by
+            :meth:`applies_to` to detect staleness.
+        state_version (int): Value of ``source_state.version`` at the time
+            of analysis.
+        target_clique (int): Index of the analyzed monochromatic K5.
+        target_edges (NDArray[np.uint16]): The clique's ten host-graph
+            edge indices, in the canonical clique-edge ordering used to
+            interpret pattern IDs.
+        old_pattern_id (int): The clique's current pattern ID (0 if
+            entirely color zero, 1023 if entirely color one).
+        pattern_ids (NDArray[np.uint16]): The 1,022 nonmonochromatic
+            pattern IDs that were evaluated, i.e. ``K5_ALLOWED_PATTERN_IDS``.
+        histogram_deltas (NDArray[np.int32]): Shape ``(1022, 11)``. Row
+            ``i`` is the net change to every bin of the global color-one
+            edge-count histogram that would result from recoloring the
+            target clique to ``pattern_ids[i]``.
+        exact_rewards (NDArray[np.int32]): Shape ``(1022,)``. Exact score
+            reduction for applying each candidate pattern, derived from
+            the change to the two monochromatic histogram bins.
+        resulting_scores (NDArray[np.int32]): Shape ``(1022,)``. The
+            exact score the state would have after applying each
+            candidate pattern.
+        changed_edge_counts (NDArray[np.uint8]): Shape ``(1022,)``.
+            Number of the ten target edges whose color differs between
+            ``old_pattern_id`` and each candidate pattern.
+        affected_clique_count (int): Number of distinct K5s (including the
+            target) that share at least one edge with the target clique
+            and were therefore considered when aggregating histogram
+            effects.
+    """
 
     source_state: RSearchState
     state_version: int
@@ -77,6 +129,14 @@ class RK5PatternAnalysis:
     affected_clique_count: int
 
     def __post_init__(self) -> None:
+        """Validate array shapes and freeze all fields to owned, read-only copies.
+
+        Raises:
+            ValueError: If ``histogram_deltas``, ``exact_rewards``,
+                ``resulting_scores``, ``changed_edge_counts``, or
+                ``target_edges`` does not have the shape implied by the
+                number of evaluated patterns and ``K5_EDGE_COUNT``.
+        """
         pattern_ids = _read_only_copy(
             np.asarray(self.pattern_ids, dtype=np.uint16)
         )
@@ -141,12 +201,34 @@ class RK5PatternAnalysis:
         self,
         state: RSearchState,
     ) -> bool:
+        """Return whether this analysis still describes the given state.
+
+        Both object identity and state version are checked, so a state
+        that has been mutated since analysis, or a different state
+        entirely, is correctly rejected.
+
+        Args:
+            state (RSearchState): Candidate search state to check.
+
+        Returns:
+            bool: ``True`` if ``state`` is the same object this analysis
+            was computed from and has not since been mutated.
+        """
         return self.source_state is state and self.state_version == state.version
 
 
 def _require_k5_state(
     state: RSearchState,
 ) -> None:
+    """Validate that a search state is configured for K5 forbidden cliques.
+
+    Args:
+        state (RSearchState): Search state to check.
+
+    Raises:
+        ValueError: If the state's clique size is not 5 or its edge count
+            per clique is not ``K5_EDGE_COUNT``.
+    """
     if state.clique_size != 5 or state.edges_per_clique != K5_EDGE_COUNT:
         raise ValueError("K5 pattern actions require a K5 search state.")
 
@@ -154,7 +236,24 @@ def _require_k5_state(
 def pattern_colors(
     pattern_id: int,
 ) -> NDArray[np.uint8]:
-    """Return the ten edge colors encoded by one nonmonochromatic pattern."""
+    """Return the ten edge colors encoded by one nonmonochromatic pattern.
+
+    Bit ``j`` of ``pattern_id`` is the requested color (0 or 1) of target
+    edge ``j`` in the canonical clique-edge ordering.
+
+    Args:
+        pattern_id (int): A nonmonochromatic ten-bit pattern ID between 1
+            and 1022 inclusive (0 and 1023 are excluded because they are
+            monochromatic).
+
+    Returns:
+        NDArray[np.uint8]: Shape ``(10,)`` array of edge colors (0 or 1)
+            decoded from ``pattern_id``.
+
+    Raises:
+        TypeError: If ``pattern_id`` is not an integer.
+        ValueError: If ``pattern_id`` is outside ``[1, 1022]``.
+    """
     if isinstance(pattern_id, bool) or not isinstance(
         pattern_id,
         (int, np.integer),
@@ -178,7 +277,23 @@ def pattern_colors(
 def monochromatic_k5_indices(
     state: RSearchState,
 ) -> NDArray[np.uint32]:
-    """Return indexes of every currently monochromatic K5."""
+    """Return indexes of every currently monochromatic K5.
+
+    A K5 is monochromatic (a "bad" K5, contributing to the exact score)
+    when its color-one edge count is either zero (all color zero) or
+    ``state.edges_per_clique`` (all color one).
+
+    Args:
+        state (RSearchState): Search state to inspect.
+
+    Returns:
+        NDArray[np.uint32]: Indices of every currently monochromatic K5,
+        in ascending clique-index order.
+
+    Raises:
+        ValueError: If ``state`` is not configured for K5 forbidden
+            cliques.
+    """
     _require_k5_state(state)
 
     counts = state.color_one_counts
@@ -205,6 +320,24 @@ def analyze_k5_patterns(
     small number of shared-edge masks actually occur.  This reduces the
     1,022-pattern calculation from tens of millions of clique-by-pattern
     operations to a small grouped table without losing information.
+
+    Args:
+        state (RSearchState): Search state to analyze. Must be configured
+            for K5 forbidden cliques.
+        target_clique (int): Index of a currently monochromatic K5 to
+            evaluate replacement patterns for.
+
+    Returns:
+        RK5PatternAnalysis: The exact score, histogram, and changed-edge
+        consequences of every one of the 1,022 nonmonochromatic patterns
+        for ``target_clique``.
+
+    Raises:
+        ValueError: If ``state`` is not configured for K5 forbidden
+            cliques, or if ``target_clique`` is not currently
+            monochromatic.
+        TypeError: If ``target_clique`` is not an integer.
+        IndexError: If ``target_clique`` is out of range.
     """
     _require_k5_state(state)
 
@@ -364,7 +497,32 @@ def apply_k5_pattern(
     target_clique: int,
     pattern_id: int,
 ) -> int:
-    """Apply one nonmonochromatic ten-edge K5 pattern exactly."""
+    """Apply one nonmonochromatic ten-edge K5 pattern exactly.
+
+    Recolors the target clique's ten edges to the colors encoded by
+    ``pattern_id``, via :meth:`RSearchState.apply_edge_recoloring`, which
+    mutates ``state`` in place and keeps all incrementally maintained
+    data (histogram, score, action-profile cache, version) consistent.
+
+    Args:
+        state (RSearchState): Search state to mutate. Must be configured
+            for K5 forbidden cliques.
+        target_clique (int): Index of the K5 to recolor.
+        pattern_id (int): Nonmonochromatic pattern ID between 1 and 1022,
+            as decoded by :func:`pattern_colors`.
+
+    Returns:
+        int: The exact score reduction produced by the recoloring; a
+        positive value means the score improved.
+
+    Raises:
+        ValueError: If ``state`` is not configured for K5 forbidden
+            cliques.
+        TypeError: If ``target_clique`` is not an integer, or if
+            ``pattern_id`` is not an integer (raised by
+            :func:`pattern_colors`).
+        IndexError: If ``target_clique`` is out of range.
+    """
     _require_k5_state(state)
 
     if isinstance(target_clique, bool) or not isinstance(

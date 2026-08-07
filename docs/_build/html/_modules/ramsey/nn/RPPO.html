@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -86,7 +90,36 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RPPO.RPPOConfig">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RPPOConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Immutable hyperparameters for PPO parameter updates.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Immutable hyperparameters for PPO parameter updates.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        update_epochs (int): Number of full passes over one rollout&#39;s</span>
+<span class="sd">            samples performed by :func:`ppo_update`, each pass using</span>
+<span class="sd">            a fresh random minibatch permutation.</span>
+<span class="sd">        minibatch_size (int): Number of rollout steps per gradient</span>
+<span class="sd">            step within an epoch.</span>
+<span class="sd">        clip_ratio (float): PPO clipping parameter ``epsilon``</span>
+<span class="sd">            bounding the probability ratio to</span>
+<span class="sd">            ``[1 - clip_ratio, 1 + clip_ratio]`` in the clipped</span>
+<span class="sd">            surrogate objective.</span>
+<span class="sd">        value_loss_weight (float): Coefficient applied to the mean</span>
+<span class="sd">            squared-error value loss when it is added to the policy</span>
+<span class="sd">            loss to form the total loss. Defaults to ``0.0``, which</span>
+<span class="sd">            disables the value loss term entirely.</span>
+<span class="sd">        entropy_weight (float): Coefficient applied to the policy</span>
+<span class="sd">            entropy bonus, subtracted from the total loss to</span>
+<span class="sd">            encourage exploration. Defaults to ``0.0``, which</span>
+<span class="sd">            disables the entropy bonus.</span>
+<span class="sd">        maximum_gradient_norm (float): Maximum global gradient norm</span>
+<span class="sd">            used to clip gradients before each optimizer step.</span>
+<span class="sd">        learning_rate (float): Learning rate passed to the Adam</span>
+<span class="sd">            optimizer created by :func:`create_optimizer`.</span>
+<span class="sd">        target_kl (float | None): Optional approximate-KL threshold.</span>
+<span class="sd">            When the mean approximate KL over an epoch&#39;s minibatches</span>
+<span class="sd">            exceeds this value, :func:`ppo_update` stops taking</span>
+<span class="sd">            further epochs early. ``None`` disables early stopping.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">update_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span>
     <span class="n">minibatch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span>
@@ -98,6 +131,25 @@
     <span class="n">target_kl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate, coerce, and normalize every configuration field in place.</span>
+
+<span class="sd">        ``update_epochs`` and ``minibatch_size`` must be positive</span>
+<span class="sd">        integers; ``clip_ratio``, ``value_loss_weight``,</span>
+<span class="sd">        ``entropy_weight``, ``maximum_gradient_norm``, and</span>
+<span class="sd">        ``learning_rate`` must be nonnegative numeric values, with</span>
+<span class="sd">        ``clip_ratio``, ``maximum_gradient_norm``, and</span>
+<span class="sd">        ``learning_rate`` further required to be strictly positive.</span>
+<span class="sd">        ``target_kl`` must be ``None`` or a positive numeric value.</span>
+<span class="sd">        Fields are rewritten with their coerced ``int``/``float``</span>
+<span class="sd">        values via ``object.__setattr__`` because the dataclass is</span>
+<span class="sd">        frozen.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If a field has the wrong type (including</span>
+<span class="sd">                ``bool`` where an integer or float is expected).</span>
+<span class="sd">            ValueError: If a field fails its range check.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
             <span class="s2">&quot;update_epochs&quot;</span><span class="p">,</span>
             <span class="s2">&quot;minibatch_size&quot;</span><span class="p">,</span>
@@ -176,7 +228,39 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RPPO.RPPOMetrics">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RPPOMetrics</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Aggregated diagnostics from one PPO update.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Aggregated diagnostics from one PPO update.</span>
+
+<span class="sd">    Each scalar field is the mean of the corresponding per-minibatch</span>
+<span class="sd">    quantity across every minibatch processed by :func:`ppo_update`,</span>
+<span class="sd">    over however many epochs actually ran.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        policy_loss (float): Mean clipped surrogate policy loss</span>
+<span class="sd">            (negated, so lower is better) across processed</span>
+<span class="sd">            minibatches.</span>
+<span class="sd">        value_loss (float): Mean squared-error value loss across</span>
+<span class="sd">            processed minibatches.</span>
+<span class="sd">        entropy (float): Mean policy entropy across processed</span>
+<span class="sd">            minibatches.</span>
+<span class="sd">        approximate_kl (float): Mean nonnegative approximate</span>
+<span class="sd">            KL-divergence estimate ``ratio - 1 - log(ratio)`` between</span>
+<span class="sd">            the old and updated policy, averaged across processed</span>
+<span class="sd">            minibatches.</span>
+<span class="sd">        clipped_fraction (float): Mean fraction of samples per</span>
+<span class="sd">            minibatch whose probability ratio fell outside</span>
+<span class="sd">            ``[1 - clip_ratio, 1 + clip_ratio]``.</span>
+<span class="sd">        gradient_norm (float): Mean global gradient norm observed</span>
+<span class="sd">            before clipping, across processed minibatches.</span>
+<span class="sd">        minibatch_updates (int): Total number of minibatch gradient</span>
+<span class="sd">            steps performed across all completed epochs.</span>
+<span class="sd">        epochs_completed (int): Number of epochs actually run, which</span>
+<span class="sd">            may be less than ``config.update_epochs`` when early</span>
+<span class="sd">            stopping triggers.</span>
+<span class="sd">        early_stopped (bool): Whether the update loop stopped before</span>
+<span class="sd">            ``config.update_epochs`` epochs because the mean</span>
+<span class="sd">            approximate KL for an epoch exceeded ``config.target_kl``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">policy_loss</span><span class="p">:</span> <span class="nb">float</span>
     <span class="n">value_loss</span><span class="p">:</span> <span class="nb">float</span>
@@ -193,7 +277,13 @@
     <span class="k">def</span> <span class="nf">as_dict</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bool</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return metrics in a logging-friendly dictionary.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return metrics in a logging-friendly dictionary.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, float | int | bool]: One entry per field of</span>
+<span class="sd">            this dataclass, keyed by field name.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;policy_loss&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">policy_loss</span><span class="p">,</span>
@@ -216,7 +306,20 @@
     <span class="n">network</span><span class="p">:</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">RPPOConfig</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create the standard Adam optimizer used by PPO.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create the standard Adam optimizer used by PPO.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        network (RPairPolicyValueNetwork): Policy/value network whose</span>
+<span class="sd">            parameters will be optimized.</span>
+<span class="sd">        config (RPPOConfig): PPO configuration supplying</span>
+<span class="sd">            ``learning_rate``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.optim.Adam: Optimizer constructed over</span>
+<span class="sd">            ``network.parameters()`` with learning rate</span>
+<span class="sd">            ``config.learning_rate``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span>
         <span class="n">network</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span>
@@ -238,7 +341,54 @@
 <span class="sd">    Train the policy/value network using one collected rollout.</span>
 
 <span class="sd">    The rollout remains CPU-resident while the tensors required for</span>
-<span class="sd">    this update are copied to the requested training device.</span>
+<span class="sd">    this update are copied to the requested training device. For</span>
+<span class="sd">    ``config.update_epochs`` epochs, the rollout&#39;s steps are shuffled</span>
+<span class="sd">    into a new random permutation and split into minibatches of</span>
+<span class="sd">    ``config.minibatch_size`` steps. For each minibatch, the network</span>
+<span class="sd">    is re-evaluated on the stored ``pair_inputs``/``available_masks``</span>
+<span class="sd">    to obtain new action log-probabilities, a new value prediction,</span>
+<span class="sd">    and the action distribution&#39;s entropy, and the following clipped</span>
+<span class="sd">    PPO loss is minimized::</span>
+
+<span class="sd">        ratio = exp(new_log_prob - old_log_prob)</span>
+<span class="sd">        unclipped = ratio * advantage</span>
+<span class="sd">        clipped = clamp(ratio, 1 - clip_ratio, 1 + clip_ratio) * advantage</span>
+<span class="sd">        policy_loss = -mean(min(unclipped, clipped))</span>
+<span class="sd">        value_loss = mean((predicted_value - return) ** 2)</span>
+<span class="sd">        total_loss = policy_loss</span>
+<span class="sd">            + value_loss_weight * value_loss</span>
+<span class="sd">            - entropy_weight * entropy</span>
+
+<span class="sd">    ``total_loss`` is backpropagated, gradients are clipped to</span>
+<span class="sd">    ``config.maximum_gradient_norm`` by global norm, and one Adam</span>
+<span class="sd">    step is taken per minibatch. After each epoch, if</span>
+<span class="sd">    ``config.target_kl`` is set and the epoch&#39;s mean approximate KL</span>
+<span class="sd">    exceeds it, training stops early before starting another epoch.</span>
+<span class="sd">    The network is set to training mode (``network.train()``) for the</span>
+<span class="sd">    duration of the update.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        network (RPairPolicyValueNetwork): Policy/value network being</span>
+<span class="sd">            trained. Must already reside on ``device``.</span>
+<span class="sd">        optimizer (torch.optim.Optimizer): Optimizer stepping</span>
+<span class="sd">            ``network``&#39;s parameters, typically created by</span>
+<span class="sd">            :func:`create_optimizer`.</span>
+<span class="sd">        rollout (RRolloutBatch): CPU-resident rollout supplying</span>
+<span class="sd">            per-step inputs, masks, actions, old log-probabilities,</span>
+<span class="sd">            advantages, and returns.</span>
+<span class="sd">        device (torch.device | str): Device the rollout tensors are</span>
+<span class="sd">            copied to for the update; must match the device</span>
+<span class="sd">            ``network`` already resides on.</span>
+<span class="sd">        config (RPPOConfig): PPO hyperparameters controlling epochs,</span>
+<span class="sd">            minibatch size, clipping, loss weights, gradient clipping,</span>
+<span class="sd">            and early stopping.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RPPOMetrics: Diagnostics averaged over every minibatch update</span>
+<span class="sd">        actually performed.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``rollout`` contains zero steps.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">number_of_samples</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">number_of_steps</span>

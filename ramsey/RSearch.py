@@ -16,6 +16,29 @@ from .RPolicy import RPolicy
 class RSearchResult:
     """
     Immutable outcome of one complete search attempt.
+
+    Attributes:
+        policy_name (str): Name of the policy that selected actions.
+        objective_name (str): Name of the objective the environment
+            used.
+        initial_coloring (RColoring): Seed coloring the episode began
+            from.
+        final_coloring (RColoring): Coloring at the moment the episode
+            ended (termination or truncation); not necessarily the
+            best coloring seen.
+        best_coloring (RColoring): Coloring with the best (lowest)
+            exact score seen during the episode.
+        initial_score (int): Exact score of ``initial_coloring``.
+        final_score (int): Exact score of ``final_coloring``.
+        best_score (int): Exact score of ``best_coloring``.
+        steps_completed (int): Number of edge flips applied.
+        terminated (bool): Whether the episode ended because an exact
+            score of zero was reached.
+        truncated (bool): Whether the episode ended because it reached
+            its step limit.
+        step_results (tuple[RStepResult, ...]): Per-step transition
+            results, populated only when the run was requested with
+            ``record_steps=True``; empty otherwise.
     """
 
     policy_name: str
@@ -75,6 +98,14 @@ class RSearch:
         environment: REnvironment,
         policy: RPolicy,
     ) -> None:
+        """Bind a search coordinator to one environment and policy.
+
+        Args:
+            environment (REnvironment): Environment each attempt is
+                run against.
+            policy (RPolicy): Strategy used to select the action taken
+                at every step.
+        """
         self._environment = environment
         self._policy = policy
 
@@ -101,16 +132,25 @@ class RSearch:
         """
         Run from an explicit seed until termination or truncation.
 
-        Parameters
-        ----------
-        coloring:
-            Immutable seed coloring for the search attempt.
+        Resets the environment to ``coloring``, then repeatedly asks
+        the policy to select an available action and applies it to the
+        environment until the episode terminates (exact score reaches
+        zero) or is truncated (the step limit is reached).
 
-        record_steps:
-            If true, preserve every RStepResult in the returned result.
+        Args:
+            coloring (RColoring): Immutable seed coloring for the
+                search attempt.
+            record_steps (bool): If true, preserve every
+                ``RStepResult`` in the returned result. If false, only
+                summary information and important coloring snapshots
+                are retained. Defaults to False.
 
-            If false, only summary information and important coloring
-            snapshots are retained.
+        Returns:
+            RSearchResult: Immutable summary of the completed attempt,
+            including initial, final, and best colorings/scores.
+
+        Raises:
+            TypeError: If ``record_steps`` is not a ``bool``.
         """
         if not isinstance(
             record_steps,

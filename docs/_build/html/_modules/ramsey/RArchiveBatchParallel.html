@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,17 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RArchiveBatchParallel</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Process-parallel archive population for independent Ramsey searches.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Process-parallel archive population for independent Ramsey searches.</span>
+
+<span class="sd">Provides :class:`RArchiveBatchParallel`, a driver analogous to</span>
+<span class="sd">:class:`ramsey.RArchiveBatch.RArchiveBatch` that instead dispatches</span>
+<span class="sd">batches of independent searches to a worker process pool</span>
+<span class="sd">(:class:`ramsey.RSearchParallel.RExactGreedyProcessPool`). Seed</span>
+<span class="sd">construction and all archive access stay in the parent process; workers</span>
+<span class="sd">receive only edge-color arrays and deterministic policy seeds, run</span>
+<span class="sd">complete searches, and return compact results that the parent then</span>
+<span class="sd">saves and tallies at each synchronization barrier (&quot;pass&quot;).</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -95,7 +109,36 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallelConfig">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RArchiveBatchParallelConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for one process-parallel archive population run.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for one process-parallel archive population run.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        run_name (str): Nonempty name recorded as provenance for every</span>
+<span class="sd">            coloring saved during this run.</span>
+<span class="sd">        target_count (int): Number of unique, in-range colorings the run</span>
+<span class="sd">            should try to accumulate in the archive before stopping</span>
+<span class="sd">            early.</span>
+<span class="sd">        maximum_attempts (int): Upper bound on the total number of</span>
+<span class="sd">            independent searches to dispatch across all passes.</span>
+<span class="sd">        batch_size (int): Number of independent search tasks dispatched</span>
+<span class="sd">            to the worker pool at each pass (subject to the remaining</span>
+<span class="sd">            attempt and target budgets).</span>
+<span class="sd">        action_seed_base (int): Base value added to each attempt&#39;s index</span>
+<span class="sd">            to derive that attempt&#39;s deterministic policy seed, so</span>
+<span class="sd">            repeated runs with the same base reproduce the same</span>
+<span class="sd">            per-attempt action sequences.</span>
+<span class="sd">        minimum_score (int | None): Inclusive lower bound on score for a</span>
+<span class="sd">            coloring to count toward ``target_count``, or ``None`` for</span>
+<span class="sd">            no lower bound.</span>
+<span class="sd">        maximum_score (int | None): Inclusive upper bound on score for a</span>
+<span class="sd">            coloring to count toward ``target_count``, or ``None`` for</span>
+<span class="sd">            no upper bound.</span>
+<span class="sd">        start_iteration (int): Iteration number assigned to the first</span>
+<span class="sd">            attempt; each subsequent attempt increments it by one.</span>
+<span class="sd">        save_out_of_range (bool): Whether colorings whose score falls</span>
+<span class="sd">            outside ``[minimum_score, maximum_score]`` should still be</span>
+<span class="sd">            saved to the archive (without counting toward</span>
+<span class="sd">            ``target_count``).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">target_count</span><span class="p">:</span> <span class="nb">int</span>
@@ -108,6 +151,20 @@
     <span class="n">save_out_of_range</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize configuration values.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``run_name`` is empty, ``target_count``,</span>
+<span class="sd">                ``maximum_attempts``, or ``batch_size`` is not positive,</span>
+<span class="sd">                ``action_seed_base`` or ``start_iteration`` is negative,</span>
+<span class="sd">                either score bound is negative, or ``minimum_score``</span>
+<span class="sd">                exceeds ``maximum_score``.</span>
+<span class="sd">            TypeError: If ``target_count``, ``maximum_attempts``,</span>
+<span class="sd">                ``batch_size``, ``action_seed_base``,</span>
+<span class="sd">                ``start_iteration``, ``minimum_score``, or</span>
+<span class="sd">                ``maximum_score`` is not an integer (or ``None`` where</span>
+<span class="sd">                allowed), or if ``save_out_of_range`` is not boolean.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;run_name must be a nonempty string.&quot;</span><span class="p">)</span>
 
@@ -162,7 +219,27 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallelAttempt">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RArchiveBatchParallelAttempt</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One completed worker search and its parent-side archive outcome.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One completed worker search and its parent-side archive outcome.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        attempt (int): Zero-based index of this attempt across the</span>
+<span class="sd">            entire run (not just within its pass).</span>
+<span class="sd">        iteration (int): Iteration number assigned to this attempt</span>
+<span class="sd">            (``config.start_iteration + attempt``), recorded as</span>
+<span class="sd">            provenance if the coloring is saved.</span>
+<span class="sd">        construction_name (str): Name of the construction source that</span>
+<span class="sd">            produced the seed coloring for this attempt.</span>
+<span class="sd">        search_result (RParallelSearchResult): Compact result returned</span>
+<span class="sd">            by the worker process for this attempt&#39;s search.</span>
+<span class="sd">        in_score_range (bool): Whether the search&#39;s best score falls</span>
+<span class="sd">            within the run&#39;s configured score band.</span>
+<span class="sd">        archive_record (RArchiveRecord | None): Archive record for the</span>
+<span class="sd">            saved coloring, or ``None`` if the coloring was not saved</span>
+<span class="sd">            (out of range and ``save_out_of_range`` was false).</span>
+<span class="sd">        new_unique_coloring (bool): Whether this attempt&#39;s coloring was</span>
+<span class="sd">            not already present in the archive (``times_seen == 1``</span>
+<span class="sd">            after saving).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">attempt</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span>
@@ -178,7 +255,23 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallelPass">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RArchiveBatchParallelPass</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Summary of one parallel barrier of independent searches.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Summary of one parallel barrier of independent searches.</span>
+
+<span class="sd">    One &quot;pass&quot; is one round-trip to the worker pool: a batch of</span>
+<span class="sd">    independent search tasks is dispatched, the pool blocks until all of</span>
+<span class="sd">    them complete, and the parent process then saves and tallies the</span>
+<span class="sd">    results before deciding whether another pass is needed.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        pass_number (int): Zero-based index of this pass within the run.</span>
+<span class="sd">        attempts (tuple[RArchiveBatchParallelAttempt, ...]): Outcome of</span>
+<span class="sd">            every attempt dispatched in this pass.</span>
+<span class="sd">        eligible_count (int): Number of unique in-range colorings in the</span>
+<span class="sd">            archive, re-queried immediately after this pass completed.</span>
+<span class="sd">        elapsed_seconds (float): Wall-clock time spent waiting on the</span>
+<span class="sd">            worker pool for this pass (excludes seed construction and</span>
+<span class="sd">            archive I/O).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">pass_number</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">attempts</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RArchiveBatchParallelAttempt</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
@@ -187,10 +280,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">attempt_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of search attempts dispatched in this pass.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">attempts</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">initial_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: ``int64`` array of each attempt&#39;s pre-search score, one entry per attempt.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
             <span class="p">[</span>
                 <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">initial_score</span>
@@ -201,6 +296,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">final_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: ``int64`` array of each attempt&#39;s score at search termination, one entry per attempt.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
             <span class="p">[</span>
                 <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">final_score</span>
@@ -211,6 +307,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">best_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.ndarray: ``int64`` array of each attempt&#39;s best score seen during search, one entry per attempt.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
             <span class="p">[</span>
                 <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
@@ -221,6 +318,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">improved_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of attempts whose best score improved on (was lower than) their initial score.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
             <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
             <span class="o">&lt;</span> <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">initial_score</span>
@@ -229,6 +327,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">in_score_range_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of attempts whose best score fell within the configured score band.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
             <span class="n">attempt</span><span class="o">.</span><span class="n">in_score_range</span>
             <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempts</span>
@@ -236,6 +335,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">new_unique_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of attempts that were both in range and newly archived (not previously seen).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
             <span class="n">attempt</span><span class="o">.</span><span class="n">in_score_range</span>
             <span class="ow">and</span> <span class="n">attempt</span><span class="o">.</span><span class="n">new_unique_coloring</span>
@@ -244,6 +344,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">attempts_per_second</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;float: Throughput of this pass, or ``inf`` if it completed in effectively zero time.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">elapsed_seconds</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
             <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempt_count</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">elapsed_seconds</span></div>
@@ -254,7 +355,25 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallelResult">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RArchiveBatchParallelResult</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of a bounded process-parallel population run.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of a bounded process-parallel population run.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        run_name (str): Run name the population run was executed under.</span>
+<span class="sd">        target_count (int): Target number of unique in-range colorings</span>
+<span class="sd">            the run was trying to reach.</span>
+<span class="sd">        maximum_attempts (int): Attempt budget the run was allowed to</span>
+<span class="sd">            use.</span>
+<span class="sd">        initial_eligible_count (int): Number of unique in-range</span>
+<span class="sd">            colorings already in the archive before this run started.</span>
+<span class="sd">        final_eligible_count (int): Number of unique in-range colorings</span>
+<span class="sd">            in the archive after this run finished, re-queried from the</span>
+<span class="sd">            archive so it stays exact even if another process wrote to</span>
+<span class="sd">            it concurrently.</span>
+<span class="sd">        passes (tuple[RArchiveBatchParallelPass, ...]): Summary of every</span>
+<span class="sd">            parallel pass performed, in order.</span>
+<span class="sd">        elapsed_seconds (float): Total wall-clock time spent across all</span>
+<span class="sd">            passes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">target_count</span><span class="p">:</span> <span class="nb">int</span>
@@ -266,18 +385,22 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">attempts_completed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Total number of search attempts dispatched across all passes.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">attempt_count</span> <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">passes</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">target_reached</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Whether the archive holds at least ``target_count`` eligible colorings.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_eligible_count</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_count</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">new_eligible_colorings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Net increase in unique in-range colorings caused by this run.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_eligible_count</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_eligible_count</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int | None: Lowest best-score seen across every attempt in every pass, or ``None`` if no attempts ran.&quot;&quot;&quot;</span>
         <span class="n">scores</span> <span class="o">=</span> <span class="p">[</span>
             <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
             <span class="k">for</span> <span class="n">parallel_pass</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">passes</span>
@@ -291,6 +414,7 @@
     <span class="p">[</span><span class="n">RArchiveBatchParallelPass</span><span class="p">],</span>
     <span class="kc">None</span><span class="p">,</span>
 <span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;Callback invoked with each :class:`RArchiveBatchParallelPass` as it completes.&quot;&quot;&quot;</span>
 
 
 <div class="viewcode-block" id="RArchiveBatchParallel">
@@ -312,6 +436,23 @@
         <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span><span class="p">,</span>
         <span class="n">search_pool</span><span class="p">:</span> <span class="n">RExactGreedyProcessPool</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Bind a construction, archive, and worker pool to one host graph.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph that seed colorings and archive</span>
+<span class="sd">                queries are scoped to.</span>
+<span class="sd">            construction (RConstruction): Construction used to produce a</span>
+<span class="sd">                seed coloring for each attempt.</span>
+<span class="sd">            archive (RArchive): Archive that discovered colorings are</span>
+<span class="sd">                saved to and queried against, from the parent process</span>
+<span class="sd">                only.</span>
+<span class="sd">            search_pool (RExactGreedyProcessPool): Worker process pool</span>
+<span class="sd">                that runs the greedy searches dispatched at each pass.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``archive`` does not implement</span>
+<span class="sd">                :class:`ramsey.RArchive.RArchive`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">archive</span><span class="p">,</span> <span class="n">RArchive</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;archive must implement RArchive.&quot;</span><span class="p">)</span>
 
@@ -322,18 +463,22 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RGraph</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RGraph: Host graph seed colorings and archive queries are scoped to.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">construction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RConstruction</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RConstruction: Construction used to produce seed colorings.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">archive</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchive</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RArchive: Archive that discovered colorings are saved to.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">search_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RExactGreedyProcessPool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RExactGreedyProcessPool: Worker process pool searches are dispatched to.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_search_pool</span>
 
 <div class="viewcode-block" id="RArchiveBatchParallel.populate">
@@ -344,7 +489,33 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">observer</span><span class="p">:</span> <span class="n">RArchiveBatchParallelObserver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveBatchParallelResult</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate until the score band is full or attempts run out.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate until the score band is full or attempts run out.</span>
+
+<span class="sd">        Runs a sequence of passes. Each pass constructs up to</span>
+<span class="sd">        ``config.batch_size`` seed colorings (capped by the remaining</span>
+<span class="sd">        attempt budget and by how many more eligible colorings are</span>
+<span class="sd">        still needed), dispatches them to the worker pool as one batch,</span>
+<span class="sd">        waits for every task in the batch to complete, then saves</span>
+<span class="sd">        qualifying results to the archive and re-queries the eligible</span>
+<span class="sd">        count. Passes continue until the target count is reached or the</span>
+<span class="sd">        attempt budget is exhausted.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config (RArchiveBatchParallelConfig): Run settings: run</span>
+<span class="sd">                name, target count, attempt budget, pass size, action</span>
+<span class="sd">                seed base, score band, and starting iteration.</span>
+<span class="sd">            observer (RArchiveBatchParallelObserver | None): Optional</span>
+<span class="sd">                callback invoked with each :class:`RArchiveBatchParallelPass`</span>
+<span class="sd">                as it completes, e.g. for progress reporting.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RArchiveBatchParallelResult: Summary of the run, including</span>
+<span class="sd">            the eligible-coloring counts before and after, every pass&#39;s</span>
+<span class="sd">            outcome, and total elapsed time.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``observer`` is supplied and is not callable.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">observer</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;observer must be callable.&quot;</span><span class="p">)</span>
 
@@ -480,6 +651,17 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">RArchiveBatchParallelConfig</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Query the archive for the current count of unique in-range colorings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config (RArchiveBatchParallelConfig): Run settings supplying</span>
+<span class="sd">                the score band to query.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of unique colorings in the archive, scoped to</span>
+<span class="sd">            :attr:`graph`, whose score falls within</span>
+<span class="sd">            ``[config.minimum_score, config.maximum_score]``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="o">.</span><span class="n">coloring_count_in_score_range</span><span class="p">(</span>
             <span class="n">minimum_score</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">minimum_score</span><span class="p">,</span>
             <span class="n">maximum_score</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">maximum_score</span><span class="p">,</span>
@@ -494,6 +676,18 @@
     <span class="n">minimum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check whether a score falls within an inclusive band.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        score (int): Score to test.</span>
+<span class="sd">        minimum_score (int | None): Inclusive lower bound, or ``None``</span>
+<span class="sd">            for no lower bound.</span>
+<span class="sd">        maximum_score (int | None): Inclusive upper bound, or ``None``</span>
+<span class="sd">            for no upper bound.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: ``True`` if ``score`` satisfies both bounds.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">minimum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">score</span> <span class="o">&lt;</span> <span class="n">minimum_score</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span>
     <span class="k">if</span> <span class="n">maximum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">score</span> <span class="o">&gt;</span> <span class="n">maximum_score</span><span class="p">:</span>
@@ -502,6 +696,19 @@
 
 
 <span class="k">def</span> <span class="nf">_nonnegative_integer</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate that a value is a nonnegative integer.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): Parameter name, used in error messages.</span>
+<span class="sd">        value (int): Candidate value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: ``value`` coerced to ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``value`` is not an integer (booleans excluded).</span>
+<span class="sd">        ValueError: If ``value`` is negative.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be an integer.&quot;</span><span class="p">)</span>
 
@@ -514,6 +721,19 @@
 
 
 <span class="k">def</span> <span class="nf">_positive_integer</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate that a value is a positive integer.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): Parameter name, used in error messages.</span>
+<span class="sd">        value (int): Candidate value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: ``value`` coerced to ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``value`` is not an integer (booleans excluded).</span>
+<span class="sd">        ValueError: If ``value`` is not positive.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">value</span> <span class="o">=</span> <span class="n">_nonnegative_integer</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -526,6 +746,20 @@
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate that a value is a nonnegative integer or ``None``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): Parameter name, used in error messages.</span>
+<span class="sd">        value (int | None): Candidate value, or ``None``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int | None: ``None`` if ``value`` is ``None``, otherwise</span>
+<span class="sd">        ``value`` coerced to ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``value`` is not ``None`` and not an integer.</span>
+<span class="sd">        ValueError: If ``value`` is negative.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
     <span class="k">return</span> <span class="n">_nonnegative_integer</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>

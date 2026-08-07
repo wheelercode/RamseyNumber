@@ -21,7 +21,48 @@ from .RState import RSearchState
 
 @dataclass(frozen=True, slots=True, eq=False)
 class RTwoEdgeFlipCausalAnalysis:
-    """Complete read-only causal footprint of two specified edge flips."""
+    """Complete read-only causal footprint of two specified edge flips.
+
+    Produced by :func:`analyze_two_edge_flip_causality`, which flips a
+    copy of a search state at two distinct edges and records the state
+    exactly before and after both flips, plus the exact set of
+    monochromatic K5s created or destroyed by the pair. Unlike
+    :class:`REdgeFlipCausalAnalysis.REdgeFlipCausalAnalysis`, this
+    measures the *net* effect of the pair applied together: only the
+    original and final states are compared, so events caused solely by
+    the first flip and later undone or altered by the second are not
+    reported individually — :attr:`interaction_reward` isolates the
+    portion of the combined reward that is not explained by the two
+    flips' independent, single-edge rewards.
+
+    Attributes:
+        edges (tuple[int, int]): Indices of the two flipped host-graph
+            edges.
+        endpoints (tuple[tuple[int, int], tuple[int, int]]): Vertex
+            indices of each flipped edge.
+        old_colors (tuple[int, int]): Edge colors before the flips, one
+            per edge in ``edges``.
+        new_colors (tuple[int, int]): Edge colors after the flips (the
+            complement of each corresponding ``old_colors`` entry).
+        score_before (int): Exact score of the state before either flip.
+        score_after (int): Exact score of the state after both flips.
+        participation_before (RMonochromaticParticipation): Exact
+            monochromatic K5 participation counts before the flips.
+        participation_after (RMonochromaticParticipation): Exact
+            monochromatic K5 participation counts after the flips.
+        clique_changes (tuple[RMonochromaticCliqueChange, ...]): Exact
+            net event decomposition of every K5 created or destroyed
+            comparing the original state directly to the final state.
+        greedy_rewards_before (numpy.ndarray): Read-only ``int32`` array
+            of the exact immediate reward for every edge, evaluated
+            before either flip.
+        greedy_rewards_after (numpy.ndarray): Read-only ``int32`` array
+            of the exact immediate reward for every edge, evaluated
+            after both flips.
+        individual_rewards (tuple[int, int]): Exact immediate reward
+            each edge would have produced flipped alone from the
+            original state, one per edge in ``edges``.
+    """
 
     edges: tuple[int, int]
     endpoints: tuple[tuple[int, int], tuple[int, int]]
@@ -37,6 +78,18 @@ class RTwoEdgeFlipCausalAnalysis:
     individual_rewards: tuple[int, int]
 
     def __post_init__(self) -> None:
+        """Validate and normalize all fields, then freeze the reward arrays.
+
+        Raises:
+            ValueError: If ``edges`` does not contain two distinct edge
+                indices, if ``endpoints`` does not contain two vertex
+                pairs, if ``old_colors``/``new_colors`` does not contain
+                two binary colors, if a ``new_colors`` entry is not the
+                complement of the matching ``old_colors`` entry, if
+                ``individual_rewards`` does not contain two values, or
+                if ``greedy_rewards_before`` and ``greedy_rewards_after``
+                do not have equal shape.
+        """
         edges = tuple(int(edge) for edge in self.edges)
         endpoints = tuple(
             tuple(int(vertex) for vertex in pair)
@@ -93,21 +146,28 @@ class RTwoEdgeFlipCausalAnalysis:
 
     @property
     def exact_reward(self) -> int:
-        """Score improvement produced by flipping both edges together."""
+        """int: Exact score improvement produced by flipping both edges together."""
         return self.score_before - self.score_after
 
     @property
     def interaction_reward(self) -> int:
-        """Pair reward beyond the sum of the two independent rewards."""
+        """int: Pair reward beyond the sum of the two independent single-edge rewards.
+
+        Positive values mean the pair together does strictly better
+        than the two flips would independently; negative values mean
+        the flips interfere with each other (e.g. one flip destroys a
+        K5 that the other flip would otherwise also have destroyed).
+        """
         return self.exact_reward - sum(self.individual_rewards)
 
     @property
     def shared_vertex(self) -> bool:
-        """Whether the two host edges share an endpoint."""
+        """bool: Whether the two host edges share an endpoint."""
         return bool(set(self.endpoints[0]) & set(self.endpoints[1]))
 
     @property
     def vertex_participation_delta(self) -> NDArray[np.int32]:
+        """numpy.ndarray: Per-vertex, per-color change in monochromatic K5 participation."""
         return (
             self.participation_after.vertices
             - self.participation_before.vertices
@@ -115,6 +175,7 @@ class RTwoEdgeFlipCausalAnalysis:
 
     @property
     def edge_participation_delta(self) -> NDArray[np.int32]:
+        """numpy.ndarray: Per-edge, per-color change in monochromatic K5 participation."""
         return (
             self.participation_after.edges
             - self.participation_before.edges
@@ -122,10 +183,12 @@ class RTwoEdgeFlipCausalAnalysis:
 
     @property
     def greedy_reward_delta(self) -> NDArray[np.int32]:
+        """numpy.ndarray: Per-edge change in exact immediate reward caused by the pair."""
         return self.greedy_rewards_after - self.greedy_rewards_before
 
     @property
     def changed_vertices(self) -> NDArray[np.int32]:
+        """numpy.ndarray: Indices of vertices whose monochromatic K5 participation changed."""
         changed = np.any(
             self.vertex_participation_delta != 0,
             axis=1,
@@ -134,6 +197,7 @@ class RTwoEdgeFlipCausalAnalysis:
 
     @property
     def changed_structure_edges(self) -> NDArray[np.int32]:
+        """numpy.ndarray: Sorted unique indices of host edges touched by any clique change."""
         if not self.clique_changes:
             return np.empty(0, dtype=np.int32)
 
@@ -145,6 +209,13 @@ class RTwoEdgeFlipCausalAnalysis:
 
     @property
     def vertex_event_counts(self) -> NDArray[np.int32]:
+        """numpy.ndarray: Number of net clique-change events touching each vertex.
+
+        Counts every creation and destruction event in
+        :attr:`clique_changes` regardless of color, so a vertex involved
+        in both a destroyed red K5 and a created blue K5 scores two
+        events even though its net delta may be zero.
+        """
         result = np.zeros(
             len(self.participation_before.vertices),
             dtype=np.int32,
@@ -157,6 +228,11 @@ class RTwoEdgeFlipCausalAnalysis:
 
     @property
     def edge_event_counts(self) -> NDArray[np.int32]:
+        """numpy.ndarray: Number of net clique-change events touching each host edge.
+
+        Counts events the same way as :attr:`vertex_event_counts`, but
+        indexed by host edge rather than vertex.
+        """
         result = np.zeros(
             len(self.participation_before.edges),
             dtype=np.int32,
@@ -176,10 +252,35 @@ def analyze_two_edge_flip_causality(
     """
     Analyze two simultaneous edge flips without mutating the supplied state.
 
-    Clique changes are measured from the original state directly to the final
-    state. Intermediate events caused by only the first flip are intentionally
-    excluded, so the returned event decomposition is the exact net causal
-    footprint of the pair.
+    Copies ``state``, flips ``first_edge`` and then ``second_edge`` on
+    the copy, and records the exact score, monochromatic participation,
+    and per-edge immediate-reward landscape before either flip and
+    after both. Clique changes are measured from the original state
+    directly to the final state. Intermediate events caused by only the
+    first flip are intentionally excluded, so the returned event
+    decomposition is the exact net causal footprint of the pair (see
+    :attr:`RTwoEdgeFlipCausalAnalysis.interaction_reward` for the
+    departure from the sum of the two flips' independent rewards).
+
+    Args:
+        state (RSearchState): Search state to analyze. Not mutated;
+            the flips are applied to an internal copy.
+        first_edge (int): Index of the first host-graph edge to flip.
+        second_edge (int): Index of the second host-graph edge to flip.
+            Must differ from ``first_edge``.
+
+    Returns:
+        RTwoEdgeFlipCausalAnalysis: Complete net causal footprint of
+        flipping both ``first_edge`` and ``second_edge`` from ``state``.
+
+    Raises:
+        TypeError: If ``first_edge`` or ``second_edge`` is not an
+            integer.
+        IndexError: If ``first_edge`` or ``second_edge`` is outside the
+            host graph.
+        ValueError: If ``first_edge`` and ``second_edge`` are equal.
+        RuntimeError: If the internal event-decomposition consistency
+            check fails (see :func:`_verify_event_decomposition`).
     """
     first_edge = _validated_edge(
         state,
@@ -320,6 +421,21 @@ def _validated_edge(
     *,
     name: str,
 ) -> int:
+    """Validate that ``edge`` is an in-range integer edge index.
+
+    Args:
+        state (RSearchState): Search state defining the valid edge
+            range.
+        edge (int): Candidate edge index to validate.
+        name (str): Parameter name to use in error messages.
+
+    Returns:
+        int: ``edge`` coerced to a plain ``int``.
+
+    Raises:
+        TypeError: If ``edge`` is not an integer (or is a ``bool``).
+        IndexError: If ``edge`` is outside the host graph.
+    """
     if isinstance(edge, bool) or not isinstance(edge, Integral):
         raise TypeError(f"{name} must be an integer.")
 
@@ -334,7 +450,22 @@ def _validated_edge(
 def _verify_event_decomposition(
     analysis: RTwoEdgeFlipCausalAnalysis,
 ) -> None:
-    """Verify that pair events exactly reconstruct both load deltas."""
+    """Verify that pair events exactly reconstruct both load deltas.
+
+    Replays every recorded :class:`RMonochromaticCliqueChange` event
+    and checks that the resulting per-vertex and per-edge deltas match
+    :attr:`RTwoEdgeFlipCausalAnalysis.vertex_participation_delta` and
+    :attr:`RTwoEdgeFlipCausalAnalysis.edge_participation_delta` exactly.
+
+    Args:
+        analysis (RTwoEdgeFlipCausalAnalysis): Analysis whose event
+            decomposition should be checked for consistency.
+
+    Raises:
+        RuntimeError: If replaying the clique-change events does not
+            exactly reconstruct either the vertex or the edge
+            participation delta.
+    """
     vertex_delta = np.zeros_like(
         analysis.vertex_participation_delta
     )

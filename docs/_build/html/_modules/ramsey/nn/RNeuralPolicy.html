@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.nn.RNeuralPolicy</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Adapter connecting neural model output to the search policy interface.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Adapter connecting neural model output to the search policy interface.</span>
+
+<span class="sd">Wraps a trained :class:`~ramsey.nn.RModel.RPairPolicyValueNetwork` in</span>
+<span class="sd">an :class:`~ramsey.RPolicy.RPolicy` implementation so it can be used</span>
+<span class="sd">by :class:`~ramsey.RSearch.RSearch` like any other search policy,</span>
+<span class="sd">either sampling actions stochastically (for rollout collection during</span>
+<span class="sd">PPO training) or selecting the highest-probability action greedily</span>
+<span class="sd">(for evaluation).</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -86,8 +98,20 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RNeuralPolicy.RNeuralDecision">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RNeuralDecision</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Action and diagnostic predictions from one policy evaluation.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Action and diagnostic predictions from one policy evaluation.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        edge (int): Encoded index of the edge action selected (either</span>
+<span class="sd">            sampled or, in greedy mode, the highest-logit available</span>
+<span class="sd">            edge).</span>
+<span class="sd">        log_probability (float): Log-probability the policy&#39;s action</span>
+<span class="sd">            distribution assigned to ``edge``, under the categorical</span>
+<span class="sd">            distribution built from the network&#39;s logits.</span>
+<span class="sd">        value (float): The network&#39;s scalar value estimate for the</span>
+<span class="sd">            current search state, from the value head.</span>
+<span class="sd">        entropy (float): Entropy of the full action distribution over</span>
+<span class="sd">            available edges, a measure of how spread out (as opposed</span>
+<span class="sd">            to peaked) the policy&#39;s action probabilities are.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span>
@@ -100,8 +124,12 @@
 <div class="viewcode-block" id="RNeuralPolicy">
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RNeuralPolicy.RNeuralPolicy">[docs]</a>
 <span class="k">class</span> <span class="nc">RNeuralPolicy</span><span class="p">(</span><span class="n">RPolicy</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Select actions using a trained policy/value network.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Select actions using a trained policy/value network.</span>
+
+<span class="sd">    Builds the pair-input and action-mask tensors for the environment&#39;s</span>
+<span class="sd">    current search state, runs the network in evaluation mode</span>
+<span class="sd">    (gradient-free), and either samples from or takes the argmax of the</span>
+<span class="sd">    resulting categorical action distribution over available edges.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -111,6 +139,23 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">greedy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Wrap a trained network as a search policy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            network (RPairPolicyValueNetwork): Policy/value network to</span>
+<span class="sd">                query for action logits and value estimates. Must</span>
+<span class="sd">                already reside on ``device``.</span>
+<span class="sd">            device (torch.device | str): Device the network&#39;s</span>
+<span class="sd">                parameters live on and the device the input tensors are</span>
+<span class="sd">                built on; resolved via</span>
+<span class="sd">                :func:`~ramsey.nn.RRuntime.resolve_torch_device`.</span>
+<span class="sd">            greedy (bool): If ``True``, always select the</span>
+<span class="sd">                highest-logit available action. If ``False`` (the</span>
+<span class="sd">                default), sample from the action distribution.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``greedy`` is not a boolean.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">greedy</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;greedy must be boolean.&quot;</span><span class="p">)</span>
 
@@ -120,6 +165,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;str: ``&quot;neural-greedy&quot;`` or ``&quot;neural-sampling&quot;``, per ``greedy``.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_greedy</span><span class="p">:</span>
             <span class="k">return</span> <span class="s2">&quot;neural-greedy&quot;</span>
 
@@ -129,18 +175,22 @@
     <span class="k">def</span> <span class="nf">network</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RPairPolicyValueNetwork: The wrapped policy/value network.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">device</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;torch.device: Device the network and its inputs reside on.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">greedy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Whether actions are selected greedily rather than sampled.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_greedy</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">requires_full_analysis</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Always ``False``; the neural policy does not need cached exact action analysis.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">False</span>
 
 <div class="viewcode-block" id="RNeuralPolicy.select_action">
@@ -149,6 +199,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the selected edge index for the current search state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment providing the</span>
+<span class="sd">                current search state and action availability.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Encoded index of the edge action chosen by</span>
+<span class="sd">            :meth:`evaluate`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">environment</span><span class="p">)</span><span class="o">.</span><span class="n">edge</span></div>
 
 
@@ -159,8 +219,26 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RNeuralDecision</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Evaluate the current state and return one decision.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate the current state and return one decision.</span>
+
+<span class="sd">        Runs under ``torch.no_grad()``: no gradients are tracked, since</span>
+<span class="sd">        this is inference-only evaluation (used both for rollout action</span>
+<span class="sd">        selection and for policy diagnostics), not a training step.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment providing the</span>
+<span class="sd">                current search state and action availability.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RNeuralDecision: The selected edge, its log-probability</span>
+<span class="sd">            under the action distribution, the network&#39;s value</span>
+<span class="sd">            estimate for the state, and the distribution&#39;s entropy.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the environment&#39;s host graph dimensions do</span>
+<span class="sd">                not match the wrapped network.</span>
+<span class="sd">            RuntimeError: If the network&#39;s parameters do not reside on</span>
+<span class="sd">                this policy&#39;s device.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_compatible_environment</span><span class="p">(</span><span class="n">environment</span><span class="p">)</span>
 
@@ -210,6 +288,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Require the environment&#39;s host graph to match the network.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment whose host graph</span>
+<span class="sd">                dimensions are checked against the network.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the environment graph&#39;s vertex or edge</span>
+<span class="sd">                count does not match the network.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">environment</span><span class="o">.</span><span class="n">graph</span>
 
         <span class="k">if</span> <span class="p">(</span>
@@ -223,6 +311,16 @@
     <span class="k">def</span> <span class="nf">_require_network_device</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Require the network&#39;s parameters to reside on this policy&#39;s device.</span>
+
+<span class="sd">        Falls back to inspecting the ``edge_vertices`` buffer&#39;s device</span>
+<span class="sd">        if the network happens to expose no parameters.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the network&#39;s parameters (or, absent any</span>
+<span class="sd">                parameters, its ``edge_vertices`` buffer) are on a</span>
+<span class="sd">                different device than this policy.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">actual_device</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span>
         <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>

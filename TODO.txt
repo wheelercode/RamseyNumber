@@ -1,0 +1,29 @@
+#  Suspicious code/design issues noticed but not fixed (aggregated from all 9 agents):
+
+RArchive.py:640 — string built from adjacent literal concatenation (f"{a}:" f"{b}:"), unusual style only.
+
+RColoring.py — to_adjacency_matrix raises IndexError for invalid edge_color while from_adjacency_matrix raises ValueError for the same kind of invalid input — inconsistent exception type for symmetric validation.
+
+_owned_read_only/_read_only_copy — near-identical copy-and-freeze helper duplicated independently in RAction.py, RActionFlexibility.py, RActionLandscape.py, RVertexBalanceAction.py, REdgeViolationAction.py, RK5Action.py, etc.
+
+RState.py — _update_action_profiles's None-guard is dead code given its only call site already checks the same condition.
+
+RActionFlexibility.py — candidate-flip evaluation flips an edge then flips it back to "undo," relying on toggle semantics rather than an explicit undo path — fragile if flip semantics ever change.
+
+REdgeFlipCausalAnalysis.py / RTwoEdgeFlipCausalAnalysis.py — fields named greedy_rewards_before/after actually hold exact rewards, not a greedy heuristic; misleading naming.
+
+RConstructionEdgeRisk.py — class docstring previously claimed hard-coded "K43," but the implementation is fully generic over any symmetric two-color problem — corrected in the new docstring, but worth confirming that was truly a documentation error and not a design assumption elsewhere.
+
+RConstructionK5Risk.py:139 — dataclass isn't frozen, yet __post_init__ uses object.__setattr__ (harmless but inconsistent with the rest of the file's plain assignment).
+
+RVertexBalanceAction.py::_candidate_transfers — O(donors × recipients × n_vertices) pure-Python triple loop, unvectorized, unlike the rest of the module.
+
+RK5Policy.py::select_greedy_k5_action — if the first ranked target has no eligible pattern in range, the function raises immediately rather than trying the next-ranked target within target_limit.
+
+RMetric.py::_violation_subset_counts — pure-Python itertools.combinations loop per clique, a likely performance hot spot versus the vectorized paths elsewhere in the same module.
+
+nn/RPPO.py — value_loss_weight and entropy_weight both default to 0.0, silently disabling the value loss and entropy bonus unless explicitly overridden by the caller.
+
+nn/REvaluation.py::_evaluate_checkpoint — restores each checkpoint with a throwaway np.random.default_rng(0), discarding any NumPy RNG state actually stored in the checkpoint.
+
+RArchiveBatchParallel.py defaults save_out_of_range=False vs. RArchiveBatch.py's True — likely intentional (avoid flooding the archive from parallel throwaway results) but worth confirming.

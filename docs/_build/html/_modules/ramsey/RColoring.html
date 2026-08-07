@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RColoring</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Validated, immutable edge-coloring values and conversions.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Validated, immutable edge-coloring values and conversions.</span>
+
+<span class="sd">Defines :class:`RColoring`, the immutable value type for one complete</span>
+<span class="sd">assignment of colors to every edge of an :class:`ramsey.RGraph.RGraph`.</span>
+<span class="sd">It validates colors against the graph&#39;s problem definition and provides</span>
+<span class="sd">conversions to and from color/adjacency matrix representations, along</span>
+<span class="sd">with content-addressable hashing used by archives and duplicate</span>
+<span class="sd">detection.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -89,14 +101,28 @@
     <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RColoring</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    One immutable assignment of colors to the edges of an RGraph.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One immutable assignment of colors to the edges of an RGraph.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        graph (RGraph): Host graph whose edges are colored.</span>
+<span class="sd">        colors (ColorArray): Read-only ``uint8`` array of shape</span>
+<span class="sd">            ``(graph.number_of_edges,)``. Entry ``e`` is the color of</span>
+<span class="sd">            host edge ``e``, aligned with ``graph.edges``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span>
     <span class="n">colors</span><span class="p">:</span> <span class="n">ColorArray</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate the supplied colors and normalize/freeze them.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``colors`` does not have shape</span>
+<span class="sd">                ``(graph.number_of_edges,)``, or contains a value</span>
+<span class="sd">                outside the problem&#39;s valid color range.</span>
+<span class="sd">            TypeError: If ``colors`` does not have an integer or</span>
+<span class="sd">                boolean dtype.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">supplied</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">colors</span><span class="p">)</span>
 
         <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,)</span>
@@ -141,8 +167,11 @@
 <div class="viewcode-block" id="RColoring.mutable_copy">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RColoring.RColoring.mutable_copy">[docs]</a>
     <span class="k">def</span> <span class="nf">mutable_copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ColorArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return a writable copy for use by mutable search state.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a writable copy for use by mutable search state.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ColorArray: Independently owned, writable copy of</span>
+<span class="sd">            ``colors``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
 
@@ -153,8 +182,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the color assigned to one encoded edge.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the color assigned to one encoded edge.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge (int): Index of the host edge to look up.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Color currently assigned to ``edge``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If ``edge`` is out of range.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">edge</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">edge</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">colors</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid edge index: </span><span class="si">{</span><span class="n">edge</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -167,11 +204,15 @@
     <span class="k">def</span> <span class="nf">to_color_matrix</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ColorArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the symmetric matrix of edge colors.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the symmetric matrix of edge colors.</span>
 
 <span class="sd">        Diagonal entries are zero and do not represent colored</span>
 <span class="sd">        self-edges. They are unused.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ColorArray: Owned ``uint8`` array of shape</span>
+<span class="sd">            ``(n_vertices, n_vertices)``, symmetric, with entry</span>
+<span class="sd">            ``[i, j]`` equal to the color of edge ``(i, j)``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">n_vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
 
@@ -200,8 +241,22 @@
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
         <span class="n">matrix</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RColoring&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Construct a coloring from a symmetric edge-color matrix.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a coloring from a symmetric edge-color matrix.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph the coloring is defined over.</span>
+<span class="sd">            matrix (NDArray[np.integer]): Symmetric ``(n_vertices,</span>
+<span class="sd">                n_vertices)`` matrix whose entry ``[i, j]`` gives the</span>
+<span class="sd">                color of edge ``(i, j)``. Diagonal entries are ignored.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: New coloring extracted from ``matrix`` along</span>
+<span class="sd">            ``graph.edges``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``matrix`` does not have shape</span>
+<span class="sd">                ``(n_vertices, n_vertices)``, is not symmetric, or</span>
+<span class="sd">                contains a color outside the problem&#39;s valid range.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">matrix</span><span class="p">)</span>
 
@@ -247,11 +302,21 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">edge_color</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Project one selected color to ordinary graph edges.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Project one selected color to ordinary graph edges.</span>
 
-<span class="sd">        An entry is one exactly when its edge has edge_color.</span>
+<span class="sd">        An entry is one exactly when its edge has ``edge_color``.</span>
 <span class="sd">        Every other edge color becomes a non-edge.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge_color (int): Color to project into the adjacency</span>
+<span class="sd">                matrix.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.uint8]: Owned, symmetric ``(n_vertices,</span>
+<span class="sd">            n_vertices)`` binary adjacency matrix for ``edge_color``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If ``edge_color`` is out of range.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_color</span><span class="p">(</span><span class="n">edge_color</span><span class="p">)</span>
 
@@ -283,8 +348,28 @@
         <span class="n">matrix</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
         <span class="n">edge_color</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RColoring&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Construct a binary coloring from an ordinary adjacency matrix.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a binary coloring from an ordinary adjacency matrix.</span>
+
+<span class="sd">        Edges present in ``matrix`` (value ``1``) receive ``edge_color``;</span>
+<span class="sd">        absent edges (value ``0``) receive the other color.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph the coloring is defined over;</span>
+<span class="sd">                must be a two-color problem.</span>
+<span class="sd">            matrix (NDArray[np.integer]): Symmetric, binary, zero-</span>
+<span class="sd">                diagonal ``(n_vertices, n_vertices)`` adjacency matrix.</span>
+<span class="sd">            edge_color (int): Color assigned to edges present in</span>
+<span class="sd">                ``matrix``; must be ``0`` or ``1``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: New two-color coloring built from ``matrix``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``graph.problem.n_colors`` is not ``2``, if</span>
+<span class="sd">                ``edge_color`` is not ``0`` or ``1``, if ``matrix`` does</span>
+<span class="sd">                not have shape ``(n_vertices, n_vertices)``, is not</span>
+<span class="sd">                symmetric, contains values other than ``0``/``1``, or</span>
+<span class="sd">                has a nonzero diagonal.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -345,8 +430,14 @@
 <div class="viewcode-block" id="RColoring.complement">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RColoring.RColoring.complement">[docs]</a>
     <span class="k">def</span> <span class="nf">complement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RColoring&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Swap the two colors in a binary Ramsey coloring.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Swap the two colors in a binary Ramsey coloring.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: New coloring with every edge&#39;s color flipped</span>
+<span class="sd">            (``1 - color``).</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``graph.problem.n_colors`` is not ``2``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Color complement is defined here &quot;</span> <span class="s2">&quot;only for two colors.&quot;</span><span class="p">)</span>
@@ -363,8 +454,15 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">edge_color</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return ordinary-graph degrees for one selected edge color.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return ordinary-graph degrees for one selected edge color.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge_color (int): Color whose adjacency projection is used.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.int64]: Degree of each vertex, shape</span>
+<span class="sd">            ``(n_vertices,)``, in the ``edge_color`` adjacency</span>
+<span class="sd">            projection.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">adjacency</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_adjacency_matrix</span><span class="p">(</span><span class="n">edge_color</span><span class="o">=</span><span class="n">edge_color</span><span class="p">)</span>
 
@@ -380,8 +478,14 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">edge_color</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return vertices having degree zero in one color projection.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return vertices having degree zero in one color projection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge_color (int): Color whose adjacency projection is used.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.int32]: Indices of vertices with no incident</span>
+<span class="sd">            edge of ``edge_color``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">degrees</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertex_degrees</span><span class="p">(</span><span class="n">edge_color</span><span class="o">=</span><span class="n">edge_color</span><span class="p">)</span>
 
@@ -391,8 +495,14 @@
 <div class="viewcode-block" id="RColoring.packed">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RColoring.RColoring.packed">[docs]</a>
     <span class="k">def</span> <span class="nf">packed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return a compact deterministic byte representation.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a compact deterministic byte representation.</span>
+
+<span class="sd">        For a two-color problem, colors are bit-packed (one bit per</span>
+<span class="sd">        edge); otherwise the raw color array bytes are used.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bytes: Compact byte encoding of ``colors``, deterministic</span>
+<span class="sd">            for a given coloring.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">packbits</span><span class="p">(</span>
@@ -406,8 +516,15 @@
 <div class="viewcode-block" id="RColoring.exact_hash">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RColoring.RColoring.exact_hash">[docs]</a>
     <span class="k">def</span> <span class="nf">exact_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return an identifier containing problem and coloring data.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return an identifier containing problem and coloring data.</span>
+
+<span class="sd">        Combines the problem&#39;s vertex count, forbidden clique sizes,</span>
+<span class="sd">        and edge count with :meth:`packed` into a SHA-256 digest,</span>
+<span class="sd">        suitable as a content-addressable key for archives and</span>
+<span class="sd">        duplicate detection.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Hexadecimal SHA-256 digest identifying this coloring.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">problem</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
 
@@ -426,8 +543,18 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">other</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return whether another coloring has identical semantics.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether another coloring has identical semantics.</span>
+
+<span class="sd">        Unlike default dataclass equality (disabled here via</span>
+<span class="sd">        ``eq=False``), this compares the problem definition and color</span>
+<span class="sd">        values rather than object identity.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            other (object): Value to compare against.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if ``other`` is an ``RColoring`` with an</span>
+<span class="sd">            equal problem and identical colors.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="n">other</span><span class="p">,</span>
@@ -445,8 +572,14 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">color</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Validate a color index used for a graph projection.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate a color index used for a graph projection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            color (int): Color index to validate.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If ``color`` is negative or not less than the</span>
+<span class="sd">                problem&#39;s number of colors.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">color</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">color</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid color index: </span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>

@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -81,7 +85,15 @@
 <span class="k">def</span> <span class="nf">_owned_read_only</span><span class="p">(</span>
     <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an owned, read-only copy of an array.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an owned, read-only copy of an array.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        values (numpy.ndarray): Source array or array-like value to copy.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: A new array that owns its memory, with the</span>
+<span class="sd">        ``writeable`` flag cleared.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
     <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
@@ -104,6 +116,15 @@
 <span class="sd">    forbidden cliques containing edge e.  This deliberately measures</span>
 <span class="sd">    only current structural involvement; it does not estimate the</span>
 <span class="sd">    score change, danger, or other consequences of flipping the edge.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        source_state (RSearchState): Search state this analysis</span>
+<span class="sd">            describes.</span>
+<span class="sd">        state_version (int): Version of ``source_state`` at the time of</span>
+<span class="sd">            analysis, used by :meth:`applies_to` to detect staleness.</span>
+<span class="sd">        violation_loads (numpy.ndarray): Read-only ``int32`` array of</span>
+<span class="sd">            shape ``(number_of_edges,)`` giving the number of currently</span>
+<span class="sd">            monochromatic forbidden cliques containing each edge.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
@@ -111,6 +132,12 @@
     <span class="n">violation_loads</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate the shape and non-negativity of ``violation_loads``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``violation_loads`` does not have one value</span>
+<span class="sd">                per edge, or if any value is negative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
         <span class="p">)</span>
@@ -144,7 +171,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">maximum_load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the greatest current violation load of any edge.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Greatest current violation load of any edge, or zero if there are no edges.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">violation_loads</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="mi">0</span>
 
@@ -152,7 +179,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">total_load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return total edge participation across all violations.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Total edge participation summed across all violations.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">int</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">violation_loads</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
                 <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
@@ -165,7 +192,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this analysis describes the current state.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this analysis describes the current state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Candidate state to check.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if ``state`` is the same object as</span>
+<span class="sd">            :attr:`source_state` and has not been mutated since (its</span>
+<span class="sd">            version still matches :attr:`state_version`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span>
             <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span>
@@ -186,6 +222,14 @@
 <span class="sd">    all-red K5s and the final profile bin contains all-blue K5s.</span>
 <span class="sd">    Their sum is therefore exactly the number of violations containing</span>
 <span class="sd">    each edge.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state whose edges are counted.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: ``int32`` array of shape ``(number_of_edges,)``</span>
+<span class="sd">        with the number of currently monochromatic forbidden cliques</span>
+<span class="sd">        containing each edge.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">profiles</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">action_profiles</span>
 
@@ -201,7 +245,15 @@
 <span class="k">def</span> <span class="nf">analyze_edge_violations</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REdgeViolationAnalysis</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Analyze current monochromatic-clique participation by edge.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Analyze current monochromatic-clique participation by edge.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to analyze.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        REdgeViolationAnalysis: Wrapped violation-load counts for</span>
+<span class="sd">        ``state``, tagged with its version for staleness checks.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">REdgeViolationAnalysis</span><span class="p">(</span>
         <span class="n">source_state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
         <span class="n">state_version</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>

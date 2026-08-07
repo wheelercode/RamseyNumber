@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -90,12 +94,17 @@
 
 <span class="sd">    This deliberately ignores the consequences of the flip and ranks</span>
 <span class="sd">    edges only by how many current monochromatic cliques contain them.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rng (numpy.random.Generator): Random source used to break ties</span>
+<span class="sd">            uniformly among edges that share the maximum violation load.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;str: Stable identifier for this policy, ``&quot;edge-violation-load&quot;``.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;edge-violation-load&quot;</span>
 
 <div class="viewcode-block" id="REdgeViolationPolicy.select_action">
@@ -104,6 +113,21 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Select an available edge with the greatest violation load.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment supplying the</span>
+<span class="sd">                current search state and the mask of currently</span>
+<span class="sd">                available actions.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Index of an available edge whose violation load</span>
+<span class="sd">            (:func:`REdgeViolationAction.analyze_edge_violations`) is</span>
+<span class="sd">            maximal, chosen uniformly at random among ties.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no edge is available to select.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">available_mask</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">environment</span><span class="o">.</span><span class="n">available_action_mask_fast</span><span class="p">()</span>
         <span class="p">)</span>

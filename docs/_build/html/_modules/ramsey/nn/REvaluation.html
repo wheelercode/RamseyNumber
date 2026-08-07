@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,17 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.nn.REvaluation</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Reproducible, no-training evaluation of neural checkpoints.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Reproducible, no-training evaluation of neural checkpoints.</span>
+
+<span class="sd">Loads one or more saved training checkpoints, runs each restored</span>
+<span class="sd">policy (greedy or sampling) through :class:`~ramsey.RSearch.RSearch`</span>
+<span class="sd">over a shared, fixed collection of starting colorings, and reports</span>
+<span class="sd">comparable score statistics across checkpoints without performing any</span>
+<span class="sd">optimization or writing any state back out. Global PyTorch RNG state</span>
+<span class="sd">is saved and restored around evaluation so evaluating checkpoints does</span>
+<span class="sd">not disturb random-number sequences used elsewhere (e.g. by an</span>
+<span class="sd">in-progress training run).</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -93,13 +107,31 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.REvaluationSeed">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">REvaluationSeed</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One named coloring shared by every evaluated checkpoint.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One named coloring shared by every evaluated checkpoint.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        name (str): Unique, human-readable identifier for this seed</span>
+<span class="sd">            (e.g. ``&quot;&lt;source_name&gt;-0000&quot;``), used to label individual</span>
+<span class="sd">            evaluation runs.</span>
+<span class="sd">        source_name (str): Name of the construction that produced</span>
+<span class="sd">            ``coloring``, used to group runs by originating</span>
+<span class="sd">            construction.</span>
+<span class="sd">        coloring (RColoring): The starting coloring every evaluated</span>
+<span class="sd">            checkpoint&#39;s search is initialized from.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">source_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate that the name fields are nonempty strings and the coloring is an RColoring.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``name`` or ``source_name`` is not a</span>
+<span class="sd">                nonempty (after stripping) string.</span>
+<span class="sd">            TypeError: If ``coloring`` is not an :class:`RColoring`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="p">(</span>
             <span class="s2">&quot;name&quot;</span><span class="p">,</span>
             <span class="s2">&quot;source_name&quot;</span><span class="p">,</span>
@@ -123,7 +155,23 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluationConfig">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RCheckpointEvaluationConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings shared by every checkpoint comparison.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings shared by every checkpoint comparison.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        repetitions_per_seed (int): Number of independent search runs</span>
+<span class="sd">            performed per evaluation seed, each with a distinct action</span>
+<span class="sd">            seed. Must be positive.</span>
+<span class="sd">        action_seed (int): Base seed used to derive a distinct,</span>
+<span class="sd">            reproducible per-run action seed (via</span>
+<span class="sd">            :func:`~ramsey.nn.RRuntime.seed_torch`) for every</span>
+<span class="sd">            combination of seed and repetition.</span>
+<span class="sd">        greedy (bool): Whether each restored checkpoint&#39;s policy</span>
+<span class="sd">            selects actions greedily rather than by sampling.</span>
+<span class="sd">        score_thresholds (tuple[int, ...]): Exact-score thresholds used</span>
+<span class="sd">            to report, for each checkpoint, how many runs reached a</span>
+<span class="sd">            best score at or below each threshold. Normalized to a</span>
+<span class="sd">            unique, descending tuple in ``__post_init__``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">repetitions_per_seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="n">action_seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000_000</span>
@@ -135,6 +183,16 @@
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize all fields in place.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``repetitions_per_seed`` or ``action_seed``</span>
+<span class="sd">                is not an integer, if ``greedy`` is not a boolean, or</span>
+<span class="sd">                if any entry of ``score_thresholds`` is not an integer.</span>
+<span class="sd">            ValueError: If ``repetitions_per_seed`` is not positive, if</span>
+<span class="sd">                ``action_seed`` or any threshold is negative, or if</span>
+<span class="sd">                ``score_thresholds`` contains duplicate values.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">repetitions</span> <span class="o">=</span> <span class="n">_nonnegative_integer</span><span class="p">(</span>
             <span class="s2">&quot;repetitions_per_seed&quot;</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">repetitions_per_seed</span><span class="p">,</span>
@@ -191,7 +249,34 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluationRun">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RCheckpointEvaluationRun</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of one checkpoint, seed, and repetition.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of one checkpoint, seed, and repetition.</span>
+
+<span class="sd">    Mirrors the fields of :class:`~ramsey.RSearch.RSearchResult`,</span>
+<span class="sd">    together with identifying information about which seed, repetition,</span>
+<span class="sd">    and action seed produced this run.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        seed_name (str): Name of the :class:`REvaluationSeed` this run</span>
+<span class="sd">            started from.</span>
+<span class="sd">        source_name (str): Name of the construction that produced the</span>
+<span class="sd">            starting coloring.</span>
+<span class="sd">        repetition (int): Index of this run among the repetitions</span>
+<span class="sd">            performed for its seed.</span>
+<span class="sd">        action_seed (int): Seed used to make this run&#39;s action</span>
+<span class="sd">            selection reproducible.</span>
+<span class="sd">        initial_score (int): Exact monochromatic score of the starting</span>
+<span class="sd">            coloring, before any actions were taken.</span>
+<span class="sd">        final_score (int): Exact monochromatic score of the coloring</span>
+<span class="sd">            when the search run ended.</span>
+<span class="sd">        best_score (int): Best (lowest) exact monochromatic score</span>
+<span class="sd">            observed at any point during the run.</span>
+<span class="sd">        steps_completed (int): Number of actions applied during the</span>
+<span class="sd">            run.</span>
+<span class="sd">        terminated (bool): Whether the search ended because the</span>
+<span class="sd">            environment reached a terminal state.</span>
+<span class="sd">        truncated (bool): Whether the search ended because it was cut</span>
+<span class="sd">            off (e.g. a step limit), rather than terminating naturally.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">seed_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">source_name</span><span class="p">:</span> <span class="nb">str</span>
@@ -207,12 +292,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return improvement from initial to final score.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Improvement from the initial score to the final score.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_score</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_score</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">best_score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return improvement from initial to best score.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Improvement from the initial score to the best score observed.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_score</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span></div>
 
 
@@ -221,7 +306,24 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluation">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RCheckpointEvaluation</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Aggregate evaluation of one checkpoint.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Aggregate evaluation of one checkpoint.</span>
+
+<span class="sd">    Bundles every :class:`RCheckpointEvaluationRun` produced for one</span>
+<span class="sd">    checkpoint across all evaluation seeds and repetitions, together</span>
+<span class="sd">    with summary statistics computed over those runs.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        checkpoint_path (Path): Path the checkpoint was loaded from.</span>
+<span class="sd">        completed_iteration (int): Training iteration count recorded in</span>
+<span class="sd">            the checkpoint.</span>
+<span class="sd">        metadata (dict): Free-form metadata recorded in the checkpoint.</span>
+<span class="sd">        greedy (bool): Whether this checkpoint&#39;s policy selected</span>
+<span class="sd">            actions greedily rather than by sampling.</span>
+<span class="sd">        score_thresholds (tuple[int, ...]): Exact-score thresholds used</span>
+<span class="sd">            by :attr:`threshold_counts`.</span>
+<span class="sd">        runs (tuple[RCheckpointEvaluationRun, ...]): Every run performed</span>
+<span class="sd">            for this checkpoint.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span>
     <span class="n">completed_iteration</span><span class="p">:</span> <span class="nb">int</span>
@@ -232,44 +334,52 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">number_of_runs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Total number of runs performed for this checkpoint.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">mean_final_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;float: Mean final exact score across all runs.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
             <span class="n">mean</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">final_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">median_final_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;float: Median final exact score across all runs.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
             <span class="n">median</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">final_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">mean_best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;float: Mean best (lowest) exact score observed across all runs.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
             <span class="n">mean</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">best_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">median_best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;float: Median best (lowest) exact score observed across all runs.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
             <span class="n">median</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">best_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">minimum_best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Lowest best exact score observed across all runs.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">best_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">mean_score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;float: Mean improvement from initial to final score across all runs.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
             <span class="n">mean</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">score_reduction</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">mean_best_score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;float: Mean improvement from initial to best observed score across all runs.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
             <span class="n">mean</span><span class="p">(</span>
                 <span class="n">run</span><span class="o">.</span><span class="n">best_score_reduction</span>
@@ -279,6 +389,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">improved_final_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of runs whose final score improved on the initial score.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
             <span class="n">run</span><span class="o">.</span><span class="n">score_reduction</span> <span class="o">&gt;</span> <span class="mi">0</span>
             <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
@@ -286,6 +397,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">improved_best_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of runs whose best observed score improved on the initial score.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
             <span class="n">run</span><span class="o">.</span><span class="n">best_score_reduction</span> <span class="o">&gt;</span> <span class="mi">0</span>
             <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
@@ -293,6 +405,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">threshold_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;dict[int, int]: Number of runs whose best score was at or below each threshold in ``score_thresholds``.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="n">threshold</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span>
                 <span class="n">run</span><span class="o">.</span><span class="n">best_score</span> <span class="o">&lt;=</span> <span class="n">threshold</span>
@@ -303,6 +416,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">source_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;tuple[str, ...]: Sorted, unique construction source names represented among ``runs``.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
             <span class="nb">sorted</span><span class="p">(</span>
                 <span class="p">{</span>
@@ -318,7 +432,17 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">source_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RCheckpointEvaluationRun</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return only runs originating from one seed source.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return only runs originating from one seed source.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            source_name (str): Construction source name to filter</span>
+<span class="sd">                ``runs`` by.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[RCheckpointEvaluationRun, ...]: The subset of ``runs``</span>
+<span class="sd">            whose ``source_name`` equals ``source_name``, in original</span>
+<span class="sd">            order.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
             <span class="n">run</span>
             <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
@@ -332,7 +456,15 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluationResult">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RCheckpointEvaluationResult</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparable evaluations for a collection of checkpoints.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparable evaluations for a collection of checkpoints.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        seeds (tuple[REvaluationSeed, ...]): The evaluation seeds every</span>
+<span class="sd">            evaluated checkpoint was run against.</span>
+<span class="sd">        evaluations (tuple[RCheckpointEvaluation, ...]): One aggregate</span>
+<span class="sd">            evaluation per checkpoint, in the order the checkpoints</span>
+<span class="sd">            were evaluated.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">seeds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
     <span class="n">evaluations</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RCheckpointEvaluation</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
@@ -341,7 +473,19 @@
     <span class="k">def</span> <span class="nf">strongest_checkpoint</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RCheckpointEvaluation</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rank checkpoints by typical performance, then minimum.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rank checkpoints by typical performance, then minimum.</span>
+
+<span class="sd">        Checkpoints are ordered by ``mean_best_score``, breaking ties by</span>
+<span class="sd">        ``median_best_score`` and then ``minimum_best_score`` — all</span>
+<span class="sd">        ascending, since a lower exact score is better.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RCheckpointEvaluation: The evaluation with the best-ranked</span>
+<span class="sd">            combination of mean, median, and minimum best score.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If ``evaluations`` is empty.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">evaluations</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;No checkpoints were evaluated.&quot;</span><span class="p">)</span>
 
@@ -359,7 +503,15 @@
 <div class="viewcode-block" id="RCheckpointEvaluator">
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluator">[docs]</a>
 <span class="k">class</span> <span class="nc">RCheckpointEvaluator</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate trained checkpoints without optimization or writes.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate trained checkpoints without optimization or writes.</span>
+
+<span class="sd">    For each checkpoint, restores the policy/value network, wraps it in</span>
+<span class="sd">    an :class:`~ramsey.nn.RNeuralPolicy.RNeuralPolicy`, and runs it</span>
+<span class="sd">    through :class:`~ramsey.RSearch.RSearch` once per evaluation seed</span>
+<span class="sd">    and repetition, recording the resulting scores. No gradients are</span>
+<span class="sd">    computed and no files are written; the network is loaded purely for</span>
+<span class="sd">    inference.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -367,6 +519,23 @@
         <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Bind the evaluator to a fixed host graph and search environment.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph every restored checkpoint&#39;s</span>
+<span class="sd">                network must match.</span>
+<span class="sd">            environment (REnvironment): Search environment every</span>
+<span class="sd">                restored policy is run through. Its problem must match</span>
+<span class="sd">                ``graph.problem``.</span>
+<span class="sd">            device (torch.device | str): Device checkpoints are</span>
+<span class="sd">                restored onto; resolved via</span>
+<span class="sd">                :func:`~ramsey.nn.RRuntime.resolve_torch_device`.</span>
+<span class="sd">                Defaults to ``&quot;auto&quot;``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``environment.graph.problem`` does not match</span>
+<span class="sd">                ``graph.problem``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">environment</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Environment problem does not match graph.&quot;</span>
@@ -384,7 +553,40 @@
         <span class="n">seeds</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">],</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">RCheckpointEvaluationConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RCheckpointEvaluationResult</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run every checkpoint under identical evaluation cases.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run every checkpoint under identical evaluation cases.</span>
+
+<span class="sd">        Every checkpoint is evaluated against the same ``seeds`` using</span>
+<span class="sd">        the same per-run action seeds (derived from</span>
+<span class="sd">        ``config.action_seed``), so resulting scores are directly</span>
+<span class="sd">        comparable across checkpoints. PyTorch&#39;s global RNG state is</span>
+<span class="sd">        saved before evaluation and restored afterward (even if</span>
+<span class="sd">        evaluation raises), so this call does not disturb random-number</span>
+<span class="sd">        sequences used elsewhere.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_paths (Iterable[str | Path]): Paths to the</span>
+<span class="sd">                checkpoints to evaluate. Must be nonempty and contain no</span>
+<span class="sd">                duplicates.</span>
+<span class="sd">            seeds (Iterable[REvaluationSeed]): Starting colorings every</span>
+<span class="sd">                checkpoint is evaluated against. Must be nonempty, and</span>
+<span class="sd">                each seed&#39;s coloring must belong to a graph with the</span>
+<span class="sd">                same problem as ``graph``.</span>
+<span class="sd">            config (RCheckpointEvaluationConfig | None): Evaluation</span>
+<span class="sd">                settings. Uses ``RCheckpointEvaluationConfig()`` defaults</span>
+<span class="sd">                when ``None``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RCheckpointEvaluationResult: The evaluation seeds used and</span>
+<span class="sd">            one :class:`RCheckpointEvaluation` per checkpoint, in the</span>
+<span class="sd">            order of ``checkpoint_paths``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``checkpoint_paths`` or ``seeds`` is empty,</span>
+<span class="sd">                if ``checkpoint_paths`` contains duplicate paths, or if</span>
+<span class="sd">                any seed&#39;s coloring problem does not match ``graph``.</span>
+<span class="sd">            TypeError: If any element of ``seeds`` is not an</span>
+<span class="sd">                :class:`REvaluationSeed`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">config</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">config</span>
             <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -454,6 +656,30 @@
         <span class="n">seeds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">RCheckpointEvaluationConfig</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RCheckpointEvaluation</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore one checkpoint and run it against every seed and repetition.</span>
+
+<span class="sd">        The checkpoint is restored using a throwaway NumPy generator</span>
+<span class="sd">        (seeded with 0), since evaluation only needs the network and</span>
+<span class="sd">        optimizer state, not reproducible NumPy sampling. Each</span>
+<span class="sd">        ``(seed, repetition)`` combination gets its own deterministic</span>
+<span class="sd">        action seed, derived from ``config.action_seed`` so that runs</span>
+<span class="sd">        for the same seed/repetition pair are reproducible and directly</span>
+<span class="sd">        comparable across checkpoints.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_path (Path): Path to the checkpoint to restore</span>
+<span class="sd">                and evaluate.</span>
+<span class="sd">            seeds (tuple[REvaluationSeed, ...]): Starting colorings to</span>
+<span class="sd">                run the restored policy against.</span>
+<span class="sd">            config (RCheckpointEvaluationConfig): Evaluation settings</span>
+<span class="sd">                controlling repetitions, action seeding, greediness, and</span>
+<span class="sd">                score thresholds.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RCheckpointEvaluation: The aggregate evaluation for this</span>
+<span class="sd">            checkpoint, containing one :class:`RCheckpointEvaluationRun`</span>
+<span class="sd">            per seed and repetition.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">restored</span> <span class="o">=</span> <span class="n">load_training_checkpoint</span><span class="p">(</span>
             <span class="n">checkpoint_path</span><span class="p">,</span>
             <span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">,</span>
@@ -538,7 +764,34 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">name_prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct and freeze a reusable checkpoint seed collection.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct and freeze a reusable checkpoint seed collection.</span>
+
+<span class="sd">    Repeatedly invokes ``construction.construct(graph)`` to build</span>
+<span class="sd">    ``number_of_seeds`` starting colorings, wrapping each in an</span>
+<span class="sd">    :class:`REvaluationSeed` so the same fixed collection of seeds can</span>
+<span class="sd">    be reused across multiple calls to</span>
+<span class="sd">    :meth:`RCheckpointEvaluator.evaluate`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        graph (RGraph): Host graph to construct starting colorings for.</span>
+<span class="sd">        construction (RConstruction): Construction strategy used to</span>
+<span class="sd">            build each starting coloring.</span>
+<span class="sd">        number_of_seeds (int): Number of seeds to construct. Must be</span>
+<span class="sd">            positive.</span>
+<span class="sd">        name_prefix (str | None): Prefix used to build each seed&#39;s</span>
+<span class="sd">            ``name`` as ``f&quot;{prefix}-{index:04d}&quot;``. When ``None``, each</span>
+<span class="sd">            seed uses its own construction&#39;s</span>
+<span class="sd">            ``construction.last_source_name`` as the prefix.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[REvaluationSeed, ...]: ``number_of_seeds`` newly</span>
+<span class="sd">        constructed evaluation seeds.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``number_of_seeds`` is not an integer.</span>
+<span class="sd">        ValueError: If ``number_of_seeds`` is not positive, or if</span>
+<span class="sd">            ``name_prefix`` is neither ``None`` nor a nonempty string.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">number_of_seeds</span> <span class="o">=</span> <span class="n">_nonnegative_integer</span><span class="p">(</span>
         <span class="s2">&quot;number_of_seeds&quot;</span><span class="p">,</span>
         <span class="n">number_of_seeds</span><span class="p">,</span>
@@ -584,7 +837,19 @@
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate and normalize one nonnegative integer.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate and normalize one nonnegative integer.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): Name of the value, used only in error messages.</span>
+<span class="sd">        value (int): Candidate value to validate.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: ``value`` converted to a built-in ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``value`` is a boolean or not an integral type.</span>
+<span class="sd">        ValueError: If ``value`` is negative.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
         <span class="n">value</span><span class="p">,</span>
         <span class="n">Integral</span><span class="p">,</span>

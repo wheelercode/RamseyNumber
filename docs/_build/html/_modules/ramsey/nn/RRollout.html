@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -91,6 +95,19 @@
 <span class="k">class</span> <span class="nc">RRolloutReward</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    State-transition quantity used as the training reward.</span>
+
+<span class="sd">    Selects which per-step reward reported by</span>
+<span class="sd">    :meth:`~ramsey.REnvironment.REnvironment.step` is used, after</span>
+<span class="sd">    scaling by ``RRolloutConfig.reward_scale``, as the PPO training</span>
+<span class="sd">    reward for that step.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        EXACT_SCORE: Use the environment&#39;s ``immediate_reward``, the</span>
+<span class="sd">            change in exact score (count of forbidden monochromatic</span>
+<span class="sd">            K5 cliques) caused by the action.</span>
+<span class="sd">        OBJECTIVE: Use the environment&#39;s ``objective_reward``, the</span>
+<span class="sd">            change in the (possibly smoother) search objective caused</span>
+<span class="sd">            by the action.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">EXACT_SCORE</span> <span class="o">=</span> <span class="s2">&quot;exact-score&quot;</span>
@@ -104,6 +121,25 @@
 <span class="k">class</span> <span class="nc">RRolloutConfig</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Immutable settings for one policy rollout.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rollout_steps (int): Maximum number of environment steps to</span>
+<span class="sd">            collect before stopping, unless the episode terminates or</span>
+<span class="sd">            truncates first.</span>
+<span class="sd">        discount (float): Discount factor ``gamma`` used by</span>
+<span class="sd">            :func:`calculate_advantages` for both the temporal</span>
+<span class="sd">            difference error and the advantage&#39;s exponential decay.</span>
+<span class="sd">        gae_lambda (float): Generalized Advantage Estimation decay</span>
+<span class="sd">            parameter ``lambda`` controlling the bias/variance</span>
+<span class="sd">            trade-off in :func:`calculate_advantages`.</span>
+<span class="sd">        reward_scale (float): Positive divisor applied to every raw</span>
+<span class="sd">            per-step reward before it is stored, keeping reward</span>
+<span class="sd">            magnitudes in a range suitable for PPO training.</span>
+<span class="sd">        reward_source (RRolloutReward): Which environment reward</span>
+<span class="sd">            quantity is used as the (unscaled) per-step reward.</span>
+<span class="sd">        normalize_advantages (bool): When ``True``, advantages</span>
+<span class="sd">            computed for the rollout are standardized to zero mean</span>
+<span class="sd">            and unit variance before being stored.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">rollout_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span>
@@ -118,6 +154,24 @@
     <span class="n">normalize_advantages</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate, coerce, and normalize every configuration field in place.</span>
+
+<span class="sd">        ``rollout_steps`` must be a positive integer; ``discount`` and</span>
+<span class="sd">        ``gae_lambda`` must be numeric values in ``[0, 1]``;</span>
+<span class="sd">        ``reward_scale`` must be a positive numeric value;</span>
+<span class="sd">        ``reward_source`` must be convertible to :class:`RRolloutReward`;</span>
+<span class="sd">        ``normalize_advantages`` must be a ``bool``. Fields are</span>
+<span class="sd">        rewritten with their coerced values via ``object.__setattr__``</span>
+<span class="sd">        because the dataclass is frozen.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If a field has the wrong type (including</span>
+<span class="sd">                ``bool`` where an integer or float is expected).</span>
+<span class="sd">            ValueError: If a field fails its range check, or if</span>
+<span class="sd">                ``reward_source`` is not a valid :class:`RRolloutReward`</span>
+<span class="sd">                value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rollout_steps</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">rollout_steps</span><span class="p">,</span>
             <span class="n">Integral</span><span class="p">,</span>
@@ -205,6 +259,61 @@
 <span class="k">class</span> <span class="nc">RRolloutBatch</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    CPU-resident experiences and summary data from one rollout.</span>
+
+<span class="sd">    Produced by :func:`collect_rollout` and consumed by</span>
+<span class="sd">    :func:`ramsey.nn.RPPO.ppo_update`, which copies the required</span>
+<span class="sd">    tensors to the training device per minibatch. Every tensor field</span>
+<span class="sd">    below has a leading dimension equal to</span>
+<span class="sd">    :attr:`number_of_steps`, one entry per collected environment</span>
+<span class="sd">    step, in the order the steps were taken.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        pair_inputs (torch.Tensor): Float32 tensor of shape</span>
+<span class="sd">            ``(number_of_steps, n_vertices, n_vertices, input_size)``</span>
+<span class="sd">            holding the per-step, per-vertex-pair network input</span>
+<span class="sd">            features used by the policy/value network.</span>
+<span class="sd">        available_masks (torch.Tensor): Boolean tensor of shape</span>
+<span class="sd">            ``(number_of_steps, number_of_edges)`` marking which</span>
+<span class="sd">            edges/actions were available (unblocked by tabu memory or</span>
+<span class="sd">            already-colored edges) at each step.</span>
+<span class="sd">        actions (torch.Tensor): Long tensor of shape</span>
+<span class="sd">            ``(number_of_steps,)`` holding the sampled edge/action</span>
+<span class="sd">            index at each step.</span>
+<span class="sd">        old_log_probabilities (torch.Tensor): Float32 tensor of shape</span>
+<span class="sd">            ``(number_of_steps,)`` holding the log-probability the</span>
+<span class="sd">            behavior policy assigned to the sampled action, used as</span>
+<span class="sd">            the PPO reference policy for the probability ratio.</span>
+<span class="sd">        rewards (torch.Tensor): Float32 tensor of shape</span>
+<span class="sd">            ``(number_of_steps,)`` holding the scaled per-step reward</span>
+<span class="sd">            (see ``RRolloutConfig.reward_scale`` and</span>
+<span class="sd">            ``RRolloutConfig.reward_source``).</span>
+<span class="sd">        old_values (torch.Tensor): Float32 tensor of shape</span>
+<span class="sd">            ``(number_of_steps,)`` holding the value network&#39;s</span>
+<span class="sd">            state-value prediction at each step, before the update.</span>
+<span class="sd">        advantages (torch.Tensor): Float32 tensor of shape</span>
+<span class="sd">            ``(number_of_steps,)`` holding the generalized advantage</span>
+<span class="sd">            estimate for each step, as computed by</span>
+<span class="sd">            :func:`calculate_advantages` and optionally normalized.</span>
+<span class="sd">        returns (torch.Tensor): Float32 tensor of shape</span>
+<span class="sd">            ``(number_of_steps,)`` holding the value-function</span>
+<span class="sd">            regression target (``advantages + old_values``) for each</span>
+<span class="sd">            step.</span>
+<span class="sd">        initial_score (int): Exact score of the coloring the rollout</span>
+<span class="sd">            started from.</span>
+<span class="sd">        final_score (int): Exact score of the coloring at the end of</span>
+<span class="sd">            the rollout (after the last collected step).</span>
+<span class="sd">        best_score (int): Lowest exact score observed by the</span>
+<span class="sd">            environment during the rollout.</span>
+<span class="sd">        final_coloring (RColoring): Coloring snapshot at the end of</span>
+<span class="sd">            the rollout.</span>
+<span class="sd">        best_coloring (RColoring): Best (lowest-score) coloring</span>
+<span class="sd">            snapshot observed during the rollout.</span>
+<span class="sd">        terminated (bool): Whether the environment reached a true</span>
+<span class="sd">            terminal search state (for example, a score-zero</span>
+<span class="sd">            coloring) during the rollout.</span>
+<span class="sd">        truncated (bool): Whether the environment stopped the episode</span>
+<span class="sd">            due to a step or other time limit rather than a true</span>
+<span class="sd">            terminal state.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">pair_inputs</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
@@ -230,6 +339,15 @@
     <span class="n">truncated</span><span class="p">:</span> <span class="nb">bool</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Verify that every per-step tensor field has equal length.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``pair_inputs``, ``available_masks``,</span>
+<span class="sd">                ``old_log_probabilities``, ``rewards``, ``old_values``,</span>
+<span class="sd">                ``advantages``, or ``returns`` does not have the same</span>
+<span class="sd">                length as ``actions``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">number_of_steps</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">actions</span><span class="p">)</span>
 
         <span class="n">step_tensors</span> <span class="o">=</span> <span class="p">(</span>
@@ -247,10 +365,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">number_of_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of environment steps collected in this rollout.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">actions</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">total_scaled_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;float: Sum of the scaled per-step rewards across the rollout.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rewards</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">())</span></div>
 
 
@@ -271,8 +391,53 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate generalized advantages and value-return targets.</span>
 
-<span class="sd">    A true terminal transition prevents value bootstrapping.</span>
-<span class="sd">    A time-limit truncation does not.</span>
+<span class="sd">    Implements Generalized Advantage Estimation (GAE), computing the</span>
+<span class="sd">    advantage at each step by a backward recursion over the</span>
+<span class="sd">    one-step temporal difference errors::</span>
+
+<span class="sd">        delta[t] = reward[t] + discount * next_value[t] * can_continue[t]</span>
+<span class="sd">            - value[t]</span>
+<span class="sd">        advantage[t] = delta[t]</span>
+<span class="sd">            + discount * gae_lambda * can_continue[t] * advantage[t + 1]</span>
+
+<span class="sd">    where ``next_value[t]`` is ``values[t + 1]`` for all but the last</span>
+<span class="sd">    step, and ``last_value`` for the last step, and</span>
+<span class="sd">    ``can_continue[t]`` is ``0`` when ``terminated[t]`` is ``True``</span>
+<span class="sd">    and ``1`` otherwise. A true terminal transition therefore prevents</span>
+<span class="sd">    value bootstrapping past that step (``can_continue`` zeroes out</span>
+<span class="sd">    both the next-value term and the recursive advantage carry-over),</span>
+<span class="sd">    while a time-limit truncation -- represented by the corresponding</span>
+<span class="sd">    ``terminated`` entry being ``False`` -- does not, so bootstrapping</span>
+<span class="sd">    continues using ``last_value``. Value-regression targets</span>
+<span class="sd">    (``returns``) are then ``advantages + values``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rewards (numpy.ndarray): One-dimensional array of per-step</span>
+<span class="sd">            rewards, coerced to ``float32``.</span>
+<span class="sd">        values (numpy.ndarray): One-dimensional array of per-step</span>
+<span class="sd">            value predictions, coerced to ``float32``, the same</span>
+<span class="sd">            length as ``rewards``.</span>
+<span class="sd">        terminated (numpy.ndarray): One-dimensional boolean array,</span>
+<span class="sd">            the same length as ``rewards``, marking which steps ended</span>
+<span class="sd">            in a true terminal state (as opposed to a truncation).</span>
+<span class="sd">        last_value (float): Bootstrap value used for the step after</span>
+<span class="sd">            the final collected step, i.e. the value network&#39;s</span>
+<span class="sd">            prediction for the state the rollout stopped at (``0.0``</span>
+<span class="sd">            when that state is a true terminal state).</span>
+<span class="sd">        discount (float): Discount factor ``gamma`` in ``[0, 1]``.</span>
+<span class="sd">        gae_lambda (float): GAE decay parameter ``lambda`` in</span>
+<span class="sd">            ``[0, 1]``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[numpy.ndarray, numpy.ndarray]: A ``(advantages, returns)``</span>
+<span class="sd">        pair, each a ``float32`` array of the same length as</span>
+<span class="sd">        ``rewards``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``rewards``, ``values``, or ``terminated`` is</span>
+<span class="sd">            not one-dimensional, if their lengths differ, or if</span>
+<span class="sd">            ``discount`` or ``gae_lambda`` is outside ``[0, 1]``.</span>
+<span class="sd">        TypeError: If ``terminated`` does not have boolean dtype.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">rewards</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
         <span class="n">rewards</span><span class="p">,</span>
@@ -350,8 +515,52 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Collect one rollout from an explicit seed coloring.</span>
 
-<span class="sd">    The returned tensors remain on the CPU. Minibatches are moved to</span>
-<span class="sd">    the training device later by PPO.</span>
+<span class="sd">    Resets ``environment`` to ``coloring`` and then repeatedly: builds</span>
+<span class="sd">    the network input and available-action mask for the current</span>
+<span class="sd">    search state, samples an action from the policy&#39;s categorical</span>
+<span class="sd">    action distribution (network in evaluation mode, no gradient</span>
+<span class="sd">    tracking), records the value prediction and action</span>
+<span class="sd">    log-probability, and applies the action to the environment. This</span>
+<span class="sd">    continues for up to ``config.rollout_steps`` steps, stopping early</span>
+<span class="sd">    if the environment terminates or truncates. The per-step reward</span>
+<span class="sd">    is taken from either the environment&#39;s exact-score reward or its</span>
+<span class="sd">    objective reward (selected by ``config.reward_source``), divided</span>
+<span class="sd">    by ``config.reward_scale``. After the loop, a bootstrap value is</span>
+<span class="sd">    obtained: ``0.0`` if the environment reached a true terminal</span>
+<span class="sd">    state, otherwise the value network&#39;s prediction for the final</span>
+<span class="sd">    (non-terminal) state reached. Generalized advantages and returns</span>
+<span class="sd">    are then computed with :func:`calculate_advantages`, and</span>
+<span class="sd">    advantages are optionally standardized to zero mean and unit</span>
+<span class="sd">    variance when ``config.normalize_advantages`` is set. All</span>
+<span class="sd">    resulting tensors are assembled, CPU-resident, into an</span>
+<span class="sd">    :class:`RRolloutBatch` alongside score and coloring summaries</span>
+<span class="sd">    from ``environment``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        network (RPairPolicyValueNetwork): Policy/value network used</span>
+<span class="sd">            to act in the environment and to estimate values. Must</span>
+<span class="sd">            already reside on ``device`` and must have vertex/edge</span>
+<span class="sd">            dimensions matching ``environment.graph``.</span>
+<span class="sd">        environment (REnvironment): Search environment being driven;</span>
+<span class="sd">            reset to ``coloring`` at the start of the call and mutated</span>
+<span class="sd">            by repeated calls to ``environment.step``.</span>
+<span class="sd">        coloring (RColoring): Seed coloring the rollout starts from.</span>
+<span class="sd">        device (torch.device | str): Device the network is expected</span>
+<span class="sd">            to reside on and that network inputs are built for.</span>
+<span class="sd">            Resolved via :func:`~ramsey.nn.RRuntime.resolve_torch_device`.</span>
+<span class="sd">        config (RRolloutConfig): Rollout settings controlling step</span>
+<span class="sd">            budget, discounting, reward scaling/source, and advantage</span>
+<span class="sd">            normalization.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RRolloutBatch: CPU-resident experiences and summary data from</span>
+<span class="sd">        this rollout.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If ``network``&#39;s actual device does not match</span>
+<span class="sd">            the resolved ``device``.</span>
+<span class="sd">        ValueError: If ``environment.graph``&#39;s vertex/edge dimensions</span>
+<span class="sd">            do not match ``network``&#39;s.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">device</span> <span class="o">=</span> <span class="n">resolve_torch_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
@@ -566,6 +775,19 @@
     <span class="n">network</span><span class="p">:</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">,</span>
     <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Verify that ``environment``&#39;s host graph matches ``network``&#39;s dimensions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        network (RPairPolicyValueNetwork): Policy/value network whose</span>
+<span class="sd">            expected vertex and edge counts are checked against.</span>
+<span class="sd">        environment (REnvironment): Environment supplying the host</span>
+<span class="sd">            graph to validate.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the environment&#39;s number of vertices or number</span>
+<span class="sd">            of edges does not match the network&#39;s.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">graph</span> <span class="o">=</span> <span class="n">environment</span><span class="o">.</span><span class="n">graph</span>
 
     <span class="k">if</span> <span class="p">(</span>
@@ -579,6 +801,22 @@
     <span class="n">network</span><span class="p">:</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Verify that ``network``&#39;s parameters already reside on ``device``.</span>
+
+<span class="sd">    Falls back to inspecting the ``edge_vertices`` buffer when</span>
+<span class="sd">    ``network`` has no parameters (``next(network.parameters())``</span>
+<span class="sd">    raises ``StopIteration``).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        network (RPairPolicyValueNetwork): Network whose device</span>
+<span class="sd">            placement is checked.</span>
+<span class="sd">        device (torch.device): Expected device.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If ``network``&#39;s actual device differs from</span>
+<span class="sd">            ``device``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">actual_device</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">network</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span>
     <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>

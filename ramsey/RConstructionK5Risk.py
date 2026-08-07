@@ -1,4 +1,12 @@
-"""Incremental K5 construction guided by overlapping partial-K5 risk."""
+"""Incremental K5 construction guided by overlapping partial-K5 risk.
+
+Builds a symmetric two-color K5-scored coloring by repeatedly selecting a
+constrained, partially colored K5, choosing a full coloring for its
+remaining edges (preferring the twelve balanced C5/complement-C5
+patterns when compatible with existing colors), and committing the
+candidate that minimizes expected future monochromatic K5 risk summed
+over every partial K5 touched by the new edges.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +30,24 @@ def _balanced_k5_cycle_patterns() -> NDArray[np.uint8]:
     is also a five-cycle.  Consequently neither color contains a
     triangle and every pattern contains exactly five edges of each
     color.
+
+    Each pattern is a length-10 array of 0/1 colors, one entry per edge
+    of the 5-vertex clique in the fixed order produced by
+    ``itertools.combinations(range(5), 2)``, describing one way to
+    2-color K5 as a 5-cycle plus its complementary 5-cycle. Vertex 0 is
+    fixed as the cycle's first vertex to remove rotational duplicates;
+    reversing a cycle yields the same undirected edge set and is
+    removed automatically by the ``set`` deduplication.
+
+    Returns:
+        NDArray[np.uint8]: A read-only array of shape ``(12, 10)``
+        listing every distinct labeled balanced pattern, sorted in
+        ascending lexicographic order.
+
+    Raises:
+        RuntimeError: If the computed pattern count or shape is not
+            exactly ``(12, 10)`` (an internal consistency check, not
+            expected to trigger under normal use).
     """
     local_edges = tuple(
         combinations(
@@ -67,12 +93,32 @@ def _balanced_k5_cycle_patterns() -> NDArray[np.uint8]:
     return result
 
 
+# Precomputed once at import time: the 12 labeled balanced C5/complement
+# -C5 colorings of K5, used to bias new K5 completions toward this
+# monochromatic-clique-free structure whenever compatible.
 K5_BALANCED_CYCLE_PATTERNS = _balanced_k5_cycle_patterns()
 
 
 @dataclass(frozen=True, slots=True)
 class RK5RiskConstructionReport:
-    """Diagnostics from one completed K5-risk construction."""
+    """
+    Diagnostics from one completed K5-risk construction.
+
+    Attributes:
+        macro_steps (int): Number of target-K5 completion steps taken
+            (each step colors every remaining edge of one selected K5).
+        balanced_pattern_steps (int): Subset of ``macro_steps`` where the
+            selected K5 was compatible with one of the 12 balanced
+            C5/complement-C5 patterns.
+        fallback_pattern_steps (int): Subset of ``macro_steps`` where no
+            balanced pattern was compatible, so all nonmonochromatic
+            completions were considered instead.
+        risk_ties (int): Number of steps where more than one candidate
+            pattern tied for minimum expected risk, requiring the
+            balance/random tie-break.
+        red_edges (int): Total edges assigned color 0 (red).
+        blue_edges (int): Total edges assigned color 1 (blue).
+    """
 
     macro_steps: int
     balanced_pattern_steps: int
@@ -83,6 +129,9 @@ class RK5RiskConstructionReport:
 
     @property
     def total_edges(self) -> int:
+        """
+        int: Total number of colored edges (``red_edges + blue_edges``).
+        """
         return self.red_edges + self.blue_edges
 
 
@@ -104,7 +153,25 @@ class RK5RiskConstruction(RConstruction):
 
     Each candidate is scored jointly over every partial K5 containing
     at least one newly colored edge.  Lower expected future
-    monochromatic risk wins.
+    monochromatic risk wins. Ties are broken by preferring the candidate
+    that keeps the overall red/blue edge count closest to balanced,
+    with any remaining tie broken uniformly at random.
+
+    Requires a symmetric two-color Ramsey problem scored by K5 cliques.
+
+    Attributes:
+        rng (numpy.random.Generator): Source of randomness used to
+            select among tied target cliques and tied candidate
+            patterns.
+        minimum_pressure_edges (int): Minimum same-color edge count a
+            partial K5 must reach, with no opposite-colored edges yet
+            assigned, before it contributes to risk.
+        preferred_new_edges (int): Minimum number of uncolored edges a
+            target K5 should still have to be preferred as the next
+            completion target.
+        risk_epsilon (float): Maximum absolute risk difference from the
+            minimum for a candidate pattern to be treated as tied for
+            best.
     """
 
     rng: np.random.Generator
@@ -119,6 +186,18 @@ class RK5RiskConstruction(RConstruction):
     )
 
     def __post_init__(self) -> None:
+        """
+        Validate ``rng``, ``minimum_pressure_edges``,
+        ``preferred_new_edges``, and ``risk_epsilon``.
+
+        Raises:
+            TypeError: If ``rng`` is not a NumPy ``Generator``, or if
+                ``minimum_pressure_edges`` or ``preferred_new_edges``
+                is not an integer.
+            ValueError: If ``minimum_pressure_edges`` or
+                ``preferred_new_edges`` is less than 1, or if
+                ``risk_epsilon`` is negative.
+        """
         if not isinstance(self.rng, np.random.Generator):
             raise TypeError("rng must be a NumPy Generator.")
 
@@ -145,6 +224,10 @@ class RK5RiskConstruction(RConstruction):
 
     @property
     def name(self) -> str:
+        """
+        str: Name encoding ``minimum_pressure_edges`` and
+        ``preferred_new_edges``, e.g. ``"k5-risk-pressure-4-new-4"``.
+        """
         return (
             "k5-risk-"
             f"pressure-{self.minimum_pressure_edges}-"
@@ -155,12 +238,44 @@ class RK5RiskConstruction(RConstruction):
     def last_report(
         self,
     ) -> RK5RiskConstructionReport | None:
+        """
+        RK5RiskConstructionReport | None: Diagnostics from the most
+        recent call to :meth:`construct`, or ``None`` beforehand.
+        """
         return self._last_report
 
     def construct(
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Color ``graph`` by repeatedly completing constrained K5s.
+
+        Repeatedly selects a target K5 (see :meth:`_select_target_clique`),
+        enumerates candidate colorings for its remaining edges (see
+        :meth:`_candidate_patterns` and :meth:`_fallback_patterns`),
+        scores each candidate by summed expected risk over every
+        affected partial K5, and commits the lowest-risk candidate
+        (breaking ties toward color balance and then at random) until
+        every edge is colored.
+
+        Args:
+            graph (RGraph): Host graph to color. Its problem must use
+                two symmetric colors and be scored by K5 cliques.
+
+        Returns:
+            RColoring: The completed coloring. Also records diagnostics
+            retrievable via :attr:`last_report`.
+
+        Raises:
+            ValueError: If ``graph.problem`` is not a symmetric
+                two-color problem, if it is not scored by K5 cliques, or
+                if ``minimum_pressure_edges`` or ``preferred_new_edges``
+                exceeds the number of edges in a K5 (ten).
+            RuntimeError: If a selected target K5 has no uncolored
+                edges (an internal consistency check on the selection
+                logic, not expected to trigger under normal use).
+        """
         problem = graph.problem
 
         if problem.n_colors != 2 or not problem.is_symmetric:
@@ -373,6 +488,26 @@ class RK5RiskConstruction(RConstruction):
         assigned_counts: NDArray[np.uint8],
         edges_per_clique: int,
     ) -> int:
+        """
+        Choose the next K5 to complete.
+
+        Prefers cliques with at least ``preferred_new_edges`` uncolored
+        edges, breaking ties toward the most already-assigned (most
+        constrained) such clique; when no clique meets that preference,
+        falls back to the most-assigned incomplete clique instead. Any
+        remaining tie is broken uniformly at random.
+
+        Args:
+            assigned_counts (NDArray[np.uint8]): Number of colored edges
+                in every indexed clique, indexed by clique id.
+            edges_per_clique (int): Number of edges in each K5 (ten).
+
+        Returns:
+            int: Index of the selected target clique.
+
+        Raises:
+            RuntimeError: If every clique is already fully colored.
+        """
         uncolored_counts = (
             edges_per_clique
             - assigned_counts.astype(np.int16)
@@ -408,6 +543,23 @@ class RK5RiskConstruction(RConstruction):
     def _candidate_patterns(
         target_colors: NDArray[np.int8],
     ) -> NDArray[np.uint8]:
+        """
+        Return balanced C5/complement-C5 patterns compatible with
+        ``target_colors``.
+
+        Args:
+            target_colors (NDArray[np.int8]): Length-10 array of colors
+                already assigned to the target K5's edges, in the fixed
+                combination order; ``-1`` marks an uncolored edge.
+
+        Returns:
+            NDArray[np.uint8]: The subset of
+            :data:`K5_BALANCED_CYCLE_PATTERNS` that agree with every
+            already-colored edge in ``target_colors``. Empty if no
+            balanced pattern is compatible; equal to
+            :data:`K5_BALANCED_CYCLE_PATTERNS` unchanged if no edge is
+            yet colored.
+        """
         colored = target_colors >= 0
 
         if not np.any(colored):
@@ -425,6 +577,28 @@ class RK5RiskConstruction(RConstruction):
     def _fallback_patterns(
         target_colors: NDArray[np.int8],
     ) -> NDArray[np.uint8]:
+        """
+        Enumerate every nonmonochromatic completion of the target K5.
+
+        Used when no balanced C5/complement-C5 pattern is compatible
+        with the target's existing colors. Enumerates every 0/1
+        assignment of the remaining uncolored edges and keeps those that
+        do not leave the K5 entirely one color, so this construction
+        never deliberately creates a new monochromatic K5 when a
+        nonmonochromatic completion exists.
+
+        Args:
+            target_colors (NDArray[np.int8]): Length-10 array of colors
+                already assigned to the target K5's edges, in the fixed
+                combination order; ``-1`` marks an uncolored edge.
+
+        Returns:
+            NDArray[np.uint8]: Every completion of ``target_colors``
+            that avoids a monochromatic result, or, if every
+            completion would be monochromatic (the target is already
+            forced), every possible completion instead so the
+            construction can make progress.
+        """
         uncolored_positions = np.flatnonzero(
             target_colors < 0
         )
@@ -478,6 +652,24 @@ class RK5RiskConstruction(RConstruction):
         self,
         edges_per_clique: int,
     ) -> NDArray[np.float64]:
+        """
+        Build the risk weight table indexed by same-color edge count.
+
+        Weight ``k`` (for ``k >= minimum_pressure_edges``) is
+        ``2 ** -(edges_per_clique - k)``, the probability that a K5
+        already showing ``k`` edges of one color and none of the
+        opposite color would become monochromatic if its remaining
+        edges were colored uniformly at random. Weights below
+        ``minimum_pressure_edges`` are zero, so cliques under that
+        pressure threshold contribute no risk.
+
+        Args:
+            edges_per_clique (int): Number of edges in each K5 (ten).
+
+        Returns:
+            NDArray[np.float64]: Array of length ``edges_per_clique +
+            1`` mapping a same-color edge count to its risk weight.
+        """
         weights = np.zeros(
             edges_per_clique + 1,
             dtype=np.float64,
@@ -498,6 +690,27 @@ class RK5RiskConstruction(RConstruction):
         blue_counts: NDArray[np.uint8],
         risk_weights: NDArray[np.float64],
     ) -> float:
+        """
+        Sum expected monochromatic-completion risk over a set of cliques.
+
+        For each clique that is entirely red so far (``blue_counts ==
+        0``), looks up the risk weight for its red edge count; likewise
+        for cliques that are entirely blue so far. Cliques already
+        containing both colors contribute zero, since they can no
+        longer become monochromatic.
+
+        Args:
+            red_counts (NDArray[np.uint8]): Red edge count in each
+                considered clique.
+            blue_counts (NDArray[np.uint8]): Blue edge count in each
+                considered clique, aligned by index with ``red_counts``.
+            risk_weights (NDArray[np.float64]): Risk weight table from
+                :meth:`_risk_weights`, indexed by same-color edge count.
+
+        Returns:
+            float: Total expected future monochromatic-clique risk
+            summed over every considered clique.
+        """
         red_only = blue_counts == 0
         blue_only = red_counts == 0
 

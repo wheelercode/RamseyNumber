@@ -1,4 +1,15 @@
-"""Consequences and exact score changes for candidate search actions."""
+"""Exact single-edge-flip action analysis for a search state.
+
+An "action" in this package is the flip of one host-graph edge from its
+current color to the other color. Because the exact score is the count of
+monochromatic K5 cliques (``histogram[0] + histogram[-1]`` of the color-one
+edge-count histogram), flipping a single edge only changes the color-one
+count of the cliques incident to that edge, and only those cliques can move
+between histogram bins. This module derives, for every edge, the exact
+resulting change to the global histogram and the exact score reduction
+(reward) that flip would produce, without recomputing the score from
+scratch.
+"""
 
 from __future__ import annotations
 
@@ -16,8 +27,15 @@ HistogramDeltas = NDArray[np.int32]
 def _owned_read_only(
     array: NDArray,
 ) -> NDArray:
-    """
-    Copy an array, mark the copy read-only, and return it.
+    """Copy an array, mark the copy read-only, and return it.
+
+    Args:
+        array (NDArray): Source array; may be any array-like value.
+
+    Returns:
+        NDArray: An independently owned copy with ``flags.writeable`` set
+        to ``False``, safe to expose without risking aliasing the
+        caller's mutable buffers.
     """
     owned = np.asarray(array).copy()
 
@@ -32,8 +50,32 @@ def _owned_read_only(
     eq=False,
 )
 class RActionAnalysis:
-    """
-    Exact consequences of every single-edge flip in one state.
+    """Exact consequences of every single-edge flip in one state.
+
+    An instance is a snapshot: it is tied to the exact
+    ``source_state``/``state_version`` pair it was built from, and
+    :meth:`applies_to` must be used to confirm it is still valid before
+    reusing it against a state that may since have been mutated.
+
+    Attributes:
+        source_state (RSearchState): Search state this analysis was
+            computed from.
+        state_version (int): ``source_state.version`` at the time of
+            computation, used to detect staleness after later mutation.
+        profiles (ActionProfiles): ``uint16`` array of shape
+            ``(number_of_edges, edges_per_clique + 1)``. ``profiles[e, k]``
+            is the number of indexed K5s containing edge ``e`` that
+            currently have exactly ``k`` color-one edges.
+        histogram_deltas (HistogramDeltas): ``int32`` array of the same
+            shape as ``profiles``. Row ``e`` is the exact change to the
+            global color-one-count histogram that would result from
+            flipping edge ``e``.
+        immediate_rewards (NDArray[np.int32]): Exact score reduction for
+            flipping each edge; positive values improve the score
+            (fewer monochromatic K5s), negative values worsen it.
+        resulting_scores (NDArray[np.int32]): Exact score that would
+            result from flipping each edge, equal to
+            ``source_state.score - immediate_rewards``.
     """
 
     source_state: RSearchState
@@ -46,6 +88,13 @@ class RActionAnalysis:
     resulting_scores: NDArray[np.int32]
 
     def __post_init__(self) -> None:
+        """Validate array shapes and freeze all array fields.
+
+        Raises:
+            ValueError: If ``profiles``, ``histogram_deltas``, or
+                ``resulting_scores`` does not describe the same number
+                of actions as ``immediate_rewards``.
+        """
         number_of_actions = len(self.immediate_rewards)
 
         if self.profiles.shape[0] != number_of_actions:
@@ -99,20 +148,25 @@ class RActionAnalysis:
     def number_of_actions(
         self,
     ) -> int:
-        """
-        Return the number of analyzed edge flips.
-        """
+        """int: Number of analyzed edge-flip actions (one per host edge)."""
         return len(self.immediate_rewards)
 
     def applies_to(
         self,
         state: RSearchState,
     ) -> bool:
-        """
-        Return whether this analysis belongs to the current state.
+        """Return whether this analysis belongs to the current state.
 
         Both object identity and state version are checked. Two
         different states at version zero are not interchangeable.
+
+        Args:
+            state (RSearchState): Candidate state to check freshness
+                against.
+
+        Returns:
+            bool: ``True`` if ``state`` is the exact object this
+            analysis was computed from and has not been mutated since.
         """
         return self.source_state is state and self.state_version == state.version
 
@@ -120,15 +174,23 @@ class RActionAnalysis:
 def edge_clique_profiles(
     state: RSearchState,
 ) -> ActionProfiles:
-    """
-    Count affected cliques by current color-one edge count.
+    """Count affected cliques by current color-one edge count.
 
-    profiles[e, k] is the number of indexed cliques containing
-    edge e that currently have exactly k color-one edges.
+    ``profiles[e, k]`` is the number of indexed cliques containing
+    edge ``e`` that currently have exactly ``k`` color-one edges.
 
-    RSearchState constructs this information lazily and maintains it
-    incrementally after each edge flip.  Return an owned copy so this
-    function retains its original value-returning behavior.
+    ``RSearchState`` constructs this information lazily and maintains it
+    incrementally after each edge flip. This function returns an owned
+    copy so it retains its original value-returning behavior even though
+    ``state.action_profiles`` itself is a read-only view.
+
+    Args:
+        state (RSearchState): Search state to read the action-profile
+            cache from.
+
+    Returns:
+        ActionProfiles: Owned ``uint16`` copy of shape
+        ``(number_of_edges, edges_per_clique + 1)``.
     """
     return state.action_profiles.copy()
 
@@ -137,8 +199,31 @@ def all_histogram_deltas(
     state: RSearchState,
     profiles: ActionProfiles,
 ) -> HistogramDeltas:
-    """
-    Calculate the global histogram delta for every edge flip.
+    """Calculate the global histogram delta for every edge flip.
+
+    For each edge ``e``, this computes how the global color-one-count
+    histogram would change if ``e`` were flipped, given the current
+    color of ``e`` and the clique-count profile of every edge. Flipping
+    a color-zero edge to color one moves each incident clique's bin
+    ``k`` up to ``k + 1``; flipping a color-one edge to color zero moves
+    each incident clique's bin ``k`` down to ``k - 1``. Every other bin
+    for that edge simply loses the cliques that moved out of it, which
+    is why the deltas start as ``-profiles``.
+
+    Args:
+        state (RSearchState): Search state supplying the current edge
+            colors and expected table dimensions.
+        profiles (ActionProfiles): Per-edge clique-count profile, as
+            returned by :func:`edge_clique_profiles`.
+
+    Returns:
+        HistogramDeltas: ``int32`` array of shape
+        ``(number_of_edges, edges_per_clique + 1)``. Row ``e`` is the
+        exact change to the global histogram if edge ``e`` is flipped.
+
+    Raises:
+        ValueError: If ``profiles`` does not have the shape
+            ``(state.number_of_edges, state.edges_per_clique + 1)``.
     """
     expected_shape = (
         state.number_of_edges,
@@ -184,8 +269,23 @@ def all_histogram_deltas(
 def all_immediate_rewards(
     histogram_deltas: HistogramDeltas,
 ) -> NDArray[np.int32]:
-    """
-    Return the exact score reduction for every histogram delta.
+    """Return the exact score reduction for every histogram delta.
+
+    The exact score is ``histogram[0] + histogram[-1]`` (the number of
+    all-color-zero plus all-color-one K5s), so the score change from a
+    flip is the sum of its histogram delta's first and last bins; the
+    reward is the negation of that change so a positive value means the
+    score improved.
+
+    Args:
+        histogram_deltas (HistogramDeltas): Per-action histogram deltas,
+            as returned by :func:`all_histogram_deltas`.
+
+    Returns:
+        NDArray[np.int32]: Exact score reduction for every action.
+
+    Raises:
+        ValueError: If ``histogram_deltas`` is not two-dimensional.
     """
     if histogram_deltas.ndim != 2:
         raise ValueError("histogram_deltas must be " "two-dimensional.")
@@ -199,11 +299,36 @@ def immediate_rewards_for_edges(
     state: RSearchState,
     edge_indices: NDArray[np.integer],
 ) -> NDArray[np.int32]:
-    """
-    Calculate exact score reductions for selected edge flips.
+    """Calculate exact score reductions for selected edge flips.
 
-    This is the fast path. It avoids constructing complete profiles
-    and histogram deltas for every action.
+    This is the fast path used when only a subset of actions is
+    needed: it avoids constructing the complete action-profile and
+    histogram-delta tables and instead reads
+    ``state.color_one_counts`` directly for just the cliques incident
+    to the requested edges.
+
+    For a color-zero (red) edge, flipping it to color one destroys
+    every incident clique currently at count zero (all-red) and creates
+    a new all-blue clique for every incident clique currently at count
+    ``edges_per_clique - 1``. For a color-one (blue) edge, flipping it
+    to color zero destroys every incident clique currently at count
+    ``edges_per_clique`` (all-blue) and creates a new all-red clique for
+    every incident clique currently at count one. The reward is
+    destroyed-count minus created-count in each case.
+
+    Args:
+        state (RSearchState): Search state to read colors and per-clique
+            color-one counts from.
+        edge_indices (NDArray[np.integer]): One-dimensional array of
+            host-edge indices to evaluate.
+
+    Returns:
+        NDArray[np.int32]: Exact score reduction for each requested
+        edge, in the same order as ``edge_indices``.
+
+    Raises:
+        ValueError: If ``edge_indices`` is not one-dimensional.
+        IndexError: If ``edge_indices`` contains an out-of-range edge.
     """
     edge_indices = np.asarray(
         edge_indices,
@@ -271,8 +396,18 @@ def immediate_rewards_for_edges(
 def analyze_actions(
     state: RSearchState,
 ) -> RActionAnalysis:
-    """
-    Calculate the exact consequences of every edge flip.
+    """Calculate the exact consequences of every edge flip.
+
+    This is the top-level entry point that assembles action profiles,
+    histogram deltas, immediate rewards, and resulting scores into one
+    :class:`RActionAnalysis` snapshot of ``state``.
+
+    Args:
+        state (RSearchState): Search state to analyze.
+
+    Returns:
+        RActionAnalysis: Exact per-edge consequences of flipping each
+        edge of ``state``.
     """
     profiles = edge_clique_profiles(state)
 
@@ -299,8 +434,24 @@ def resulting_histograms(
     state: RSearchState,
     analysis: RActionAnalysis,
 ) -> NDArray[np.int64]:
-    """
-    Return the complete resulting histogram for every action.
+    """Return the complete resulting histogram for every action.
+
+    Args:
+        state (RSearchState): Search state ``analysis`` must still
+            describe.
+        analysis (RActionAnalysis): Previously computed action analysis
+            for ``state``.
+
+    Returns:
+        NDArray[np.int64]: Array of shape
+        ``(number_of_actions, edges_per_clique + 1)`` where row ``e``
+        is the complete color-one-count histogram that would result
+        from flipping edge ``e``, computed as ``state.histogram +
+        analysis.histogram_deltas``.
+
+    Raises:
+        ValueError: If ``analysis`` does not apply to ``state`` (see
+            :meth:`RActionAnalysis.applies_to`).
     """
     if not analysis.applies_to(state):
         raise ValueError("Action analysis belongs to " "an earlier state version.")

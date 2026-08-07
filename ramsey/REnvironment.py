@@ -1,4 +1,12 @@
-"""Validation and application of state transitions."""
+"""Search-step environment tying search state, memory, and objective together.
+
+Defines :class:`REnvironment`, which owns one Ramsey-search episode: it
+consults search memory for tabu/revisit restrictions, applies the
+aspiration criterion and a deadlock fallback to keep at least one action
+available, validates and applies externally selected edge flips, and
+tracks the episode's best exact score and coloring. It does not itself
+select actions; that is the responsibility of an :class:`RPolicy`.
+"""
 
 from __future__ import annotations
 
@@ -29,6 +37,14 @@ def _read_only(
 ) -> NDArray:
     """
     Return an owned, typed, read-only array.
+
+    Args:
+        values (numpy.ndarray): Source values.
+        dtype: NumPy dtype the returned array is coerced to.
+
+    Returns:
+        numpy.ndarray: An independent copy of ``values`` cast to
+        ``dtype`` with the ``writeable`` flag cleared.
     """
     result = np.asarray(
         values,
@@ -49,25 +65,27 @@ class REnvironmentAnalysis:
     """
     Complete action information for the current environment state.
 
-    action_analysis:
-        Exact structural and score consequences of every edge flip.
-
-    objective_rewards:
-        Reward assigned to every action by the selected objective.
-
-    memory_status:
-        Restrictions produced by tabu or other search memory.
-
-    aspiration_mask:
-        Blocked actions allowed because they establish a new best
-        exact score.
-
-    available_mask:
-        Actions currently permitted by the environment.
-
-    forced_fallback:
-        True when every normal action was blocked and the environment
-        exposed the actions producing the best exact resulting score.
+    Attributes:
+        action_analysis (RActionAnalysis): Exact structural and score
+            consequences of every edge flip.
+        objective_rewards (numpy.ndarray): Float64 array, shape
+            ``(number_of_actions,)``, read-only. Reward assigned to
+            every action by the selected objective.
+        memory_status (RMemoryStatus): Restrictions produced by tabu
+            or other search memory.
+        aspiration_mask (numpy.ndarray): Boolean array, shape
+            ``(number_of_actions,)``, read-only. True for actions that
+            would otherwise be blocked but are allowed because they
+            establish a new best exact score (the aspiration
+            criterion).
+        available_mask (numpy.ndarray): Boolean array, shape
+            ``(number_of_actions,)``, read-only. Actions currently
+            permitted by the environment, after memory, aspiration,
+            and deadlock fallback are combined.
+        forced_fallback (bool): True when every normal action was
+            blocked and the environment exposed the actions producing
+            the best exact resulting score instead (deadlock
+            fallback).
     """
 
     action_analysis: RActionAnalysis
@@ -78,6 +96,13 @@ class REnvironmentAnalysis:
     forced_fallback: bool
 
     def __post_init__(self) -> None:
+        """Validate array shapes against the action count and freeze fields.
+
+        Raises:
+            ValueError: If ``objective_rewards``, ``aspiration_mask``,
+                ``available_mask``, or the memory status masks do not
+                match ``action_analysis.number_of_actions`` in shape.
+        """
         number_of_actions = self.action_analysis.number_of_actions
 
         expected_shape = (number_of_actions,)
@@ -141,6 +166,27 @@ class REnvironmentAnalysis:
 class RStepResult:
     """
     Observable result of one environment transition.
+
+    Attributes:
+        edge (int): Encoded edge index that was flipped.
+        previous_score (int): Exact monochromatic-clique score before
+            the flip.
+        score (int): Exact monochromatic-clique score after the flip.
+        immediate_reward (int): Exact score reduction produced by the
+            flip (``previous_score - score``); positive means the
+            score improved.
+        previous_energy (float): Objective energy before the flip.
+        energy (float): Objective energy after the flip.
+        objective_reward (float): Objective energy reduction produced
+            by the flip (``previous_energy - energy``).
+        best_score (int): Best exact score found in the episode so
+            far, including this step.
+        step_number (int): Number of transitions completed in the
+            episode, including this one.
+        terminated (bool): Whether the episode reached an exact score
+            of zero after this step.
+        truncated (bool): Whether the episode reached its step limit
+            after this step.
     """
 
     edge: int
@@ -185,6 +231,22 @@ class REnvironment:
         memory: RMemory,
         config: REnvironmentConfig | None = None,
     ) -> None:
+        """Construct an environment bound to one graph, objective, and memory.
+
+        No episode is active until :meth:`reset` is called; ``state``,
+        ``best_coloring``, and ``best_score`` raise until then.
+
+        Args:
+            graph (RGraph): Immutable host-graph topology and clique
+                index shared by every episode.
+            objective (RObjective): Optimization objective used to
+                score states and shape action rewards.
+            memory (RMemory): Search-history memory used to compute
+                per-action tabu/revisit restrictions.
+            config (REnvironmentConfig | None): Environment behavior
+                settings (step limit, aspiration). Defaults to
+                ``REnvironmentConfig()`` when omitted.
+        """
         self._graph = graph
         self._objective = objective
         self._memory = memory
@@ -235,6 +297,9 @@ class REnvironment:
     def state(self) -> RSearchState:
         """
         Return the active mutable search state.
+
+        Raises:
+            RuntimeError: If the environment has not been reset.
         """
         if self._state is None:
             raise RuntimeError("Environment has not been reset.")
@@ -245,6 +310,9 @@ class REnvironment:
     def best_coloring(self) -> RColoring:
         """
         Return an immutable snapshot of the episode's best coloring.
+
+        Raises:
+            RuntimeError: If the environment has not been reset.
         """
         if self._best_coloring is None:
             raise RuntimeError("Environment has not been reset.")
@@ -255,6 +323,9 @@ class REnvironment:
     def best_score(self) -> int:
         """
         Return the best exact score found in the episode.
+
+        Raises:
+            RuntimeError: If the environment has not been reset.
         """
         if self._best_score is None:
             raise RuntimeError("Environment has not been reset.")
@@ -296,6 +367,24 @@ class REnvironment:
         Seed generation is deliberately kept outside the environment.
         This allows random, constructive, database, mutated, or
         manually supplied seed generators to use the same environment.
+        The best coloring/score are initialized from the seed, memory
+        is reset, the step count returns to zero, and any cached
+        action analysis is discarded.
+
+        Args:
+            coloring (RColoring): Seed coloring for the new episode.
+                If it was built against a different but compatible
+                graph object (same ``problem``), an equivalent
+                coloring bound to this environment's graph is used
+                instead.
+
+        Returns:
+            RSearchState: The freshly created mutable search state for
+            the episode.
+
+        Raises:
+            ValueError: If ``coloring``'s graph belongs to a different
+                problem than this environment's graph.
         """
         if coloring.graph is not self._graph:
             if coloring.graph.problem != self._graph.problem:
@@ -328,6 +417,24 @@ class REnvironment:
     ) -> REnvironmentAnalysis:
         """
         Calculate exact consequences and availability for all actions.
+
+        Combines :func:`analyze_actions` (exact per-edge structural and
+        score consequences), the objective's shaped rewards, current
+        memory restrictions, the aspiration criterion (allowing a
+        blocked action that would set a new best exact score, when
+        ``config.use_aspiration`` is true), and the deadlock fallback
+        (exposing the actions with the best resulting exact score if
+        every action would otherwise be blocked).
+
+        Args:
+            use_cache (bool): If true and a cached analysis already
+                applies to the current search-state version, return it
+                instead of recomputing. Defaults to True.
+
+        Returns:
+            REnvironmentAnalysis: Complete action analysis, objective
+            rewards, memory status, and derived availability masks for
+            the current state.
         """
         if use_cache and self._cached_analysis is not None:
             cached_action_analysis = self._cached_analysis.action_analysis
@@ -391,7 +498,19 @@ class REnvironment:
         Exact score rewards are calculated only for blocked edges
         when aspiration must be evaluated. If every action is blocked,
         exact score rewards are calculated for all edges to provide
-        the deadlock fallback.
+        the deadlock fallback. This is the fast path used by policies
+        that do not require complete action analysis (see
+        ``RPolicy.requires_full_analysis``).
+
+        Args:
+            use_cache (bool): If true, reuse a cached full analysis or
+                a cached fast-path mask when either already applies to
+                the current search-state version. Defaults to True.
+
+        Returns:
+            numpy.ndarray: Boolean array, shape ``(number_of_edges,)``,
+            read-only. True for edges currently permitted by the
+            environment.
         """
         if use_cache:
             if self._cached_analysis is not None:
@@ -460,6 +579,10 @@ class REnvironment:
     ) -> NDArray[np.int32]:
         """
         Return the indexes of currently available edge actions.
+
+        Returns:
+            numpy.ndarray: Int32 array of encoded edge indexes for
+            which :meth:`available_action_mask_fast` is true.
         """
         return np.flatnonzero(self.available_action_mask_fast()).astype(np.int32)
 
@@ -472,17 +595,35 @@ class REnvironment:
         """
         Validate and apply one externally selected edge flip.
 
-        Parameters
-        ----------
-        edge:
-            Encoded edge index selected by a search strategy.
+        Applies the flip to the search state, updates search memory
+        with the transition, and refreshes the episode's best score
+        and coloring if the new state improves on it. Raises instead
+        of applying the flip if the episode has already ended or the
+        edge is not currently available.
 
-        full_analysis:
-            If true, verify the selected action against complete
-            all-action analysis.
+        Args:
+            edge (int): Encoded edge index selected by a search
+                strategy.
+            full_analysis (bool): If true, verify the selected action
+                against complete all-action analysis, and cross-check
+                the actual immediate and objective rewards against the
+                analysis's predictions. If false, use the lightweight
+                availability path and calculate the selected action's
+                reward during mutation, skipping cross-checks.
+                Defaults to True.
 
-            If false, use the lightweight availability path and
-            calculate the selected action's reward during mutation.
+        Returns:
+            RStepResult: Observable outcome of the transition,
+            including scores, rewards, and updated termination state.
+
+        Raises:
+            RuntimeError: If the episode has already terminated or
+                been truncated, or if ``full_analysis`` is true and
+                the actual immediate or objective reward disagrees
+                with the value predicted by the pre-flip analysis.
+            TypeError: If ``edge`` is not an integer.
+            IndexError: If ``edge`` is out of range.
+            ValueError: If ``edge`` is not currently available.
         """
         if self.terminated or self.truncated:
             raise RuntimeError("The environment episode has ended.")
@@ -592,6 +733,21 @@ class REnvironment:
     ]:
         """
         Apply the exact-score deadlock fallback when necessary.
+
+        Args:
+            available_mask (numpy.ndarray): Boolean array of actions
+                available before deadlock fallback is considered.
+            resulting_scores (numpy.ndarray): Exact score that results
+                from taking each action.
+
+        Returns:
+            tuple[numpy.ndarray, bool]: The (possibly replaced)
+            availability mask, and whether the deadlock fallback was
+            applied. When ``available_mask`` already allows at least
+            one action, it is returned unchanged with ``False``.
+            Otherwise every action tied for the best (lowest)
+            resulting score is made available, and ``True`` is
+            returned.
         """
         if np.any(available_mask):
             return (

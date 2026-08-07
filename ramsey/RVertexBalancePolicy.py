@@ -22,7 +22,25 @@ from .RVertexBalanceAction import (
     slots=True,
 )
 class RVertexBalancePolicyConfig:
-    """Configure greedy selection among balance-improving transfers."""
+    """Configure greedy selection among balance-improving transfers.
+
+    Attributes:
+        use_danger_reward (bool): If ``True``, rank candidate transfers
+            by the decayed danger-energy reward computed from their
+            histogram deltas (see
+            :func:`~ramsey.RObjective.all_danger_rewards`). If
+            ``False``, rank by each transfer's exact score reward.
+            Defaults to ``True``.
+        danger_decay (float): Decay factor passed to the danger-reward
+            calculation; eagerly validated in :meth:`__post_init__`.
+            Defaults to ``0.25``.
+        prioritize_balance (bool): If ``True``, balance reduction is
+            the primary objective and the selected reward (danger or
+            exact) is used only as a tie-breaker among transfers that
+            achieve the maximum balance reward. If ``False``, the
+            selected reward chooses among all moves that still
+            strictly improve vertex balance. Defaults to ``True``.
+    """
 
     use_danger_reward: bool = True
     danger_decay: float = 0.25
@@ -33,6 +51,14 @@ class RVertexBalancePolicyConfig:
     prioritize_balance: bool = True
 
     def __post_init__(self) -> None:
+        """Validate configuration types and eagerly validate ``danger_decay``.
+
+        Raises:
+            TypeError: If ``use_danger_reward`` or
+                ``prioritize_balance`` is not a ``bool``.
+            ValueError: If ``danger_decay`` is not a valid decay factor
+                for :func:`~ramsey.RObjective.danger_weights`.
+        """
         if not isinstance(
             self.use_danger_reward,
             bool,
@@ -60,7 +86,21 @@ class RVertexBalancePolicyConfig:
     slots=True,
 )
 class RVertexBalanceSelection:
-    """One balance transfer selected by the greedy policy."""
+    """One balance transfer selected by the greedy policy.
+
+    Attributes:
+        transfer (RVertexBalanceTransfer): The selected transfer.
+        balance_reward (int): Exact reduction in vertex color-balance
+            energy the transfer produces.
+        exact_reward (int): Exact score reduction the transfer
+            produces.
+        objective_reward (float): Reward used to rank the transfer
+            among its eligible competitors -- either the danger-energy
+            reward or the exact score reward, depending on
+            configuration.
+        resulting_score (int): Exact score that would result from
+            applying the transfer.
+    """
 
     transfer: RVertexBalanceTransfer
     balance_reward: int
@@ -73,7 +113,32 @@ def select_greedy_vertex_balance_action(
     state: RSearchState,
     config: RVertexBalancePolicyConfig | None = None,
 ) -> RVertexBalanceSelection:
-    """Select one balance-improving pivot transfer without mutation."""
+    """Select one balance-improving pivot transfer without mutation.
+
+    Analyzes every candidate transfer for ``state``, computes each
+    transfer's objective reward (danger-energy or exact score
+    reduction, per ``config.use_danger_reward``), optionally restricts
+    eligibility to transfers achieving the maximum balance reward (per
+    ``config.prioritize_balance``), and returns the highest-reward
+    eligible transfer. The transfer is only selected, not applied; use
+    :func:`~ramsey.RVertexBalanceAction.apply_vertex_balance_transfer`
+    to mutate ``state``.
+
+    Args:
+        state (RSearchState): Search state to analyze.
+        config (RVertexBalancePolicyConfig | None): Selection
+            configuration. Defaults to a freshly constructed
+            ``RVertexBalancePolicyConfig()`` when ``None``.
+
+    Returns:
+        RVertexBalanceSelection: The selected transfer together with
+        its balance, exact, and objective rewards, and its resulting
+        score.
+
+    Raises:
+        RuntimeError: If ``state`` currently has no candidate
+            vertex-balance transfers.
+    """
     config = (
         config
         if config is not None

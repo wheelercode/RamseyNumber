@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -88,6 +92,21 @@
 <span class="k">class</span> <span class="nc">RScoreReport</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Exact monochromatic score and per-color supporting data.</span>
+
+<span class="sd">    Immutable snapshot produced by :func:`evaluate_coloring`: the total</span>
+<span class="sd">    number of forbidden monochromatic cliques, the count attributed to</span>
+<span class="sd">    each color, and each color&#39;s full clique edge-count histogram.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        total (int): Total number of forbidden monochromatic cliques,</span>
+<span class="sd">            summed over all colors.</span>
+<span class="sd">        by_color (tuple[int, ...]): Number of forbidden monochromatic</span>
+<span class="sd">            cliques found for each color index.</span>
+<span class="sd">        histograms (tuple[NDArray[np.int64], ...]): Per-color histogram</span>
+<span class="sd">            of clique counts, one entry per color. ``histograms[c][k]``</span>
+<span class="sd">            is the number of indexed cliques of color ``c``&#39;s forbidden</span>
+<span class="sd">            size that contain exactly ``k`` edges of color ``c``. Each</span>
+<span class="sd">            array is an owned, read-only copy.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">total</span><span class="p">:</span> <span class="nb">int</span>
@@ -98,6 +117,14 @@
     <span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate array lengths, normalize dtypes, and freeze all fields.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``by_color`` and ``histograms`` have</span>
+<span class="sd">                different lengths, or if ``total`` does not equal the</span>
+<span class="sd">                sum of ``by_color``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">by_color</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">histograms</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;by_color and histograms must &quot;</span> <span class="s2">&quot;have equal lengths.&quot;</span><span class="p">)</span>
 
@@ -144,6 +171,18 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the edge-count histogram calculated for one color.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            color (int): Color index to look up.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.int64]: Read-only histogram where entry ``k`` is</span>
+<span class="sd">            the number of indexed cliques of that color containing</span>
+<span class="sd">            exactly ``k`` edges of that color.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If ``color`` is outside the range of stored</span>
+<span class="sd">                histograms.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">color</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">color</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">histograms</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid color index: </span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -162,6 +201,22 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Count selected-color edges in every indexed clique.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        coloring (RColoring): Coloring to inspect.</span>
+<span class="sd">        clique_size (int): Clique size to look up in the coloring&#39;s</span>
+<span class="sd">            graph&#39;s subgraph index.</span>
+<span class="sd">        color (int): Color index whose edges are counted within each</span>
+<span class="sd">            clique.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.uint8]: One count per indexed clique of size</span>
+<span class="sd">        ``clique_size``, equal to the number of that clique&#39;s edges</span>
+<span class="sd">        currently colored ``color``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        IndexError: If ``color`` is not a valid color index for the</span>
+<span class="sd">            coloring&#39;s problem.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">color</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">color</span> <span class="o">&gt;=</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid color index: </span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -184,6 +239,18 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Group indexed cliques by their selected-color edge count.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        coloring (RColoring): Coloring to inspect.</span>
+<span class="sd">        clique_size (int): Clique size to look up in the coloring&#39;s</span>
+<span class="sd">            graph&#39;s subgraph index.</span>
+<span class="sd">        color (int): Color index whose edges are counted within each</span>
+<span class="sd">            clique.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int64]: Histogram of length ``edges_per_clique + 1``</span>
+<span class="sd">        where entry ``k`` is the number of indexed cliques containing</span>
+<span class="sd">        exactly ``k`` edges of ``color``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">counts</span> <span class="o">=</span> <span class="n">count_color_edges_per_clique</span><span class="p">(</span>
         <span class="n">coloring</span><span class="o">=</span><span class="n">coloring</span><span class="p">,</span>
@@ -208,6 +275,21 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the legacy histogram for a symmetric two-color problem.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        coloring (RColoring): Coloring to inspect; must belong to a</span>
+<span class="sd">            symmetric, two-color problem.</span>
+<span class="sd">        edge_color (int): Color index whose edges are counted within</span>
+<span class="sd">            each clique. Defaults to ``1``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int64]: Histogram of clique counts by ``edge_color``</span>
+<span class="sd">        edge count, computed over the problem&#39;s single required clique</span>
+<span class="sd">        size.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the coloring&#39;s problem is not a symmetric</span>
+<span class="sd">            two-color problem.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">problem</span> <span class="o">=</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
 
@@ -231,6 +313,21 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RScoreReport</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate every forbidden monochromatic count exactly.</span>
+
+<span class="sd">    For a symmetric two-color problem, only one color&#39;s histogram is</span>
+<span class="sd">    computed directly; the other color&#39;s histogram is its exact</span>
+<span class="sd">    reversal, since exchanging color roles reverses the meaning of the</span>
+<span class="sd">    all-color-zero and all-color-one histogram bins. For problems with</span>
+<span class="sd">    more than two colors, or asymmetric problems, each color&#39;s</span>
+<span class="sd">    histogram is computed independently over that color&#39;s own</span>
+<span class="sd">    forbidden clique size.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        coloring (RColoring): Coloring to score.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RScoreReport: Exact total score, per-color counts, and</span>
+<span class="sd">        per-color histograms for ``coloring``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">problem</span> <span class="o">=</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
 
@@ -294,6 +391,13 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the total number of forbidden monochromatic cliques.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        coloring (RColoring): Coloring to score.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: Total count of monochromatic forbidden cliques across all</span>
+<span class="sd">        colors, equal to ``evaluate_coloring(coloring).total``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">evaluate_coloring</span><span class="p">(</span><span class="n">coloring</span><span class="p">)</span><span class="o">.</span><span class="n">total</span></div>
 

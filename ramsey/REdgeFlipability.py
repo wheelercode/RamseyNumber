@@ -12,6 +12,15 @@ from .RState import RSearchState
 
 
 def _read_only_copy(array: NDArray) -> NDArray:
+    """Return an owned, read-only copy of ``array``.
+
+    Args:
+        array (numpy.ndarray): Source array or array-like value to copy.
+
+    Returns:
+        numpy.ndarray: A new array that owns its memory, with the
+        ``writeable`` flag cleared.
+    """
     result = np.asarray(array).copy()
     result.flags.writeable = False
     return result
@@ -19,7 +28,24 @@ def _read_only_copy(array: NDArray) -> NDArray:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class REdgeFlipabilityAnalysis:
-    """Per-edge K5 role profiles and discrete flipability totals."""
+    """Per-edge K5 role profiles and discrete flipability totals.
+
+    Attributes:
+        source_state (RSearchState): Search state this analysis
+            describes.
+        state_version (int): Version of ``source_state`` at the time of
+            analysis, used by :meth:`applies_to` to detect staleness.
+        role_profiles (numpy.ndarray): Read-only ``uint16`` array of
+            shape ``(number_of_edges, edges_per_clique)``.
+            ``role_profiles[e, k - 1]`` is the number of K5s containing
+            edge ``e`` in which exactly ``k`` of the ten K5 edges have
+            ``e``'s current color.
+        flipabilities (numpy.ndarray): Read-only ``int64`` array of
+            shape ``(number_of_edges,)``. The sum of discrete local
+            flipability (``k - 1``) across every K5 containing each
+            edge; see :func:`calculate_edge_flipability` for the exact
+            definition.
+    """
 
     source_state: RSearchState
     state_version: int
@@ -34,6 +60,14 @@ class REdgeFlipabilityAnalysis:
     flipabilities: NDArray[np.int64]
 
     def __post_init__(self) -> None:
+        """Validate array shapes and non-negativity, then freeze them.
+
+        Raises:
+            ValueError: If ``role_profiles`` does not have shape
+                ``(number_of_edges, edges_per_clique)``, if
+                ``flipabilities`` does not have one value per edge, or
+                if any flipability value is negative.
+        """
         number_of_edges = self.source_state.number_of_edges
         edges_per_clique = self.source_state.edges_per_clique
 
@@ -70,14 +104,32 @@ class REdgeFlipabilityAnalysis:
         )
 
     def applies_to(self, state: RSearchState) -> bool:
-        """Return whether this analysis still describes ``state``."""
+        """Return whether this analysis still describes ``state``.
+
+        Args:
+            state (RSearchState): Candidate state to check.
+
+        Returns:
+            bool: ``True`` if ``state`` is the same object as
+            :attr:`source_state` and has not been mutated since (its
+            version still matches :attr:`state_version`).
+        """
         return (
             self.source_state is state
             and self.state_version == state.version
         )
 
     def summary(self) -> dict[str, int | float]:
-        """Return compact distribution statistics for the state."""
+        """Return compact distribution statistics for the state.
+
+        Returns:
+            dict[str, int | float]: Mean, standard deviation, min, max,
+            and the 5th/50th/95th percentiles of :attr:`flipabilities`,
+            keyed by ``flipability_mean``, ``flipability_std``,
+            ``flipability_min``, ``flipability_max``,
+            ``flipability_p05``, ``flipability_p50``, and
+            ``flipability_p95``.
+        """
         values = self.flipabilities
 
         return {
@@ -113,6 +165,31 @@ def calculate_edge_flipability(
     Every edge of the same complete host graph participates in the same
     number of K5s, so the totals are directly comparable without an
     arbitrary continuous weighting.
+
+    Note that flipability is a purely structural, color-agnostic count
+    of same-color neighbors within incident K5s. It does not measure
+    exact score reward (see ``RAction.analyze_actions``); an edge can
+    have high flipability while its exact reward for flipping is small
+    or negative, or vice versa.
+
+    Args:
+        state (RSearchState): Search state whose edges are analyzed.
+        analysis (RActionAnalysis | None): Optional pre-computed action
+            analysis for ``state`` to reuse its clique-count profiles
+            instead of recomputing them. Must satisfy
+            ``analysis.applies_to(state)`` when supplied.
+
+    Returns:
+        REdgeFlipabilityAnalysis: Per-edge K5 role profiles and the
+        discrete global flipability total for every host-graph edge.
+
+    Raises:
+        ValueError: If the host graph's problem does not use exactly
+            two colors, if ``analysis`` is supplied but does not apply
+            to ``state``.
+        RuntimeError: If the computed role profiles do not account for
+            every clique incident to an edge (an internal consistency
+            check).
     """
     if state.graph.problem.n_colors != 2:
         raise ValueError(

@@ -1,4 +1,14 @@
-"""Optimization objectives and reward shaping derived from action data."""
+"""Optimization objectives and reward shaping derived from action data.
+
+An objective assigns comparable numeric values to search states and to
+candidate actions on those states, so policies can be built independently
+of what "better" means. Two concrete objectives are provided:
+:class:`RMonochromaticObjective`, which uses the exact monochromatic-K5
+score directly, and :class:`RDangerObjective`, a heuristic that instead
+uses a graded, distance-weighted "danger energy" over the color-one-count
+histogram so that near-monochromatic (almost-violating) cliques also
+contribute, not just fully monochromatic ones.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +27,15 @@ def _validate_decay(
 ) -> float:
     """
     Return a validated danger-decay value.
+
+    Args:
+        decay (float): Candidate decay rate.
+
+    Returns:
+        float: ``decay`` coerced to ``float``.
+
+    Raises:
+        ValueError: If ``decay`` is not between zero and one, inclusive.
     """
     decay = float(decay)
 
@@ -40,6 +59,26 @@ def minority_histogram(
         three minority edges,
         four minority edges,
         balanced five-versus-five.
+
+    Bin ``k`` and bin ``last_bin - k`` (the color-reversed count) are
+    symmetric: both describe cliques with ``k`` edges of the minority
+    color, just with red and blue swapped. Summing each such pair
+    collapses a general clique_size-edge histogram into
+    ``last_bin // 2 + 1`` minority-count bins, with the central,
+    self-symmetric bin (if ``last_bin`` is even) left unsummed.
+
+    Args:
+        histogram (NDArray[np.integer]): One-dimensional histogram of
+            clique counts by color-one edge count, with at least two
+            bins.
+
+    Returns:
+        NDArray[np.int64]: The minority-count histogram, of length
+        ``(len(histogram) - 1) // 2 + 1``.
+
+    Raises:
+        ValueError: If ``histogram`` is not one-dimensional or has fewer
+            than two bins.
     """
     histogram = np.asarray(histogram)
 
@@ -75,6 +114,27 @@ def danger_weights(
 ) -> NDArray[np.float64]:
     """
     Return symmetric histogram weights for graded danger.
+
+    Bin ``p`` receives weight ``decay ** distance``, where ``distance``
+    is ``p``'s distance to the nearer monochromatic extreme (bin 0 or bin
+    ``number_of_bins - 1``). The two monochromatic bins therefore always
+    receive weight 1, and weights fall off geometrically at rate
+    ``decay`` moving toward the balanced center bin, symmetrically from
+    both ends.
+
+    Args:
+        number_of_bins (int): Number of histogram bins (``edges_per_clique
+            + 1`` for a clique's color-one-count histogram).
+        decay (float): Geometric decay rate in ``[0, 1]`` applied per unit
+            of distance from a monochromatic extreme. Defaults to 0.25.
+
+    Returns:
+        NDArray[np.float64]: Weight for each bin, shape
+        ``(number_of_bins,)``.
+
+    Raises:
+        ValueError: If ``number_of_bins`` is less than two, or if
+            ``decay`` is outside ``[0, 1]``.
     """
     decay = _validate_decay(decay)
 
@@ -105,7 +165,25 @@ def danger_energy(
     """
     Return the graded global danger energy of one histogram.
 
-    Lower energy is better.
+    Lower energy is better. Computed as the dot product of the histogram
+    counts with :func:`danger_weights`, so cliques closer to
+    monochromatic (in either color) contribute more energy than cliques
+    near the balanced center, and fully monochromatic cliques contribute
+    the most.
+
+    Args:
+        histogram (NDArray[np.integer]): One-dimensional histogram of
+            clique counts by color-one edge count, with at least two
+            bins.
+        decay (float): Geometric decay rate in ``[0, 1]`` passed to
+            :func:`danger_weights`. Defaults to 0.25.
+
+    Returns:
+        float: The weighted sum of histogram counts.
+
+    Raises:
+        ValueError: If ``histogram`` is not one-dimensional or has fewer
+            than two bins.
     """
     histogram = np.asarray(histogram)
 
@@ -130,6 +208,25 @@ def all_danger_rewards(
     Return the danger-energy reduction for every action.
 
     Positive reward means the action reduces danger energy.
+
+    Args:
+        histogram_deltas (NDArray[np.integer]): Two-dimensional array of
+            per-action histogram deltas, shape ``(number_of_actions,
+            number_of_bins)``, as produced for example by
+            :func:`ramsey.RAction.all_histogram_deltas` or
+            :attr:`ramsey.RK5Action.RK5PatternAnalysis.histogram_deltas`.
+        decay (float): Geometric decay rate in ``[0, 1]`` passed to
+            :func:`danger_weights`. Defaults to 0.25.
+
+    Returns:
+        NDArray[np.float64]: Danger-energy reduction for each action,
+        shape ``(number_of_actions,)``. Positive values indicate reduced
+        danger (an improving action); negative values indicate increased
+        danger.
+
+    Raises:
+        ValueError: If ``histogram_deltas`` is not two-dimensional or has
+            fewer than two bins.
     """
     histogram_deltas = np.asarray(histogram_deltas)
 
@@ -165,6 +262,10 @@ class RObjective(ABC):
     def name(self) -> str:
         """
         Return the stable objective name.
+
+        Returns:
+            str: A short, stable identifier for this objective (e.g. for
+            logging or reporting which objective produced a result).
         """
         ...
 
@@ -175,6 +276,12 @@ class RObjective(ABC):
     ) -> float:
         """
         Return a state energy where lower values are better.
+
+        Args:
+            state (RSearchState): Search state to evaluate.
+
+        Returns:
+            float: The state's energy under this objective.
         """
         ...
 
@@ -186,6 +293,17 @@ class RObjective(ABC):
     ) -> NDArray[np.float64]:
         """
         Return the energy reduction produced by every action.
+
+        Args:
+            state (RSearchState): Search state the actions would be
+                applied to.
+            analysis (RActionAnalysis): Precomputed exact action analysis
+                for ``state``; must currently describe ``state`` (see
+                :meth:`ramsey.RAction.RActionAnalysis.applies_to`).
+
+        Returns:
+            NDArray[np.float64]: Reward for each action, where a positive
+            value means the action reduces this objective's energy.
         """
         ...
 
@@ -196,6 +314,15 @@ class RObjective(ABC):
     ) -> None:
         """
         Reject analysis that does not describe the supplied state.
+
+        Args:
+            state (RSearchState): Search state the analysis should
+                describe.
+            analysis (RActionAnalysis): Action analysis to validate.
+
+        Raises:
+            ValueError: If ``analysis`` does not currently describe
+                ``state`` (stale version or different state).
         """
         if not analysis.applies_to(state):
             raise ValueError("Action analysis does not describe " "the current state.")
@@ -204,16 +331,31 @@ class RObjective(ABC):
 class RMonochromaticObjective(RObjective):
     """
     Use the exact monochromatic-clique score as the objective.
+
+    Energy is exactly the state's monochromatic score (the count of
+    fully monochromatic K5s); action rewards are the exact score
+    reductions already computed by action analysis, with no additional
+    shaping.
     """
 
     @property
     def name(self) -> str:
+        """str: The objective name, ``"monochromatic"``."""
         return "monochromatic"
 
     def energy(
         self,
         state: RSearchState,
     ) -> float:
+        """Return the state's exact monochromatic score.
+
+        Args:
+            state (RSearchState): Search state to evaluate.
+
+        Returns:
+            float: ``state.score`` as a float; zero means a valid
+            (violation-free) coloring has been found.
+        """
         return float(state.score)
 
     def action_rewards(
@@ -221,6 +363,22 @@ class RMonochromaticObjective(RObjective):
         state: RSearchState,
         analysis: RActionAnalysis,
     ) -> NDArray[np.float64]:
+        """Return each action's exact score reduction.
+
+        Args:
+            state (RSearchState): Search state the actions would be
+                applied to.
+            analysis (RActionAnalysis): Precomputed exact action analysis
+                for ``state``; must currently describe ``state``.
+
+        Returns:
+            NDArray[np.float64]: A float64 copy of
+            ``analysis.immediate_rewards``.
+
+        Raises:
+            ValueError: If ``analysis`` does not currently describe
+                ``state``.
+        """
         self._require_current_analysis(
             state,
             analysis,
@@ -239,6 +397,20 @@ class RMonochromaticObjective(RObjective):
 class RDangerObjective(RObjective):
     """
     Use graded distance from monochromatic cliques as energy.
+
+    Unlike :class:`RMonochromaticObjective`, this is a heuristic
+    objective: it does not count only exact monochromatic violations but
+    also weighs near-monochromatic cliques, using
+    :func:`danger_energy`/:func:`all_danger_rewards` over the state's
+    color-one-count histogram. This can guide a policy through plateaus
+    where the exact score is unchanged but the coloring is moving cliques
+    closer to (or further from) monochromatic.
+
+    Attributes:
+        decay (float): Geometric decay rate in ``[0, 1]`` controlling how
+            quickly per-bin danger weight falls off moving away from the
+            monochromatic extremes toward the balanced center. Defaults
+            to 0.25.
     """
 
     decay: float = 0.25
@@ -246,6 +418,11 @@ class RDangerObjective(RObjective):
     def __post_init__(
         self,
     ) -> None:
+        """Validate and normalize ``decay``.
+
+        Raises:
+            ValueError: If ``decay`` is outside ``[0, 1]``.
+        """
         object.__setattr__(
             self,
             "decay",
@@ -254,12 +431,23 @@ class RDangerObjective(RObjective):
 
     @property
     def name(self) -> str:
+        """str: The objective name, ``"danger"``."""
         return "danger"
 
     def energy(
         self,
         state: RSearchState,
     ) -> float:
+        """Return the state's graded danger energy.
+
+        Args:
+            state (RSearchState): Search state to evaluate.
+
+        Returns:
+            float: ``danger_energy(state.histogram, decay=self.decay)``;
+            lower values indicate fewer and less-nearly-monochromatic
+            cliques.
+        """
         return danger_energy(
             state.histogram,
             decay=self.decay,
@@ -270,6 +458,23 @@ class RDangerObjective(RObjective):
         state: RSearchState,
         analysis: RActionAnalysis,
     ) -> NDArray[np.float64]:
+        """Return each action's danger-energy reduction.
+
+        Args:
+            state (RSearchState): Search state the actions would be
+                applied to.
+            analysis (RActionAnalysis): Precomputed exact action analysis
+                for ``state``; must currently describe ``state``.
+
+        Returns:
+            NDArray[np.float64]: Danger-energy reduction for each action,
+            from :func:`all_danger_rewards` applied to
+            ``analysis.histogram_deltas``.
+
+        Raises:
+            ValueError: If ``analysis`` does not currently describe
+                ``state``.
+        """
         self._require_current_analysis(
             state,
             analysis,

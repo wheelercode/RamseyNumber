@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,19 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RGraph</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Immutable host-graph topology and precomputed incidence indexes.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Immutable host-graph topology and precomputed incidence indexes.</span>
+
+<span class="sd">Defines :class:`RGraph`, the complete-graph host topology for one</span>
+<span class="sd">:class:`ramsey.RProblem.RProblem`, together with the module-level</span>
+<span class="sd">functions that enumerate its edges and build, for each required</span>
+<span class="sd">forbidden clique size, the two lookup tables search and scoring code</span>
+<span class="sd">depend on: which host edges belong to each clique</span>
+<span class="sd">(:func:`enumerate_clique_edges`), and which cliques contain each host</span>
+<span class="sd">edge (:func:`build_edge_to_cliques`). These tables are the incidence</span>
+<span class="sd">structure that lets :class:`ramsey.RState.RSearchState` update clique</span>
+<span class="sd">counts incrementally after a single-edge flip instead of rescanning</span>
+<span class="sd">every clique.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -91,8 +107,22 @@
 <span class="k">def</span> <span class="nf">enumerate_edges</span><span class="p">(</span>
     <span class="n">n_vertices</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EdgeTable</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Enumerate every unordered edge of the complete graph K_n.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enumerate every unordered edge of the complete graph K_n.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        n_vertices (int): Number of vertices in the host graph; must be</span>
+<span class="sd">            at least two and at most 256 (the ``uint8`` vertex-index</span>
+<span class="sd">            limit).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        EdgeTable: ``uint8`` array of shape ``(comb(n_vertices, 2), 2)``</span>
+<span class="sd">        listing every unordered vertex pair ``(i, j)`` with ``i &lt; j``,</span>
+<span class="sd">        in combinatorial (lexicographic) order. This order defines the</span>
+<span class="sd">        canonical host-edge index used throughout the package.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``n_vertices`` is less than two, or greater than</span>
+<span class="sd">            256.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">n_vertices</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;n_vertices must be at least two.&quot;</span><span class="p">)</span>
@@ -119,8 +149,29 @@
     <span class="n">n_vertices</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">clique_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CliqueTable</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Enumerate host-edge indexes belonging to every requested clique.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enumerate host-edge indexes belonging to every requested clique.</span>
+
+<span class="sd">    Iterates every vertex subset of size ``clique_size`` in</span>
+<span class="sd">    combinatorial order and, for each, looks up the host-edge index of</span>
+<span class="sd">    every internal pair via a dictionary built from ``edges``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        edges (EdgeTable): Canonical host-edge table, as returned by</span>
+<span class="sd">            :func:`enumerate_edges`.</span>
+<span class="sd">        n_vertices (int): Number of vertices in the host graph.</span>
+<span class="sd">        clique_size (int): Size of the vertex subsets to enumerate;</span>
+<span class="sd">            must be between two and ``n_vertices``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        CliqueTable: ``uint16`` array of shape</span>
+<span class="sd">        ``(comb(n_vertices, clique_size), comb(clique_size, 2))``. Row</span>
+<span class="sd">        ``c`` lists the host-edge indices of every edge within clique</span>
+<span class="sd">        ``c``, in combinatorial vertex-pair order.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``edges`` does not have the shape implied by</span>
+<span class="sd">            ``n_vertices``, if ``clique_size`` is out of range, or if</span>
+<span class="sd">            the host graph has too many edges to index with ``uint16``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">expected_edges</span> <span class="o">=</span> <span class="n">comb</span><span class="p">(</span>
         <span class="n">n_vertices</span><span class="p">,</span>
@@ -200,8 +251,33 @@
     <span class="n">number_of_edges</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">clique_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EdgeToCliqueTable</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    List every requested clique containing each host-graph edge.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List every requested clique containing each host-graph edge.</span>
+
+<span class="sd">    Inverts ``clique_edges`` (clique to edges) into a per-edge table</span>
+<span class="sd">    (edge to cliques). It flattens ``clique_edges`` and its parallel</span>
+<span class="sd">    clique-index array, stable-sorts by edge index to group clique</span>
+<span class="sd">    indices by the edge they belong to, then reshapes into a uniform</span>
+<span class="sd">    ``(number_of_edges, cliques_per_edge)`` table. This relies on every</span>
+<span class="sd">    host edge belonging to exactly the same number of indexed cliques,</span>
+<span class="sd">    which holds because the host graph is complete.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        clique_edges (CliqueTable): Clique-to-edges table, as returned</span>
+<span class="sd">            by :func:`enumerate_clique_edges`.</span>
+<span class="sd">        n_vertices (int): Number of vertices in the host graph.</span>
+<span class="sd">        number_of_edges (int): Number of host-graph edges (rows of the</span>
+<span class="sd">            result).</span>
+<span class="sd">        clique_size (int): Size of the indexed cliques.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        EdgeToCliqueTable: ``uint32`` array of shape</span>
+<span class="sd">        ``(number_of_edges, comb(n_vertices - 2, clique_size - 2))``.</span>
+<span class="sd">        Row ``e`` lists the indices (into ``clique_edges``) of every</span>
+<span class="sd">        clique containing host edge ``e``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``clique_edges`` does not have the shape implied</span>
+<span class="sd">            by ``n_vertices`` and ``clique_size``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="p">(</span>
         <span class="n">number_of_cliques</span><span class="p">,</span>
@@ -260,8 +336,17 @@
 <span class="k">def</span> <span class="nf">_read_only</span><span class="p">(</span>
     <span class="n">array</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Mark an owned NumPy array as immutable and return it.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Mark an owned NumPy array as immutable and return it.</span>
+
+<span class="sd">    Unlike similar helpers in other modules, this does not copy: the</span>
+<span class="sd">    caller must already own ``array`` exclusively before calling this.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        array (np.ndarray): Array to freeze in place.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        np.ndarray: The same array object, with ``flags.writeable`` set</span>
+<span class="sd">        to ``False``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">array</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="k">return</span> <span class="n">array</span>
@@ -271,8 +356,16 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RGraph.RSubgraphIndex">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RSubgraphIndex</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Precomputed occurrence tables for one forbidden clique size.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Precomputed occurrence tables for one forbidden clique size.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        clique_size (int): Vertex-subset size these tables index.</span>
+<span class="sd">        clique_edges (CliqueTable): ``uint16`` array of shape</span>
+<span class="sd">            ``(clique_count, edges_per_clique)``; row ``c`` lists the</span>
+<span class="sd">            host-edge indices belonging to clique ``c``.</span>
+<span class="sd">        edge_to_cliques (EdgeToCliqueTable): ``uint32`` array of shape</span>
+<span class="sd">            ``(number_of_edges, cliques_per_edge)``; row ``e`` lists</span>
+<span class="sd">            the indices of every clique containing host edge ``e``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">clique_size</span><span class="p">:</span> <span class="nb">int</span>
@@ -281,23 +374,17 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">clique_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of indexed clique occurrences.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of indexed clique occurrences.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">edges_per_clique</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of edges in each indexed clique.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of edges in each indexed clique.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">clique_edges</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">cliques_per_edge</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of indexed cliques containing each edge.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of indexed cliques containing each edge.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span></div>
 
 
@@ -305,14 +392,24 @@
 <div class="viewcode-block" id="RGraph">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RGraph.RGraph">[docs]</a>
 <span class="k">class</span> <span class="nc">RGraph</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Complete host-graph topology required by one Ramsey problem.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete host-graph topology required by one Ramsey problem.</span>
+
+<span class="sd">    Builds and owns the canonical edge table and, for every distinct</span>
+<span class="sd">    clique size the problem requires (:attr:`RProblem.required_clique_sizes`),</span>
+<span class="sd">    the precomputed :class:`RSubgraphIndex` occurrence tables used to</span>
+<span class="sd">    maintain clique counts incrementally.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">problem</span><span class="p">:</span> <span class="n">RProblem</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build the host-graph edge table and per-clique-size indexes.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            problem (RProblem): Ramsey problem specifying the vertex</span>
+<span class="sd">                count and forbidden clique sizes to index.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_problem</span> <span class="o">=</span> <span class="n">problem</span>
 
         <span class="n">edges</span> <span class="o">=</span> <span class="n">enumerate_edges</span><span class="p">(</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">)</span>
@@ -348,23 +445,17 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">problem</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RProblem</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the mathematical problem represented by this graph.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RProblem: Mathematical problem represented by this graph.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EdgeTable</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the canonical host-edge table.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;EdgeTable: Canonical host-edge table (see :func:`enumerate_edges`).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_edges</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">number_of_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of colorable host edges.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of colorable host edges.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_edges</span><span class="p">)</span>
 
     <span class="nd">@property</span>
@@ -374,8 +465,11 @@
         <span class="nb">int</span><span class="p">,</span>
         <span class="n">RSubgraphIndex</span><span class="p">,</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the indexed forbidden clique sizes.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mapping[int, RSubgraphIndex]: Indexed tables keyed by clique size.</span>
+
+<span class="sd">        Covers every distinct clique size in</span>
+<span class="sd">        ``problem.required_clique_sizes``. The mapping is read-only</span>
+<span class="sd">        (backed by :class:`types.MappingProxyType`).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subgraph_indexes</span>
 
@@ -385,8 +479,18 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">clique_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RSubgraphIndex</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return precomputed tables for one required clique size.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return precomputed tables for one required clique size.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            clique_size (int): Clique size to look up.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RSubgraphIndex: Precomputed occurrence tables for</span>
+<span class="sd">            ``clique_size``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If ``clique_size`` was not indexed for this</span>
+<span class="sd">                graph&#39;s problem.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subgraph_indexes</span><span class="p">[</span><span class="n">clique_size</span><span class="p">]</span>

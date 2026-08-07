@@ -1,4 +1,16 @@
-"""Counterfactual flexibility produced by candidate edge flips."""
+"""Counterfactual flexibility produced by candidate edge flips.
+
+Where :mod:`ramsey.RAction` computes the *immediate* exact score reward of
+every edge flip, this module looks one flip ahead: for a set of candidate
+edges it actually applies each flip to a scratch copy of the search state,
+recomputes the action analysis, measures the resulting local flexibility
+(the fraction of subsequent actions available within various damage
+budgets, see :mod:`ramsey.RFlexibility`), and undoes the flip. The result
+is an exact score/flexibility landscape over candidate actions, together
+with the Pareto-optimal subset that jointly maximizes exact score reward
+and every resulting flexibility budget without imposing an arbitrary
+scalar weighting between them.
+"""
 
 from __future__ import annotations
 
@@ -18,13 +30,35 @@ from .RState import RSearchState
 
 
 def _read_only_copy(array: NDArray) -> NDArray:
+    """Copy an array, mark the copy read-only, and return it.
+
+    Args:
+        array (NDArray): Source array; may be any array-like value.
+
+    Returns:
+        NDArray: An independently owned, read-only copy.
+    """
     result = np.asarray(array).copy()
     result.flags.writeable = False
     return result
 
 
 def _pareto_mask(objectives: NDArray[np.float64]) -> NDArray[np.bool_]:
-    """Return rows not dominated when every objective is maximized."""
+    """Return rows not dominated when every objective is maximized.
+
+    A row is dominated when some other row is at least as good in
+    every objective column and strictly better in at least one.
+
+    Args:
+        objectives (NDArray[np.float64]): Array of shape
+            ``(number_of_candidates, number_of_objectives)`` where every
+            column is an objective to maximize.
+
+    Returns:
+        NDArray[np.bool_]: Boolean mask of shape
+        ``(number_of_candidates,)``, ``True`` for rows on the Pareto
+        front (not dominated by any other row).
+    """
     number_of_rows = len(objectives)
     result = np.ones(number_of_rows, dtype=np.bool_)
 
@@ -46,7 +80,33 @@ def _pareto_mask(objectives: NDArray[np.float64]) -> NDArray[np.bool_]:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class RActionFlexibilityLandscape:
-    """Score/flexibility consequences for a selected set of edge flips."""
+    """Score/flexibility consequences for a selected set of edge flips.
+
+    Attributes:
+        source_state (RSearchState): Search state the landscape was
+            computed from.
+        state_version (int): ``source_state.version`` at computation
+            time, used to detect staleness.
+        current (RFlexibilityProfile): Flexibility profile of
+            ``source_state`` itself, before any candidate flip.
+        candidate_edges (NDArray[np.int32]): Host-edge indices that were
+            evaluated, shape ``(number_of_candidates,)``.
+        score_rewards (NDArray[np.int32]): Exact immediate score reward
+            of flipping each candidate edge, shape
+            ``(number_of_candidates,)``.
+        resulting_fractions (NDArray[np.float64]): Flexibility fraction
+            ``F(budget)`` after applying each candidate flip, shape
+            ``(number_of_candidates, number_of_budgets)`` with columns
+            aligned to ``current.budgets``.
+        flexibility_deltas (NDArray[np.float64]): ``resulting_fractions``
+            minus ``current.fractions``, i.e. the change in flexibility
+            each candidate flip would produce, same shape as
+            ``resulting_fractions``.
+        pareto_mask (NDArray[np.bool_]): ``True`` for candidates that are
+            Pareto-optimal when jointly maximizing ``score_rewards`` and
+            every column of ``resulting_fractions``, shape
+            ``(number_of_candidates,)``.
+    """
 
     source_state: RSearchState
     state_version: int
@@ -58,6 +118,14 @@ class RActionFlexibilityLandscape:
     pareto_mask: NDArray[np.bool_]
 
     def __post_init__(self) -> None:
+        """Validate array shapes and freeze all array fields.
+
+        Raises:
+            ValueError: If any of ``candidate_edges``, ``score_rewards``,
+                ``pareto_mask``, ``resulting_fractions``, or
+                ``flexibility_deltas`` does not match the shape implied
+                by ``candidate_edges`` and ``current.budgets``.
+        """
         number_of_candidates = len(self.candidate_edges)
         number_of_budgets = len(self.current.budgets)
 
@@ -93,14 +161,38 @@ class RActionFlexibilityLandscape:
             )
 
     def applies_to(self, state: RSearchState) -> bool:
+        """Return whether this landscape still describes ``state``.
+
+        Args:
+            state (RSearchState): Candidate state to check freshness
+                against.
+
+        Returns:
+            bool: ``True`` if ``state`` is the exact object this
+            landscape was computed from and has not been mutated since.
+        """
         return self.source_state is state and self.state_version == state.version
 
     @property
     def pareto_edges(self) -> NDArray[np.int32]:
-        """Return actions nondominated in score and the full F vector."""
+        """NDArray[np.int32]: Actions nondominated in score and the full F vector."""
         return self.candidate_edges[self.pareto_mask]
 
     def budget_index(self, budget: int) -> int:
+        """Return the column index of one flexibility budget.
+
+        Args:
+            budget (int): Damage budget value to locate among
+                ``current.budgets``.
+
+        Returns:
+            int: Column index of ``budget`` in ``current.budgets``,
+            usable to index ``resulting_fractions`` and
+            ``flexibility_deltas``.
+
+        Raises:
+            KeyError: If ``budget`` is not present in the landscape.
+        """
         indexes = np.flatnonzero(self.current.budgets == budget)
 
         if indexes.size == 0:
@@ -116,15 +208,48 @@ def calculate_action_flexibility_landscape(
     *,
     candidate_mask: NDArray[np.bool_] | None = None,
 ) -> RActionFlexibilityLandscape:
-    """
-    Calculate the exact future flexibility produced by candidate flips.
+    """Calculate the exact future flexibility produced by candidate flips.
 
-    The source state is never mutated. A private scratch state reuses the
-    incremental action-profile machinery, making exact counterfactuals much
-    cheaper than rebuilding K5 incidence information for every candidate.
+    For every candidate edge, this actually applies the flip to a scratch
+    copy of ``state``, recomputes the full action analysis, measures the
+    resulting flexibility profile, and flips the edge back — so
+    ``resulting_fractions`` reflects the exact one-move-ahead flexibility
+    landscape rather than an approximation. The source state is never
+    mutated. The scratch state reuses the incremental action-profile
+    machinery (materialized once up front via ``scratch.action_profiles``),
+    making the repeated flip/analyze/undo cycle much cheaper than rebuilding
+    K5 incidence information from scratch for every candidate.
 
-    Pareto dominance maximizes exact score reward and every resulting F(b)
-    component simultaneously. No arbitrary scalar weighting is introduced.
+    Pareto dominance (see :func:`_pareto_mask`) maximizes exact score
+    reward and every resulting ``F(b)`` component simultaneously. No
+    arbitrary scalar weighting between score and flexibility is
+    introduced.
+
+    Args:
+        state (RSearchState): Search state to evaluate candidate flips
+            against; never mutated.
+        analysis (RActionAnalysis | None): Action analysis for
+            ``state``. If ``None``, it is computed via
+            :func:`ramsey.RAction.analyze_actions`.
+        budgets (Iterable[int]): Damage budgets defining the flexibility
+            curve; forwarded to :func:`calculate_flexibility`.
+        candidate_mask (NDArray[np.bool_] | None): Boolean mask of shape
+            ``(state.number_of_edges,)`` selecting which edges to
+            evaluate as candidates. If ``None``, every edge is a
+            candidate.
+
+    Returns:
+        RActionFlexibilityLandscape: Exact score and flexibility
+        consequences of every candidate flip, including the Pareto
+        front over score reward and resulting flexibility.
+
+    Raises:
+        ValueError: If ``analysis`` does not apply to ``state``, if
+            ``candidate_mask`` has the wrong shape, or if no candidate
+            edges are selected.
+        RuntimeError: If the scratch state fails to restore to
+            ``state``'s original score and colors after the flip/undo
+            cycle for every candidate (an internal consistency check).
     """
     if analysis is None:
         analysis = analyze_actions(state)

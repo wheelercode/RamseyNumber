@@ -10,7 +10,19 @@ def _require_nonnegative_integer(
     name: str,
     value: int,
 ) -> int:
-    """Return a validated nonnegative integer."""
+    """Validate and normalize a nonnegative integer configuration field.
+
+    Args:
+        name (str): Field name used to build a descriptive error message.
+        value (int): Candidate value to validate.
+
+    Returns:
+        int: ``value`` coerced to a plain ``int``.
+
+    Raises:
+        TypeError: If ``value`` is a ``bool`` or is not an ``Integral``.
+        ValueError: If ``value`` is negative.
+    """
     if isinstance(value, bool) or not isinstance(value, Integral):
         raise TypeError(f"{name} must be an integer.")
 
@@ -29,6 +41,13 @@ class REnvironmentConfig:
 
     This contains behavior belonging to the environment itself,
     rather than to a particular optimization objective.
+
+    Attributes:
+        max_steps (int): Maximum number of edge flips permitted in one
+            episode before the environment reports it as truncated.
+        use_aspiration (bool): Whether a blocked action is allowed anyway
+            when it would establish a new best exact score for the
+            episode (the aspiration criterion of tabu search).
     """
 
     # Maximum number of edge flips in one episode.
@@ -38,6 +57,13 @@ class REnvironmentConfig:
     use_aspiration: bool = True
 
     def __post_init__(self) -> None:
+        """Validate and normalize the configured field values.
+
+        Raises:
+            TypeError: If ``max_steps`` is not an integer or
+                ``use_aspiration`` is not a ``bool``.
+            ValueError: If ``max_steps`` is not positive.
+        """
         max_steps = _require_nonnegative_integer(
             "max_steps",
             self.max_steps,
@@ -63,6 +89,14 @@ class REnvironmentConfig:
 class RTabuMemoryConfig:
     """
     Configuration for tabu and visited-state memory.
+
+    Attributes:
+        edge_tenure (int): Number of future steps for which a just-flipped
+            edge remains tabu (blocked from being flipped again). Zero
+            disables edge-tenure blocking.
+        visited_state_window (int): Number of most recently visited exact
+            colorings remembered for revisit blocking. Zero disables
+            visited-state memory entirely.
     """
 
     # Number of future steps for which a flipped edge is blocked.
@@ -73,6 +107,12 @@ class RTabuMemoryConfig:
     visited_state_window: int = 2_000
 
     def __post_init__(self) -> None:
+        """Validate and normalize the configured field values.
+
+        Raises:
+            TypeError: If either field is not an integer.
+            ValueError: If either field is negative.
+        """
         object.__setattr__(
             self,
             "edge_tenure",

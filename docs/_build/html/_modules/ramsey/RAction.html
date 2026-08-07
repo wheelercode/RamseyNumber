@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,18 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RAction</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Consequences and exact score changes for candidate search actions.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Exact single-edge-flip action analysis for a search state.</span>
+
+<span class="sd">An &quot;action&quot; in this package is the flip of one host-graph edge from its</span>
+<span class="sd">current color to the other color. Because the exact score is the count of</span>
+<span class="sd">monochromatic K5 cliques (``histogram[0] + histogram[-1]`` of the color-one</span>
+<span class="sd">edge-count histogram), flipping a single edge only changes the color-one</span>
+<span class="sd">count of the cliques incident to that edge, and only those cliques can move</span>
+<span class="sd">between histogram bins. This module derives, for every edge, the exact</span>
+<span class="sd">resulting change to the global histogram and the exact score reduction</span>
+<span class="sd">(reward) that flip would produce, without recomputing the score from</span>
+<span class="sd">scratch.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -84,8 +99,15 @@
 <span class="k">def</span> <span class="nf">_owned_read_only</span><span class="p">(</span>
     <span class="n">array</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Copy an array, mark the copy read-only, and return it.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Copy an array, mark the copy read-only, and return it.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        array (NDArray): Source array; may be any array-like value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray: An independently owned copy with ``flags.writeable`` set</span>
+<span class="sd">        to ``False``, safe to expose without risking aliasing the</span>
+<span class="sd">        caller&#39;s mutable buffers.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">owned</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
@@ -102,8 +124,32 @@
     <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RActionAnalysis</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Exact consequences of every single-edge flip in one state.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exact consequences of every single-edge flip in one state.</span>
+
+<span class="sd">    An instance is a snapshot: it is tied to the exact</span>
+<span class="sd">    ``source_state``/``state_version`` pair it was built from, and</span>
+<span class="sd">    :meth:`applies_to` must be used to confirm it is still valid before</span>
+<span class="sd">    reusing it against a state that may since have been mutated.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        source_state (RSearchState): Search state this analysis was</span>
+<span class="sd">            computed from.</span>
+<span class="sd">        state_version (int): ``source_state.version`` at the time of</span>
+<span class="sd">            computation, used to detect staleness after later mutation.</span>
+<span class="sd">        profiles (ActionProfiles): ``uint16`` array of shape</span>
+<span class="sd">            ``(number_of_edges, edges_per_clique + 1)``. ``profiles[e, k]``</span>
+<span class="sd">            is the number of indexed K5s containing edge ``e`` that</span>
+<span class="sd">            currently have exactly ``k`` color-one edges.</span>
+<span class="sd">        histogram_deltas (HistogramDeltas): ``int32`` array of the same</span>
+<span class="sd">            shape as ``profiles``. Row ``e`` is the exact change to the</span>
+<span class="sd">            global color-one-count histogram that would result from</span>
+<span class="sd">            flipping edge ``e``.</span>
+<span class="sd">        immediate_rewards (NDArray[np.int32]): Exact score reduction for</span>
+<span class="sd">            flipping each edge; positive values improve the score</span>
+<span class="sd">            (fewer monochromatic K5s), negative values worsen it.</span>
+<span class="sd">        resulting_scores (NDArray[np.int32]): Exact score that would</span>
+<span class="sd">            result from flipping each edge, equal to</span>
+<span class="sd">            ``source_state.score - immediate_rewards``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
@@ -116,6 +162,13 @@
     <span class="n">resulting_scores</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate array shapes and freeze all array fields.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``profiles``, ``histogram_deltas``, or</span>
+<span class="sd">                ``resulting_scores`` does not describe the same number</span>
+<span class="sd">                of actions as ``immediate_rewards``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">number_of_actions</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">immediate_rewards</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiles</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">number_of_actions</span><span class="p">:</span>
@@ -169,9 +222,7 @@
     <span class="k">def</span> <span class="nf">number_of_actions</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of analyzed edge flips.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of analyzed edge-flip actions (one per host edge).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">immediate_rewards</span><span class="p">)</span>
 
 <div class="viewcode-block" id="RActionAnalysis.applies_to">
@@ -180,11 +231,18 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return whether this analysis belongs to the current state.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this analysis belongs to the current state.</span>
 
 <span class="sd">        Both object identity and state version are checked. Two</span>
 <span class="sd">        different states at version zero are not interchangeable.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Candidate state to check freshness</span>
+<span class="sd">                against.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if ``state`` is the exact object this</span>
+<span class="sd">            analysis was computed from and has not been mutated since.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span></div>
 </div>
@@ -196,15 +254,23 @@
 <span class="k">def</span> <span class="nf">edge_clique_profiles</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ActionProfiles</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Count affected cliques by current color-one edge count.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count affected cliques by current color-one edge count.</span>
 
-<span class="sd">    profiles[e, k] is the number of indexed cliques containing</span>
-<span class="sd">    edge e that currently have exactly k color-one edges.</span>
+<span class="sd">    ``profiles[e, k]`` is the number of indexed cliques containing</span>
+<span class="sd">    edge ``e`` that currently have exactly ``k`` color-one edges.</span>
 
-<span class="sd">    RSearchState constructs this information lazily and maintains it</span>
-<span class="sd">    incrementally after each edge flip.  Return an owned copy so this</span>
-<span class="sd">    function retains its original value-returning behavior.</span>
+<span class="sd">    ``RSearchState`` constructs this information lazily and maintains it</span>
+<span class="sd">    incrementally after each edge flip. This function returns an owned</span>
+<span class="sd">    copy so it retains its original value-returning behavior even though</span>
+<span class="sd">    ``state.action_profiles`` itself is a read-only view.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to read the action-profile</span>
+<span class="sd">            cache from.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ActionProfiles: Owned ``uint16`` copy of shape</span>
+<span class="sd">        ``(number_of_edges, edges_per_clique + 1)``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">state</span><span class="o">.</span><span class="n">action_profiles</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
 
@@ -216,8 +282,31 @@
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="n">profiles</span><span class="p">:</span> <span class="n">ActionProfiles</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HistogramDeltas</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Calculate the global histogram delta for every edge flip.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate the global histogram delta for every edge flip.</span>
+
+<span class="sd">    For each edge ``e``, this computes how the global color-one-count</span>
+<span class="sd">    histogram would change if ``e`` were flipped, given the current</span>
+<span class="sd">    color of ``e`` and the clique-count profile of every edge. Flipping</span>
+<span class="sd">    a color-zero edge to color one moves each incident clique&#39;s bin</span>
+<span class="sd">    ``k`` up to ``k + 1``; flipping a color-one edge to color zero moves</span>
+<span class="sd">    each incident clique&#39;s bin ``k`` down to ``k - 1``. Every other bin</span>
+<span class="sd">    for that edge simply loses the cliques that moved out of it, which</span>
+<span class="sd">    is why the deltas start as ``-profiles``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state supplying the current edge</span>
+<span class="sd">            colors and expected table dimensions.</span>
+<span class="sd">        profiles (ActionProfiles): Per-edge clique-count profile, as</span>
+<span class="sd">            returned by :func:`edge_clique_profiles`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        HistogramDeltas: ``int32`` array of shape</span>
+<span class="sd">        ``(number_of_edges, edges_per_clique + 1)``. Row ``e`` is the</span>
+<span class="sd">        exact change to the global histogram if edge ``e`` is flipped.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``profiles`` does not have the shape</span>
+<span class="sd">            ``(state.number_of_edges, state.edges_per_clique + 1)``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
@@ -266,8 +355,23 @@
 <span class="k">def</span> <span class="nf">all_immediate_rewards</span><span class="p">(</span>
     <span class="n">histogram_deltas</span><span class="p">:</span> <span class="n">HistogramDeltas</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Return the exact score reduction for every histogram delta.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the exact score reduction for every histogram delta.</span>
+
+<span class="sd">    The exact score is ``histogram[0] + histogram[-1]`` (the number of</span>
+<span class="sd">    all-color-zero plus all-color-one K5s), so the score change from a</span>
+<span class="sd">    flip is the sum of its histogram delta&#39;s first and last bins; the</span>
+<span class="sd">    reward is the negation of that change so a positive value means the</span>
+<span class="sd">    score improved.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        histogram_deltas (HistogramDeltas): Per-action histogram deltas,</span>
+<span class="sd">            as returned by :func:`all_histogram_deltas`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int32]: Exact score reduction for every action.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``histogram_deltas`` is not two-dimensional.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">histogram_deltas</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;histogram_deltas must be &quot;</span> <span class="s2">&quot;two-dimensional.&quot;</span><span class="p">)</span>
@@ -284,11 +388,36 @@
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="n">edge_indices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Calculate exact score reductions for selected edge flips.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate exact score reductions for selected edge flips.</span>
 
-<span class="sd">    This is the fast path. It avoids constructing complete profiles</span>
-<span class="sd">    and histogram deltas for every action.</span>
+<span class="sd">    This is the fast path used when only a subset of actions is</span>
+<span class="sd">    needed: it avoids constructing the complete action-profile and</span>
+<span class="sd">    histogram-delta tables and instead reads</span>
+<span class="sd">    ``state.color_one_counts`` directly for just the cliques incident</span>
+<span class="sd">    to the requested edges.</span>
+
+<span class="sd">    For a color-zero (red) edge, flipping it to color one destroys</span>
+<span class="sd">    every incident clique currently at count zero (all-red) and creates</span>
+<span class="sd">    a new all-blue clique for every incident clique currently at count</span>
+<span class="sd">    ``edges_per_clique - 1``. For a color-one (blue) edge, flipping it</span>
+<span class="sd">    to color zero destroys every incident clique currently at count</span>
+<span class="sd">    ``edges_per_clique`` (all-blue) and creates a new all-red clique for</span>
+<span class="sd">    every incident clique currently at count one. The reward is</span>
+<span class="sd">    destroyed-count minus created-count in each case.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to read colors and per-clique</span>
+<span class="sd">            color-one counts from.</span>
+<span class="sd">        edge_indices (NDArray[np.integer]): One-dimensional array of</span>
+<span class="sd">            host-edge indices to evaluate.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int32]: Exact score reduction for each requested</span>
+<span class="sd">        edge, in the same order as ``edge_indices``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``edge_indices`` is not one-dimensional.</span>
+<span class="sd">        IndexError: If ``edge_indices`` contains an out-of-range edge.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">edge_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
         <span class="n">edge_indices</span><span class="p">,</span>
@@ -359,8 +488,18 @@
 <span class="k">def</span> <span class="nf">analyze_actions</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RActionAnalysis</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Calculate the exact consequences of every edge flip.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate the exact consequences of every edge flip.</span>
+
+<span class="sd">    This is the top-level entry point that assembles action profiles,</span>
+<span class="sd">    histogram deltas, immediate rewards, and resulting scores into one</span>
+<span class="sd">    :class:`RActionAnalysis` snapshot of ``state``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to analyze.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RActionAnalysis: Exact per-edge consequences of flipping each</span>
+<span class="sd">        edge of ``state``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">profiles</span> <span class="o">=</span> <span class="n">edge_clique_profiles</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
@@ -390,8 +529,24 @@
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="n">analysis</span><span class="p">:</span> <span class="n">RActionAnalysis</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Return the complete resulting histogram for every action.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the complete resulting histogram for every action.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state ``analysis`` must still</span>
+<span class="sd">            describe.</span>
+<span class="sd">        analysis (RActionAnalysis): Previously computed action analysis</span>
+<span class="sd">            for ``state``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int64]: Array of shape</span>
+<span class="sd">        ``(number_of_actions, edges_per_clique + 1)`` where row ``e``</span>
+<span class="sd">        is the complete color-one-count histogram that would result</span>
+<span class="sd">        from flipping edge ``e``, computed as ``state.histogram +</span>
+<span class="sd">        analysis.histogram_deltas``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``analysis`` does not apply to ``state`` (see</span>
+<span class="sd">            :meth:`RActionAnalysis.applies_to`).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis</span><span class="o">.</span><span class="n">applies_to</span><span class="p">(</span><span class="n">state</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Action analysis belongs to &quot;</span> <span class="s2">&quot;an earlier state version.&quot;</span><span class="p">)</span>

@@ -38,7 +38,22 @@ from .RRollout import (
 
 @dataclass(frozen=True, slots=True)
 class RTrainingConfig:
-    """Settings for a sequence of PPO training iterations."""
+    """
+    Settings for a sequence of PPO training iterations.
+
+    Attributes:
+        run_name (str): Nonempty label identifying this training run,
+            used when archiving colorings and saving checkpoints.
+        iterations (int): Number of training iterations to run,
+            starting at ``start_iteration``.
+        start_iteration (int): Index of the first iteration, used to
+            number iterations (and checkpoints) when resuming a run.
+            Defaults to ``0``.
+        stop_on_solution (bool): When ``True``, :meth:`RPPOTrainer.run`
+            stops after the first iteration whose rollout reaches a
+            score-zero coloring, instead of continuing through the
+            full requested ``iterations``. Defaults to ``True``.
+    """
 
     run_name: str
     iterations: int
@@ -46,6 +61,22 @@ class RTrainingConfig:
     stop_on_solution: bool = True
 
     def __post_init__(self) -> None:
+        """
+        Validate, coerce, and normalize every configuration field in place.
+
+        ``run_name`` must be a nonempty string; ``iterations`` must be
+        a positive integer; ``start_iteration`` must be a nonnegative
+        integer; ``stop_on_solution`` must be a ``bool``. Integer
+        fields are rewritten with their coerced ``int`` values via
+        ``object.__setattr__`` because the dataclass is frozen.
+
+        Raises:
+            TypeError: If a field has the wrong type (including
+                ``bool`` where an integer is expected).
+            ValueError: If ``run_name`` is empty/whitespace, if
+                ``iterations`` is less than ``1``, or if
+                ``start_iteration`` is negative.
+        """
         if (
             not isinstance(
                 self.run_name,
@@ -92,13 +123,38 @@ class RTrainingConfig:
 
 @dataclass(frozen=True, slots=True)
 class RCheckpointSchedule:
-    """Optional periodic and final checkpoint schedule."""
+    """
+    Optional periodic and final checkpoint schedule.
+
+    Attributes:
+        directory (Path): Directory checkpoint files are written
+            into.
+        interval (int): Save a checkpoint every ``interval``
+            completed iterations. Defaults to ``100``.
+        save_final (bool): When ``True``, also save a checkpoint at
+            the final requested iteration, or when training stops
+            early on a solution (subject to
+            ``RTrainingConfig.stop_on_solution``). Defaults to
+            ``True``.
+    """
 
     directory: Path
     interval: int = 100
     save_final: bool = True
 
     def __post_init__(self) -> None:
+        """
+        Coerce ``directory`` to a ``Path`` and validate the remaining fields.
+
+        ``interval`` must be a positive integer and ``save_final``
+        must be a ``bool``. Fields are rewritten via
+        ``object.__setattr__`` because the dataclass is frozen.
+
+        Raises:
+            TypeError: If ``interval`` is not an integer (including
+                ``bool``), or if ``save_final`` is not a ``bool``.
+            ValueError: If ``interval`` is not positive.
+        """
         directory = Path(self.directory)
 
         object.__setattr__(
@@ -137,14 +193,63 @@ class RCheckpointSchedule:
         self,
         iteration: int,
     ) -> Path:
-        """Return the checkpoint path for one iteration."""
+        """
+        Return the checkpoint path for one iteration.
+
+        Args:
+            iteration (int): Training iteration index the checkpoint
+                corresponds to.
+
+        Returns:
+            Path: ``directory`` joined with a zero-padded,
+            iteration-numbered file name.
+        """
 
         return self.directory / ("ramsey_policy_iteration_" f"{iteration:06d}.pt")
 
 
 @dataclass(frozen=True, slots=True)
 class RTrainingIteration:
-    """Compact outcome and persistence data for one iteration."""
+    """
+    Compact outcome and persistence data for one iteration.
+
+    Attributes:
+        iteration (int): Index of this training iteration.
+        construction_name (str): Name of the construction used to
+            build this iteration's seed coloring.
+        construction_source (str): Identifier of the specific source
+            (for example, an archived coloring or a random
+            construction) the seed coloring was built from.
+        initial_score (int): Exact score of the seed coloring before
+            the rollout.
+        final_score (int): Exact score of the coloring at the end of
+            the rollout.
+        best_score (int): Lowest exact score observed during the
+            rollout.
+        steps_completed (int): Number of environment steps collected
+            in the rollout.
+        total_scaled_reward (float): Sum of the rollout's scaled
+            per-step rewards.
+        final_coloring (RColoring): Coloring snapshot at the end of
+            the rollout.
+        best_coloring (RColoring): Best (lowest-score) coloring
+            snapshot observed during the rollout.
+        terminated (bool): Whether the rollout ended in a true
+            terminal search state.
+        truncated (bool): Whether the rollout ended due to a step or
+            other time limit.
+        metrics (RPPOMetrics | None): PPO update diagnostics, or
+            ``None`` if the rollout was empty and no update was
+            performed.
+        archive_record (RArchiveRecord | None): Archive record for
+            the rollout's best coloring, or ``None`` if no archive was
+            configured.
+        new_archive_best (bool): Whether this iteration's archived
+            coloring improved on the archive's previous best score for
+            this graph.
+        checkpoint_path (Path | None): Path a checkpoint was saved to
+            for this iteration, or ``None`` if no checkpoint was due.
+    """
 
     iteration: int
     construction_name: str
@@ -167,14 +272,24 @@ class RTrainingIteration:
     def parameter_update_performed(
         self,
     ) -> bool:
-        """Return whether this iteration trained the network."""
+        """bool: Whether this iteration's rollout was nonempty and a PPO update ran."""
 
         return self.metrics is not None
 
 
 @dataclass(frozen=True, slots=True)
 class RTrainingResult:
-    """Outcome of a complete PPO training run."""
+    """
+    Outcome of a complete PPO training run.
+
+    Attributes:
+        run_name (str): Label identifying the training run.
+        requested_iterations (int): Number of iterations that were
+            requested via :class:`RTrainingConfig`, which may exceed
+            :attr:`completed_iterations` if training stopped early.
+        iteration_results (tuple[RTrainingIteration, ...]): Per-iteration
+            outcomes, in the order iterations were run.
+    """
 
     run_name: str
     requested_iterations: int
@@ -184,7 +299,7 @@ class RTrainingResult:
     def completed_iterations(
         self,
     ) -> int:
-        """Return the number of completed training iterations."""
+        """int: Number of iterations actually completed."""
 
         return len(self.iteration_results)
 
@@ -192,7 +307,16 @@ class RTrainingResult:
     def best_iteration(
         self,
     ) -> RTrainingIteration:
-        """Return the iteration with the lowest score."""
+        """
+        Return the iteration with the lowest score.
+
+        Returns:
+            RTrainingIteration: The iteration result whose
+            ``best_score`` is lowest across the run.
+
+        Raises:
+            RuntimeError: If no iterations completed.
+        """
 
         if not self.iteration_results:
             raise RuntimeError("Training contains no iteration results.")
@@ -206,7 +330,7 @@ class RTrainingResult:
     def best_score(
         self,
     ) -> int:
-        """Return the lowest score found during training."""
+        """int: Lowest exact score found during training."""
 
         return self.best_iteration.best_score
 
@@ -214,7 +338,7 @@ class RTrainingResult:
     def solved(
         self,
     ) -> bool:
-        """Return whether training found a score-zero coloring."""
+        """bool: Whether training found a score-zero (fully valid) coloring."""
 
         return self.best_score == 0
 
@@ -223,6 +347,7 @@ RTrainingObserver = Callable[
     [RTrainingIteration],
     None,
 ]
+"""Callback type invoked with each :class:`RTrainingIteration` as it completes."""
 
 
 class RPPOTrainer:
@@ -248,6 +373,41 @@ class RPPOTrainer:
         ppo_config: RPPOConfig,
         archive: RArchive | None = None,
     ) -> None:
+        """
+        Construct a trainer coordinating one graph/network/environment set.
+
+        Args:
+            graph (RGraph): Host graph training runs against.
+            construction (RConstruction): Construction strategy used
+                to build a new seed coloring at the start of each
+                iteration.
+            environment (REnvironment): Search environment driven
+                during rollouts. Must operate on the same problem as
+                ``graph``.
+            network (RPairPolicyValueNetwork): Policy/value network
+                being trained. Must have vertex/edge dimensions
+                matching ``graph``.
+            optimizer (torch.optim.Optimizer): Optimizer stepping
+                ``network``'s parameters during PPO updates.
+            device (torch.device | str): Device ``network`` and
+                rollout/update tensors reside on.
+            rng (numpy.random.Generator): NumPy random generator
+                available to collaborating components (for example,
+                stochastic constructions).
+            rollout_config (RRolloutConfig): Settings used to collect
+                each iteration's rollout.
+            ppo_config (RPPOConfig): Settings used for each PPO
+                update.
+            archive (RArchive | None): Optional archive that each
+                iteration's best coloring is saved to. ``None``
+                disables archiving. Defaults to ``None``.
+
+        Raises:
+            ValueError: If ``environment.graph.problem`` does not
+                match ``graph.problem``, or if ``network``'s
+                vertex/edge dimensions do not match ``graph``'s.
+            TypeError: If ``rng`` is not a ``numpy.random.Generator``.
+        """
         if environment.graph.problem != graph.problem:
             raise ValueError("Environment problem does not match " "training graph.")
 
@@ -278,60 +438,70 @@ class RPPOTrainer:
     def graph(
         self,
     ) -> RGraph:
+        """RGraph: Host graph training runs against."""
         return self._graph
 
     @property
     def construction(
         self,
     ) -> RConstruction:
+        """RConstruction: Strategy used to build each iteration's seed coloring."""
         return self._construction
 
     @property
     def environment(
         self,
     ) -> REnvironment:
+        """REnvironment: Search environment driven during rollouts."""
         return self._environment
 
     @property
     def network(
         self,
     ) -> RPairPolicyValueNetwork:
+        """RPairPolicyValueNetwork: Policy/value network being trained."""
         return self._network
 
     @property
     def optimizer(
         self,
     ) -> torch.optim.Optimizer:
+        """torch.optim.Optimizer: Optimizer stepping the network's parameters."""
         return self._optimizer
 
     @property
     def device(
         self,
     ) -> torch.device:
+        """torch.device: Device the network and training tensors reside on."""
         return self._device
 
     @property
     def rng(
         self,
     ) -> np.random.Generator:
+        """numpy.random.Generator: Random generator shared with collaborating components."""
         return self._rng
 
     @property
     def rollout_config(
         self,
     ) -> RRolloutConfig:
+        """RRolloutConfig: Settings used to collect each iteration's rollout."""
         return self._rollout_config
 
     @property
     def ppo_config(
         self,
     ) -> RPPOConfig:
+        """RPPOConfig: Settings used for each PPO update."""
         return self._ppo_config
 
     @property
     def archive(
         self,
     ) -> RArchive | None:
+        """RArchive | None: Archive each iteration's best coloring is saved to, if any."""
         return self._archive
 
     def run(
@@ -344,8 +514,39 @@ class RPPOTrainer:
         """
         Run sequential PPO iterations.
 
-        A new seed coloring is constructed for every iteration.
-        Each nonempty rollout is immediately used for one PPO update.
+        For each iteration from ``config.start_iteration`` through
+        ``config.start_iteration + config.iterations - 1``: a new seed
+        coloring is built with ``self.construction``; a rollout is
+        collected from that seed with :func:`~ramsey.nn.RRollout.collect_rollout`;
+        if the rollout is nonempty, one PPO update
+        (:func:`~ramsey.nn.RPPO.ppo_update`) is immediately performed on
+        it (a terminal seed coloring yields an empty rollout with
+        nothing to train from, but its result is still archived and
+        reported); the rollout's best coloring is archived, if an
+        archive is configured; a checkpoint is saved if one is due per
+        ``checkpoint_schedule``; and an :class:`RTrainingIteration` is
+        appended to the results and passed to ``observer``, if given.
+        If ``config.stop_on_solution`` is ``True`` and the iteration's
+        rollout reached a score-zero coloring, the loop stops after
+        that iteration even if further iterations were requested.
+
+        Args:
+            config (RTrainingConfig): Settings controlling the
+                iteration range and stop-on-solution behavior for this
+                run.
+            checkpoint_schedule (RCheckpointSchedule | None): Optional
+                schedule controlling when checkpoints are written.
+                ``None`` disables checkpointing. Defaults to ``None``.
+            observer (RTrainingObserver | None): Optional callback
+                invoked with each :class:`RTrainingIteration` as it
+                completes. Defaults to ``None``.
+
+        Returns:
+            RTrainingResult: Aggregated results for every iteration
+            that completed before the loop ended.
+
+        Raises:
+            TypeError: If ``observer`` is given and is not callable.
         """
 
         if observer is not None and not callable(observer):
@@ -452,7 +653,23 @@ class RPPOTrainer:
         RArchiveRecord | None,
         bool,
     ]:
-        """Archive the best coloring found during one rollout."""
+        """
+        Archive the best coloring found during one rollout.
+
+        Args:
+            rollout (RRolloutBatch): Rollout whose ``best_coloring``
+                is saved.
+            run_name (str): Run label recorded with the archive
+                entry.
+            iteration (int): Iteration index recorded with the
+                archive entry.
+
+        Returns:
+            tuple[RArchiveRecord | None, bool]: The saved archive
+            record (``None`` if no archive is configured) and whether
+            it improved on the archive's previous best score for
+            ``self.graph``.
+        """
 
         if self._archive is None:
             return None, False
@@ -483,7 +700,41 @@ class RPPOTrainer:
         archive_record: RArchiveRecord | None,
         construction_source: str,
     ) -> Path | None:
-        """Save and return a checkpoint path when scheduled."""
+        """
+        Save and return a checkpoint path when scheduled.
+
+        A checkpoint is saved when the number of iterations completed
+        since ``config.start_iteration`` is a multiple of
+        ``schedule.interval`` (periodic), or when
+        ``schedule.save_final`` is set and either this is the final
+        requested iteration or ``config.stop_on_solution`` is set and
+        ``solved`` is ``True`` (final). Checkpoint metadata records
+        the run name, construction name/source, and, when available,
+        the archived coloring's id and score.
+
+        Args:
+            schedule (RCheckpointSchedule | None): Checkpoint schedule
+                to consult; ``None`` disables checkpointing for this
+                call.
+            config (RTrainingConfig): Training configuration supplying
+                ``run_name``, ``start_iteration``, and
+                ``stop_on_solution``.
+            iteration (int): Index of the current iteration.
+            final_requested_iteration (bool): Whether ``iteration`` is
+                the last one requested by ``config``.
+            solved (bool): Whether this iteration's rollout reached a
+                score-zero coloring.
+            archive_record (RArchiveRecord | None): This iteration's
+                archive record, if any, used to enrich checkpoint
+                metadata.
+            construction_source (str): Identifier of the seed
+                coloring's construction source, recorded in checkpoint
+                metadata.
+
+        Returns:
+            Path | None: The path the checkpoint was written to, or
+            ``None`` if no checkpoint was due.
+        """
 
         if schedule is None:
             return None

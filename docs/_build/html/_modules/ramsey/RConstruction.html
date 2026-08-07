@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RConstruction</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Interchangeable construction of immutable seed colorings.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Interchangeable construction strategies for immutable seed colorings.</span>
+
+<span class="sd">Defines the :class:`RConstruction` abstract interface together with several</span>
+<span class="sd">concrete strategies (random, cyclic, fixed, and archive-backed) that each</span>
+<span class="sd">build one immutable :class:`~ramsey.RColoring.RColoring` for a supplied</span>
+<span class="sd">:class:`~ramsey.RGraph.RGraph`. Search code selects a construction and calls</span>
+<span class="sd">``construct()`` without needing to know the mechanism used to produce the</span>
+<span class="sd">seed coloring.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -83,6 +95,10 @@
 <span class="kn">from</span> <span class="nn">.RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
 <span class="kn">from</span> <span class="nn">.RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
 
+<span class="c1"># Circular distances (in the 43-vertex cycle) assigned red and blue,</span>
+<span class="c1"># respectively, by Exoo&#39;s published Cyclic(43) construction. Together</span>
+<span class="c1"># EXOO_RED_DISTANCES and EXOO_BLUE_DISTANCES partition every distance</span>
+<span class="c1"># from 1 to 21.</span>
 <span class="n">EXOO_RED_DISTANCES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
     <span class="p">{</span>
         <span class="mi">1</span><span class="p">,</span>
@@ -119,14 +135,18 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RConstruction.RConstruction">[docs]</a>
 <span class="k">class</span> <span class="nc">RConstruction</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Create one immutable seed coloring for a supplied graph.</span>
+<span class="sd">    Abstract strategy that produces one immutable seed coloring.</span>
+
+<span class="sd">    Concrete subclasses implement :meth:`construct` to build a single</span>
+<span class="sd">    coloring for a supplied graph, together with a stable :attr:`name`</span>
+<span class="sd">    identifying the strategy.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return a stable construction name.</span>
+<span class="sd">        str: Stable identifier for this construction strategy.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span>
 
@@ -138,7 +158,14 @@
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Construct one coloring of the supplied graph.</span>
+<span class="sd">        Build one seed coloring for the supplied graph.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph whose edges the returned coloring</span>
+<span class="sd">                assigns colors to.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: A freshly constructed coloring bound to ``graph``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -146,7 +173,7 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">last_source_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the construction that produced the most recent seed.</span>
+<span class="sd">        str: Name of the construction that produced the most recent seed.</span>
 
 <span class="sd">        Ordinary constructions produce their own stable name. Composite</span>
 <span class="sd">        constructions override this property to identify the selected child.</span>
@@ -160,13 +187,20 @@
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RRandomConstruction</span><span class="p">(</span><span class="n">RConstruction</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Assign every edge color independently and uniformly.</span>
+<span class="sd">    Assign every edge a color independently and uniformly.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rng (numpy.random.Generator): Source of randomness used to draw</span>
+<span class="sd">            each edge&#39;s color.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: Always ``&quot;random&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;random&quot;</span>
 
 <div class="viewcode-block" id="RRandomConstruction.construct">
@@ -175,6 +209,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Color every edge of ``graph`` with an independent uniform draw.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph to color.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: A coloring whose edge colors are drawn i.i.d.</span>
+<span class="sd">            uniformly from the problem&#39;s ``n_colors`` color values.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">colors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span>
             <span class="mi">0</span><span class="p">,</span>
             <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span><span class="p">,</span>
@@ -197,14 +241,30 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Color edges according to circular vertex distance.</span>
 
-<span class="sd">    colors_by_distance[d - 1] specifies the color assigned to</span>
-<span class="sd">    every edge having circular distance d.</span>
+<span class="sd">    ``colors_by_distance[d - 1]`` specifies the color assigned to every</span>
+<span class="sd">    edge having circular distance ``d``, i.e. ``min(|u - v|, n_vertices -</span>
+<span class="sd">    |u - v|)`` for endpoints ``u`` and ``v``. This reproduces circulant</span>
+<span class="sd">    Ramsey colorings such as Exoo&#39;s cyclic K43 construction.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        colors_by_distance (tuple[int, ...]): Color index assigned to each</span>
+<span class="sd">            circular distance, indexed from distance 1 through</span>
+<span class="sd">            ``n_vertices // 2``. Coerced to a tuple of ``int`` in</span>
+<span class="sd">            ``__post_init__``.</span>
+<span class="sd">        construction_name (str): Stable name reported by :attr:`name`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">colors_by_distance</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
     <span class="n">construction_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cyclic&quot;</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Coerce ``colors_by_distance`` to ``int`` and validate arguments.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``colors_by_distance`` is empty or</span>
+<span class="sd">                ``construction_name`` is empty.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">colors</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">color</span><span class="p">)</span> <span class="k">for</span> <span class="n">color</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">colors_by_distance</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">colors</span><span class="p">:</span>
@@ -221,6 +281,9 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: The configured ``construction_name``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">construction_name</span>
 
 <div class="viewcode-block" id="RCyclicConstruction.construct">
@@ -229,6 +292,28 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Color ``graph`` by circular vertex distance.</span>
+
+<span class="sd">        For every edge, computes the circular distance between its two</span>
+<span class="sd">        endpoints and looks up the corresponding entry of</span>
+<span class="sd">        ``colors_by_distance``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph to color. Its vertex count must be</span>
+<span class="sd">                even, with exactly ``n_vertices // 2`` distinct circular</span>
+<span class="sd">                distances.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: A coloring determined entirely by circular</span>
+<span class="sd">            distance.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the number of circular distances implied by</span>
+<span class="sd">                ``graph`` does not match ``len(colors_by_distance)``, or</span>
+<span class="sd">                if ``colors_by_distance`` contains a color index outside</span>
+<span class="sd">                the problem&#39;s color set.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
 
         <span class="n">expected_distances</span> <span class="o">=</span> <span class="n">n_vertices</span> <span class="o">//</span> <span class="mi">2</span>
@@ -277,7 +362,22 @@
         <span class="bp">cls</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RCyclicConstruction&quot;</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return Exoo&#39;s original cyclic K43 construction.</span>
+<span class="sd">        Build Exoo&#39;s original cyclic K43 construction.</span>
+
+<span class="sd">        Assigns blue (color 1) to every circular distance in</span>
+<span class="sd">        :data:`EXOO_BLUE_DISTANCES` and red (color 0) to every distance in</span>
+<span class="sd">        :data:`EXOO_RED_DISTANCES`; together these sets partition every</span>
+<span class="sd">        circular distance from 1 to 21 in the 43-vertex cycle.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RCyclicConstruction: A construction named</span>
+<span class="sd">            ``&quot;exoo-cyclic-k43&quot;`` reproducing the published coloring.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If :data:`EXOO_RED_DISTANCES` and</span>
+<span class="sd">                :data:`EXOO_BLUE_DISTANCES` do not together partition</span>
+<span class="sd">                every distance from 1 to 21 (an internal consistency</span>
+<span class="sd">                check on the module-level constants).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">valid_distances</span> <span class="o">=</span> <span class="n">EXOO_RED_DISTANCES</span> <span class="o">|</span> <span class="n">EXOO_BLUE_DISTANCES</span>
 
@@ -303,21 +403,35 @@
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RFixedConstruction</span><span class="p">(</span><span class="n">RConstruction</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Return a fixed coloring.</span>
+<span class="sd">    Return a fixed coloring on every call.</span>
 
-<span class="sd">    If an equivalent RGraph instance is supplied, the coloring is</span>
+<span class="sd">    Useful for replaying a known coloring as a seed. If a graph describing</span>
+<span class="sd">    the same Ramsey problem is supplied, the stored coloring&#39;s colors are</span>
 <span class="sd">    rebound to that graph without changing any colors.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        coloring (RColoring): The coloring whose colors are replayed.</span>
+<span class="sd">        construction_name (str): Stable name reported by :attr:`name`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span>
     <span class="n">construction_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;fixed&quot;</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate that ``construction_name`` is nonempty.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``construction_name`` is empty.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">construction_name</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;construction_name cannot be empty.&quot;</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: The configured ``construction_name``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">construction_name</span>
 
 <div class="viewcode-block" id="RFixedConstruction.construct">
@@ -326,6 +440,21 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Rebind the stored coloring&#39;s colors onto ``graph``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph to bind the fixed colors to. Must</span>
+<span class="sd">                describe the same Ramsey problem as ``self.coloring``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: A new coloring over ``graph`` using</span>
+<span class="sd">            ``self.coloring.colors`` unchanged.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``graph.problem`` does not equal the problem</span>
+<span class="sd">                of the stored ``coloring``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Fixed coloring problem does not &quot;</span> <span class="s2">&quot;match the supplied graph.&quot;</span>
@@ -345,6 +474,23 @@
 <span class="k">class</span> <span class="nc">RArchiveConstruction</span><span class="p">(</span><span class="n">RConstruction</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Sample seed colorings uniformly from an archive score range.</span>
+
+<span class="sd">    Queries an :class:`~ramsey.RArchive.RArchive` for every archived</span>
+<span class="sd">    coloring whose exact score falls within ``[minimum_score,</span>
+<span class="sd">    maximum_score]`` (either bound may be omitted), optionally capped to</span>
+<span class="sd">    the best ``limit`` records, and selects uniformly at random among</span>
+<span class="sd">    them on every call to :meth:`construct`.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        archive (RArchive): Archive queried for eligible colorings.</span>
+<span class="sd">        rng (numpy.random.Generator): Source of randomness used to select</span>
+<span class="sd">            among eligible records.</span>
+<span class="sd">        minimum_score (int | None): Inclusive lower score bound, or</span>
+<span class="sd">            ``None`` for no lower bound.</span>
+<span class="sd">        maximum_score (int | None): Inclusive upper score bound, or</span>
+<span class="sd">            ``None`` for no upper bound.</span>
+<span class="sd">        limit (int | None): Maximum number of best-scoring eligible</span>
+<span class="sd">            records to consider, or ``None`` for no cap.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span>
@@ -360,6 +506,18 @@
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate ``archive``, ``rng``, and the score/limit bounds.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``archive`` does not implement</span>
+<span class="sd">                :class:`RArchive`, or ``rng`` is not a NumPy</span>
+<span class="sd">                ``Generator``.</span>
+<span class="sd">            ValueError: If ``minimum_score`` and ``maximum_score`` are</span>
+<span class="sd">                both supplied with ``minimum_score`` greater than</span>
+<span class="sd">                ``maximum_score``, or if a score/limit value fails</span>
+<span class="sd">                integer validation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">archive</span><span class="p">,</span> <span class="n">RArchive</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;archive must implement RArchive.&quot;</span><span class="p">)</span>
 
@@ -396,6 +554,10 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: Name encoding the configured score range, e.g.</span>
+<span class="sd">        ``&quot;archive-score-0-to-5&quot;`` or ``&quot;archive-score-any-to-any&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">lower</span> <span class="o">=</span> <span class="p">(</span>
             <span class="s2">&quot;any&quot;</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimum_score</span> <span class="ow">is</span> <span class="kc">None</span>
@@ -413,7 +575,8 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">last_record</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the record selected by the most recent construction.</span>
+<span class="sd">        RArchiveRecord | None: The archive record selected by the most</span>
+<span class="sd">        recent call to :meth:`construct`, or ``None`` beforehand.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_record</span>
 
@@ -425,6 +588,15 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the current archive pool eligible for sampling.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph identifying which Ramsey</span>
+<span class="sd">                problem&#39;s archive to query.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[RArchiveRecord]: Every archived record within the</span>
+<span class="sd">            configured score range (and ``limit``) for ``graph``&#39;s</span>
+<span class="sd">            problem.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">archive</span><span class="o">.</span><span class="n">colorings_in_score_range</span><span class="p">(</span>
             <span class="n">minimum_score</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">minimum_score</span><span class="p">,</span>
@@ -440,6 +612,20 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sample one archived coloring uniformly at random.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph to bind the sampled coloring to.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: The coloring loaded from the selected archive</span>
+<span class="sd">            record.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no archived coloring falls within the</span>
+<span class="sd">                configured score range for ``graph``&#39;s problem.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eligible_records</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">records</span><span class="p">:</span>
@@ -473,6 +659,20 @@
 <span class="k">class</span> <span class="nc">RMixedConstruction</span><span class="p">(</span><span class="n">RConstruction</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Select among seed constructions using fixed probabilities.</span>
+
+<span class="sd">    On each call to :meth:`construct`, one child construction is drawn</span>
+<span class="sd">    according to fixed ``probabilities`` (which must be nonnegative,</span>
+<span class="sd">    finite, and sum to one) and delegated to for building the seed</span>
+<span class="sd">    coloring.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        constructions (tuple[RConstruction, ...]): Candidate child</span>
+<span class="sd">            constructions.</span>
+<span class="sd">        probabilities (tuple[float, ...]): Selection probability for each</span>
+<span class="sd">            entry of ``constructions``, aligned by index.</span>
+<span class="sd">        rng (numpy.random.Generator): Source of randomness used to</span>
+<span class="sd">            select the child construction.</span>
+<span class="sd">        construction_name (str): Stable name reported by :attr:`name`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">constructions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RConstruction</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
@@ -487,6 +687,19 @@
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Normalize and validate the constructions, probabilities, and rng.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If any entry of ``constructions`` does not</span>
+<span class="sd">                implement :class:`RConstruction`, any probability is</span>
+<span class="sd">                non-numeric, or ``rng`` is not a NumPy ``Generator``.</span>
+<span class="sd">            ValueError: If ``constructions`` is empty, ``probabilities``</span>
+<span class="sd">                does not have one entry per construction, any</span>
+<span class="sd">                probability is non-finite or negative, the probabilities</span>
+<span class="sd">                do not sum to one, or ``construction_name`` is empty or</span>
+<span class="sd">                whitespace.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">constructions</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">constructions</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">probabilities</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">probabilities</span><span class="p">)</span>
 
@@ -552,10 +765,18 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: The configured ``construction_name``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">construction_name</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">last_source_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: The ``last_source_name`` of the child construction selected</span>
+<span class="sd">        by the most recent call to :meth:`construct`, or</span>
+<span class="sd">        ``construction_name`` beforehand.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_source_name</span>
 
 <div class="viewcode-block" id="RMixedConstruction.construct">
@@ -564,6 +785,17 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Select one child construction by ``probabilities`` and delegate.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph passed through to the selected</span>
+<span class="sd">                child construction.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: The coloring produced by the selected child</span>
+<span class="sd">            construction.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">selected_index</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
                 <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">constructions</span><span class="p">),</span>
@@ -594,6 +826,17 @@
 <span class="sd">    The eligible records are queried once, shuffled once, and then</span>
 <span class="sd">    consumed exactly once each. Records subsequently added to the</span>
 <span class="sd">    archive cannot enter this seed pool.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        archive (RArchive): Archive queried for the snapshot.</span>
+<span class="sd">        rng (numpy.random.Generator): Source of randomness used to</span>
+<span class="sd">            shuffle the snapshot.</span>
+<span class="sd">        minimum_score (int | None): Inclusive lower score bound, or</span>
+<span class="sd">            ``None`` for no lower bound.</span>
+<span class="sd">        maximum_score (int | None): Inclusive upper score bound, or</span>
+<span class="sd">            ``None`` for no upper bound.</span>
+<span class="sd">        limit (int | None): Maximum number of best-scoring eligible</span>
+<span class="sd">            records to include in the snapshot, or ``None`` for no cap.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span>
@@ -627,6 +870,18 @@
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate ``archive``, ``rng``, and the score/limit bounds.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``archive`` does not implement</span>
+<span class="sd">                :class:`RArchive`, or ``rng`` is not a NumPy</span>
+<span class="sd">                ``Generator``.</span>
+<span class="sd">            ValueError: If ``minimum_score`` and ``maximum_score`` are</span>
+<span class="sd">                both supplied with ``minimum_score`` greater than</span>
+<span class="sd">                ``maximum_score``, or if a score/limit value fails</span>
+<span class="sd">                integer validation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">archive</span><span class="p">,</span> <span class="n">RArchive</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
                 <span class="s2">&quot;archive must implement RArchive.&quot;</span>
@@ -672,6 +927,10 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: Name encoding the configured score range, e.g.</span>
+<span class="sd">        ``&quot;archive-snapshot-score-0-to-5&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">lower</span> <span class="o">=</span> <span class="p">(</span>
             <span class="s2">&quot;any&quot;</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimum_score</span> <span class="ow">is</span> <span class="kc">None</span>
@@ -693,14 +952,25 @@
     <span class="k">def</span> <span class="nf">last_record</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        RArchiveRecord | None: The record selected by the most recent</span>
+<span class="sd">        call to :meth:`construct`, or ``None`` beforehand.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_record</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">prepared</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        bool: Whether the snapshot has been queried and shuffled yet.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">snapshot_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        int: Total number of records in the frozen snapshot, or 0</span>
+<span class="sd">        before preparation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="mi">0</span>
 
@@ -708,6 +978,10 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">remaining_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        int: Number of snapshot records not yet consumed, or 0 before</span>
+<span class="sd">        preparation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="mi">0</span>
 
@@ -724,6 +998,24 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Freeze and shuffle the currently eligible archive records.</span>
+
+<span class="sd">        Idempotent once prepared for a given problem: a later call for</span>
+<span class="sd">        the same problem simply returns the existing snapshot size</span>
+<span class="sd">        without re-querying the archive.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph identifying which Ramsey</span>
+<span class="sd">                problem&#39;s archive to query.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of records in the (possibly newly created)</span>
+<span class="sd">            snapshot.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the snapshot was already prepared for a</span>
+<span class="sd">                different Ramsey problem than ``graph.problem``.</span>
+<span class="sd">            RuntimeError: If no archived coloring falls within the</span>
+<span class="sd">                configured score range for ``graph``&#39;s problem.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem</span><span class="p">:</span>
@@ -769,6 +1061,24 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Consume and return the next unconsumed snapshot record.</span>
+
+<span class="sd">        Prepares the snapshot on first use (see :meth:`prepare`), then</span>
+<span class="sd">        hands out the next record in the frozen shuffled order.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph to bind the loaded coloring to.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: The coloring loaded from the next snapshot</span>
+<span class="sd">            record.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no archived coloring falls within the</span>
+<span class="sd">                configured score range for ``graph``&#39;s problem, or if</span>
+<span class="sd">                every snapshot record has already been consumed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -808,7 +1118,21 @@
     <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Validate an optional nonnegative integer.</span>
+<span class="sd">    Validate and coerce an optional nonnegative integer parameter.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): Parameter name used in raised error messages.</span>
+<span class="sd">        value (int | None): Candidate value; ``None`` is passed through</span>
+<span class="sd">            unchanged.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int | None: ``None`` if ``value`` is ``None``, otherwise</span>
+<span class="sd">        ``value`` coerced to ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``value`` is neither ``None`` nor an integer</span>
+<span class="sd">            (``bool`` values are rejected).</span>
+<span class="sd">        ValueError: If ``value`` is negative.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
@@ -832,7 +1156,21 @@
     <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Validate an optional positive integer.</span>
+<span class="sd">    Validate and coerce an optional positive integer parameter.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): Parameter name used in raised error messages.</span>
+<span class="sd">        value (int | None): Candidate value; ``None`` is passed through</span>
+<span class="sd">            unchanged.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int | None: ``None`` if ``value`` is ``None``, otherwise</span>
+<span class="sd">        ``value`` coerced to ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``value`` is neither ``None`` nor an integer</span>
+<span class="sd">            (``bool`` values are rejected).</span>
+<span class="sd">        ValueError: If ``value`` is zero or negative.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">value</span> <span class="o">=</span> <span class="n">_optional_nonnegative_integer</span><span class="p">(</span>
         <span class="n">name</span><span class="p">,</span>

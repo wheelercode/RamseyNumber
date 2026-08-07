@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -81,12 +85,32 @@
 <span class="k">class</span> <span class="nc">RProblem</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Immutable definition of one classical Ramsey coloring problem.</span>
+
+<span class="sd">    A problem fixes the order of the complete host graph and, for each</span>
+<span class="sd">    color, the size of the monochromatic clique that a coloring must</span>
+<span class="sd">    avoid in that color to be a valid construction.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        n_vertices (int): Number of vertices in the complete host graph.</span>
+<span class="sd">        forbidden_clique_sizes (tuple[int, ...]): Forbidden clique size</span>
+<span class="sd">            for each color, indexed by color. Its length is the number</span>
+<span class="sd">            of colors in the problem.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">n_vertices</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">forbidden_clique_sizes</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize the problem definition.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``n_vertices`` or any forbidden clique size is</span>
+<span class="sd">                not an integer.</span>
+<span class="sd">            ValueError: If ``n_vertices`` is less than two, fewer than</span>
+<span class="sd">                two colors/clique sizes are supplied, any forbidden</span>
+<span class="sd">                clique size is less than two, or any forbidden clique</span>
+<span class="sd">                size exceeds ``n_vertices``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">,</span>
             <span class="n">Integral</span><span class="p">,</span>
@@ -139,6 +163,10 @@
     <span class="k">def</span> <span class="nf">n_colors</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the number of edge colors in the problem.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of colors, equal to the length of</span>
+<span class="sd">            ``forbidden_clique_sizes``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forbidden_clique_sizes</span><span class="p">)</span>
 
@@ -146,6 +174,9 @@
     <span class="k">def</span> <span class="nf">edge_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the number of edges in the complete host graph.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: ``n_vertices`` choose 2.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">comb</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">,</span>
@@ -158,6 +189,11 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the distinct clique sizes that must be indexed.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[int, ...]: The sorted, deduplicated set of forbidden</span>
+<span class="sd">            clique sizes across all colors. A search-state or graph</span>
+<span class="sd">            index only needs to enumerate cliques of these sizes.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forbidden_clique_sizes</span><span class="p">)))</span>
 
@@ -165,6 +201,11 @@
     <span class="k">def</span> <span class="nf">is_symmetric</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return whether every color forbids the same clique size.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True when ``required_clique_sizes`` contains exactly</span>
+<span class="sd">            one value, i.e. the problem is a classical symmetric</span>
+<span class="sd">            Ramsey number (such as R(5, 5)).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">required_clique_sizes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
 
@@ -176,6 +217,16 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the forbidden clique size for one color.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            color (int): Zero-based color index.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Size of the monochromatic clique forbidden in</span>
+<span class="sd">            ``color``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If ``color`` is not a valid color index.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">color</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">color</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_colors</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid color index: </span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -191,6 +242,15 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the number of vertex subsets of the requested size.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            clique_size (int): Clique size to count vertex subsets for.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: ``n_vertices`` choose ``clique_size``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``clique_size`` is outside ``[2, n_vertices]``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_clique_size</span><span class="p">(</span><span class="n">clique_size</span><span class="p">)</span>
 
@@ -208,6 +268,15 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the number of edges in a clique.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            clique_size (int): Clique size (number of vertices).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: ``clique_size`` choose 2.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``clique_size`` is outside ``[2, n_vertices]``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_clique_size</span><span class="p">(</span><span class="n">clique_size</span><span class="p">)</span>
 
@@ -225,6 +294,17 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return how many requested cliques contain one fixed edge.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            clique_size (int): Clique size (number of vertices).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: ``n_vertices - 2`` choose ``clique_size - 2``, the</span>
+<span class="sd">            number of cliques of the requested size that contain any</span>
+<span class="sd">            given edge.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``clique_size`` is outside ``[2, n_vertices]``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_clique_size</span><span class="p">(</span><span class="n">clique_size</span><span class="p">)</span>
 
@@ -240,6 +320,12 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Validate a clique size used in a derived calculation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            clique_size (int): Candidate clique size.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``clique_size`` is outside ``[2, n_vertices]``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">clique_size</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">clique_size</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;clique_size must be between &quot;</span> <span class="s2">&quot;two and n_vertices.&quot;</span><span class="p">)</span>
@@ -256,6 +342,19 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RProblem&quot;</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Construct a problem with the same forbidden size per color.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            n_vertices (int): Number of vertices in the host graph.</span>
+<span class="sd">            clique_size (int): Forbidden clique size shared by every</span>
+<span class="sd">                color.</span>
+<span class="sd">            n_colors (int): Number of colors. Defaults to 2.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RProblem: A problem whose ``forbidden_clique_sizes`` repeats</span>
+<span class="sd">            ``clique_size`` once per color.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``n_colors`` is less than two.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">n_colors</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;n_colors must be at least two.&quot;</span><span class="p">)</span>
@@ -275,6 +374,18 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RProblem&quot;</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Construct the two-color K5 problem at the requested order.</span>
+
+<span class="sd">        This is the classical R(5, 5) lower-bound construction problem:</span>
+<span class="sd">        color the edges of the complete graph on ``n_vertices`` vertices</span>
+<span class="sd">        with two colors while avoiding any monochromatic K5.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            n_vertices (int): Number of vertices in the host graph.</span>
+<span class="sd">                Defaults to 43.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RProblem: A symmetric two-color problem forbidding K5 in</span>
+<span class="sd">            each color.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">symmetric</span><span class="p">(</span>
             <span class="n">n_vertices</span><span class="o">=</span><span class="n">n_vertices</span><span class="p">,</span>

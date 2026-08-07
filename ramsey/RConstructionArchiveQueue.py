@@ -20,7 +20,23 @@ def _optional_nonnegative_integer(
     name: str,
     value: int | None,
 ) -> int | None:
-    """Validate an optional nonnegative integer."""
+    """
+    Validate and coerce an optional nonnegative integer parameter.
+
+    Args:
+        name (str): Parameter name used in raised error messages.
+        value (int | None): Candidate value; ``None`` is passed through
+            unchanged.
+
+    Returns:
+        int | None: ``None`` if ``value`` is ``None``, otherwise
+        ``value`` coerced to ``int``.
+
+    Raises:
+        TypeError: If ``value`` is neither ``None`` nor an integer
+            (``bool`` values are rejected).
+        ValueError: If ``value`` is negative.
+    """
     if value is None:
         return None
 
@@ -42,7 +58,23 @@ def _optional_positive_integer(
     name: str,
     value: int | None,
 ) -> int | None:
-    """Validate an optional positive integer."""
+    """
+    Validate and coerce an optional positive integer parameter.
+
+    Args:
+        name (str): Parameter name used in raised error messages.
+        value (int | None): Candidate value; ``None`` is passed through
+            unchanged.
+
+    Returns:
+        int | None: ``None`` if ``value`` is ``None``, otherwise
+        ``value`` coerced to ``int``.
+
+    Raises:
+        TypeError: If ``value`` is neither ``None`` nor an integer
+            (``bool`` values are rejected).
+        ValueError: If ``value`` is zero or negative.
+    """
     result = _optional_nonnegative_integer(
         name,
         value,
@@ -68,6 +100,18 @@ class RArchiveQueueConstruction(RConstruction):
     If ``limit`` is supplied, the archive query first selects the best
     ``limit`` eligible records by its normal score ordering and this
     construction then shuffles that active pool.
+
+    Attributes:
+        archive (RArchive): Archive queried for each queue generation.
+        rng (numpy.random.Generator): Source of randomness used to
+            shuffle each queue generation.
+        minimum_score (int | None): Inclusive lower score bound, or
+            ``None`` for no lower bound.
+        maximum_score (int | None): Inclusive upper score bound, or
+            ``None`` for no upper bound.
+        limit (int | None): Maximum number of best-scoring eligible
+            records to include in each queue generation, or ``None``
+            for no cap.
     """
 
     archive: RArchive
@@ -108,6 +152,18 @@ class RArchiveQueueConstruction(RConstruction):
     )
 
     def __post_init__(self) -> None:
+        """
+        Validate ``archive``, ``rng``, and the score/limit bounds.
+
+        Raises:
+            TypeError: If ``archive`` does not implement
+                :class:`RArchive`, or ``rng`` is not a NumPy
+                ``Generator``.
+            ValueError: If ``minimum_score`` and ``maximum_score`` are
+                both supplied with ``minimum_score`` greater than
+                ``maximum_score``, or if a score/limit value fails
+                integer validation.
+        """
         if not isinstance(self.archive, RArchive):
             raise TypeError(
                 "archive must implement RArchive."
@@ -153,6 +209,10 @@ class RArchiveQueueConstruction(RConstruction):
 
     @property
     def name(self) -> str:
+        """
+        str: Name encoding the configured score range, e.g.
+        ``"archive-queue-score-0-to-5"``.
+        """
         lower = (
             "any"
             if self.minimum_score is None
@@ -210,6 +270,20 @@ class RArchiveQueueConstruction(RConstruction):
         Normal construct() usage calls this automatically after the
         current queue is exhausted.  Calling it explicitly abandons
         any unconsumed records in the current queue.
+
+        Args:
+            graph (RGraph): Host graph identifying which Ramsey
+                problem's archive to query.
+
+        Returns:
+            int: Number of records in the freshly queried and
+            shuffled queue generation.
+
+        Raises:
+            ValueError: If this construction was already used for a
+                different Ramsey problem than ``graph.problem``.
+            RuntimeError: If no archived coloring falls within the
+                configured queue score range for ``graph``'s problem.
         """
         if (
             self._problem is not None
@@ -254,6 +328,26 @@ class RArchiveQueueConstruction(RConstruction):
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Consume and return the next queued archive record.
+
+        Refreshes the queue (see :meth:`refresh_queue`) whenever the
+        current generation is missing or fully consumed, then hands out
+        the next record in that generation's shuffled order.
+
+        Args:
+            graph (RGraph): Host graph to bind the loaded coloring to.
+
+        Returns:
+            RColoring: The coloring loaded from the next queued
+            archive record.
+
+        Raises:
+            ValueError: If this construction was already used for a
+                different Ramsey problem than ``graph.problem``.
+            RuntimeError: If no archived coloring falls within the
+                configured queue score range for ``graph``'s problem.
+        """
         if (
             self._records is None
             or self._next_record

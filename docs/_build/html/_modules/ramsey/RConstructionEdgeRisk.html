@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RConstructionEdgeRisk</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Incremental edge construction guided by partial-K5 future risk.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Incremental edge construction guided by partial-K5 future risk.</span>
+
+<span class="sd">Builds one coloring by assigning edges to a symmetric two-color K5 problem</span>
+<span class="sd">in random order, one edge at a time. Each edge normally receives the</span>
+<span class="sd">globally balanced alternating color, but is overridden whenever the</span>
+<span class="sd">partial K5s touching that edge show a clear expected-risk advantage for</span>
+<span class="sd">the opposite color, in an attempt to steer away from future monochromatic</span>
+<span class="sd">K5 completions.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -85,7 +97,23 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionEdgeRisk.REdgeRiskConstructionReport">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">REdgeRiskConstructionReport</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Diagnostics from one completed edge-risk construction.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Diagnostics from one completed edge-risk construction.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        alternating_decisions (int): Number of edges colored by the</span>
+<span class="sd">            globally balanced alternating rule (risk was tied within</span>
+<span class="sd">            ``risk_epsilon``).</span>
+<span class="sd">        risk_decisions (int): Number of edges colored by comparing</span>
+<span class="sd">            expected future monochromatic risk between the two colors.</span>
+<span class="sd">        risk_overrides (int): Subset of ``risk_decisions`` where the</span>
+<span class="sd">            risk-driven color differed from the alternating proposal.</span>
+<span class="sd">        first_risk_step (int | None): Zero-based edge-processing step at</span>
+<span class="sd">            which risk first broke a tie, or ``None`` if risk never</span>
+<span class="sd">            differed from the alternating proposal.</span>
+<span class="sd">        red_edges (int): Total edges assigned color 0 (red).</span>
+<span class="sd">        blue_edges (int): Total edges assigned color 1 (blue).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">alternating_decisions</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">risk_decisions</span><span class="p">:</span> <span class="nb">int</span>
@@ -96,6 +124,9 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">total_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        int: Total number of colored edges (``red_edges + blue_edges``).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_edges</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_edges</span></div>
 
 
@@ -104,7 +135,49 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionEdgeRisk.REdgeRiskConstructionProgress">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">REdgeRiskConstructionProgress</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One observable edge-assignment event during construction.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    One observable edge-assignment event during construction.</span>
+
+<span class="sd">    Passed to the construction&#39;s ``observer`` callback (if any) after</span>
+<span class="sd">    each edge is colored, giving a full account of that step&#39;s decision.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        step_number (int): One-based index of this edge within the</span>
+<span class="sd">            random processing order.</span>
+<span class="sd">        total_edges (int): Total number of edges being colored.</span>
+<span class="sd">        edge (int): Index of the edge that was just colored.</span>
+<span class="sd">        endpoints (tuple[int, int]): Vertex pair joined by ``edge``.</span>
+<span class="sd">        color (int): Color actually assigned to ``edge`` (0 or 1).</span>
+<span class="sd">        alternating_color (int): Color the globally balanced alternating</span>
+<span class="sd">            rule would have proposed for this step.</span>
+<span class="sd">        risk_red (float): Expected future monochromatic risk summed over</span>
+<span class="sd">            partial K5s containing ``edge`` if it were colored red.</span>
+<span class="sd">        risk_blue (float): Expected future monochromatic risk summed</span>
+<span class="sd">            over partial K5s containing ``edge`` if it were colored</span>
+<span class="sd">            blue.</span>
+<span class="sd">        red_completions (int): Number of partial K5s containing</span>
+<span class="sd">            ``edge`` that would become a monochromatic red K5 if</span>
+<span class="sd">            ``edge`` were colored red.</span>
+<span class="sd">        blue_completions (int): Number of partial K5s containing</span>
+<span class="sd">            ``edge`` that would become a monochromatic blue K5 if</span>
+<span class="sd">            ``edge`` were colored blue.</span>
+<span class="sd">        risk_driven (bool): Whether ``risk_red`` and ``risk_blue``</span>
+<span class="sd">            differed by more than ``risk_epsilon``, making this a</span>
+<span class="sd">            risk-driven decision rather than an alternating one.</span>
+<span class="sd">        overrode_alternating (bool): Whether the color actually chosen</span>
+<span class="sd">            differs from ``alternating_color``.</span>
+<span class="sd">        red_edges (int): Cumulative red edges assigned through this</span>
+<span class="sd">            step, inclusive.</span>
+<span class="sd">        blue_edges (int): Cumulative blue edges assigned through this</span>
+<span class="sd">            step, inclusive.</span>
+<span class="sd">        alternating_decisions (int): Cumulative alternating-rule</span>
+<span class="sd">            decisions through this step, inclusive.</span>
+<span class="sd">        risk_decisions (int): Cumulative risk-driven decisions through</span>
+<span class="sd">            this step, inclusive.</span>
+<span class="sd">        risk_overrides (int): Cumulative risk-driven decisions that</span>
+<span class="sd">            overrode the alternating proposal, through this step,</span>
+<span class="sd">            inclusive.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">step_number</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">total_edges</span><span class="p">:</span> <span class="nb">int</span>
@@ -126,16 +199,26 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">completed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        bool: Whether this step colored the final edge of the graph.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_number</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_edges</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">unavoidable</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether either color completes a monochromatic K5.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        bool: Whether coloring ``edge`` either color would complete at</span>
+<span class="sd">        least one monochromatic K5 (a forced trade-off between colors).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_completions</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_completions</span> <span class="o">&gt;</span> <span class="mi">0</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">created_monochromatic_k5s</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the K5s completed by the color actually chosen.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        int: Number of monochromatic K5s completed by the color</span>
+<span class="sd">        actually assigned to ``edge`` (``red_completions`` or</span>
+<span class="sd">        ``blue_completions``, matching ``color``).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_completions</span>
 
@@ -148,17 +231,36 @@
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">REdgeRiskConstruction</span><span class="p">(</span><span class="n">RConstruction</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Color K43 one edge at a time while minimizing partial-K5 risk.</span>
+<span class="sd">    Color the host graph one edge at a time while minimizing K5 risk.</span>
 
-<span class="sd">    Edges are processed in one random order.  Step parity proposes the</span>
-<span class="sd">    globally balanced red/blue alternating color.  If the partial K5s</span>
-<span class="sd">    containing the current edge give one candidate color strictly less</span>
-<span class="sd">    expected future monochromatic risk, that color overrides the</span>
-<span class="sd">    alternating proposal.</span>
+<span class="sd">    Requires a symmetric two-color Ramsey problem scored by a single</span>
+<span class="sd">    forbidden clique size (e.g. K5). Edges are processed in one random</span>
+<span class="sd">    order. Step parity proposes the globally balanced red/blue</span>
+<span class="sd">    alternating color. If the partial K5s containing the current edge</span>
+<span class="sd">    give one candidate color strictly less expected future monochromatic</span>
+<span class="sd">    risk (beyond ``risk_epsilon``), that color overrides the alternating</span>
+<span class="sd">    proposal.</span>
 
 <span class="sd">    A partial K5 contributes risk only after at least</span>
 <span class="sd">    ``minimum_pressure_edges`` edges of one color have been assigned</span>
-<span class="sd">    while none of the opposite color have been assigned.</span>
+<span class="sd">    while none of the opposite color have been assigned; its risk weight</span>
+<span class="sd">    is ``2 ** -(uncolored edges remaining in that K5)``, the probability</span>
+<span class="sd">    that the remaining edges would all randomly complete the</span>
+<span class="sd">    monochromatic clique.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rng (numpy.random.Generator): Source of randomness used to</span>
+<span class="sd">            choose the edge processing order.</span>
+<span class="sd">        minimum_pressure_edges (int): Minimum same-color edge count a</span>
+<span class="sd">            partial K5 must reach, with no opposite-colored edges yet</span>
+<span class="sd">            assigned, before it contributes to risk.</span>
+<span class="sd">        risk_epsilon (float): Minimum absolute difference between</span>
+<span class="sd">            ``risk_red`` and ``risk_blue`` required to treat a decision</span>
+<span class="sd">            as risk-driven rather than alternating.</span>
+<span class="sd">        observer (Callable[[REdgeRiskConstructionProgress], None] | None):</span>
+<span class="sd">            Optional callback invoked with a</span>
+<span class="sd">            :class:`REdgeRiskConstructionProgress` after each edge is</span>
+<span class="sd">            colored, for diagnostics or visualization.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
@@ -173,6 +275,17 @@
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate ``rng``, ``minimum_pressure_edges``, ``risk_epsilon``,</span>
+<span class="sd">        and ``observer``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``rng`` is not a NumPy ``Generator``,</span>
+<span class="sd">                ``minimum_pressure_edges`` is not an integer, or</span>
+<span class="sd">                ``observer`` is neither ``None`` nor callable.</span>
+<span class="sd">            ValueError: If ``minimum_pressure_edges`` is less than 1 or</span>
+<span class="sd">                ``risk_epsilon`` is negative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;rng must be a NumPy Generator.&quot;</span><span class="p">)</span>
 
@@ -201,6 +314,10 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: Name encoding ``minimum_pressure_edges``, e.g.</span>
+<span class="sd">        ``&quot;edge-risk-pressure-4&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="s2">&quot;edge-risk-&quot;</span>
             <span class="sa">f</span><span class="s2">&quot;pressure-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -210,6 +327,10 @@
     <span class="k">def</span> <span class="nf">last_report</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REdgeRiskConstructionReport</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        REdgeRiskConstructionReport | None: Diagnostics from the most</span>
+<span class="sd">        recent call to :meth:`construct`, or ``None`` beforehand.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_report</span>
 
 <div class="viewcode-block" id="REdgeRiskConstruction.construct">
@@ -218,6 +339,25 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Color every edge of ``graph`` one at a time, minimizing K5 risk.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph to color. Its problem must use</span>
+<span class="sd">                two symmetric colors and a single forbidden clique</span>
+<span class="sd">                size.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: The completed coloring. Also records diagnostics</span>
+<span class="sd">            retrievable via :attr:`last_report`, and, if ``observer`` is</span>
+<span class="sd">            set, reports one :class:`REdgeRiskConstructionProgress`</span>
+<span class="sd">            event per colored edge.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``graph.problem`` is not a symmetric</span>
+<span class="sd">                two-color problem, or if ``minimum_pressure_edges``</span>
+<span class="sd">                exceeds the number of edges in the forbidden clique.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">problem</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
 
         <span class="k">if</span> <span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">problem</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>

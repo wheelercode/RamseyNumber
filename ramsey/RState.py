@@ -1,4 +1,12 @@
-"""Mutable incremental state for one active search attempt."""
+"""Mutable incremental state for one active search attempt.
+
+This module defines :class:`RSearchState`, the single mutable object a
+search algorithm drives forward one edge flip at a time. Every mutation
+touches only the cliques incident to the flipped edge, so the coloring,
+per-clique color-one counts, global histogram, exact score, and (when in
+use) the action-profile cache are all updated incrementally rather than
+recomputed from scratch after each move.
+"""
 
 from __future__ import annotations
 
@@ -11,17 +19,45 @@ from .RScoring import count_color_edges_per_clique
 
 
 class RSearchState:
-    """
-    Incrementally maintained state for symmetric two-color search.
+    """Incrementally maintained state for symmetric two-color search.
 
-    RSearchState is the sole owner of mutable coloring, clique-count,
-    histogram, and score data.
+    ``RSearchState`` is the sole owner of mutable coloring, clique-count,
+    histogram, and score data for one search attempt. It currently
+    supports only symmetric two-color problems (both colors forbid the
+    same clique size), since the score is derived from a single
+    color-one-count histogram whose two ends (``histogram[0]`` and
+    ``histogram[-1]``) count the all-color-zero and all-color-one
+    cliques respectively.
+
+    Every exposed array property returns a read-only view that shares
+    memory with the state's internal buffers; callers must not attempt
+    to mutate them, and the view is only valid until the next mutating
+    call, after which it reflects the new data (or in the case of a
+    view into a *replaced* buffer, would no longer track it).
     """
 
     def __init__(
         self,
         coloring: RColoring,
     ) -> None:
+        """Build a search state initialized to a starting coloring.
+
+        Computes per-clique color-one counts, the color-one-count
+        histogram, and the exact score from ``coloring``. The
+        action-profile cache is left unbuilt (``None``) until first
+        requested, so search paths that never need it avoid its
+        construction cost.
+
+        Args:
+            coloring (RColoring): Starting coloring to copy into the
+                new mutable state. The state takes an independent
+                mutable copy of the colors; ``coloring`` itself is
+                unaffected by later mutations.
+
+        Raises:
+            ValueError: If ``coloring.graph.problem`` is not a
+                symmetric two-color problem.
+        """
         problem = coloring.graph.problem
 
         if problem.n_colors != 2 or not problem.is_symmetric:
@@ -60,50 +96,40 @@ class RSearchState:
 
     @property
     def graph(self) -> RGraph:
-        """
-        Return the immutable graph topology.
-        """
+        """RGraph: Immutable host-graph topology this state colors."""
         return self._graph
 
     @property
     def index(self) -> RSubgraphIndex:
-        """
-        Return the clique index maintained by this state.
-        """
+        """RSubgraphIndex: Precomputed clique-incidence index maintained by this state."""
         return self._index
 
     @property
     def clique_size(self) -> int:
-        """
-        Return the forbidden clique size maintained by this state.
-        """
+        """int: Forbidden clique size maintained by this state."""
         return self._clique_size
 
     @property
     def edges_per_clique(self) -> int:
-        """
-        Return the number of edges in each maintained clique.
-        """
+        """int: Number of edges in each maintained clique."""
         return self._index.edges_per_clique
 
     @property
     def number_of_edges(self) -> int:
-        """
-        Return the number of available edge-flip actions.
-        """
+        """int: Number of available edge-flip actions (host-graph edges)."""
         return self._graph.number_of_edges
 
     @property
     def score(self) -> int:
-        """
-        Return the current monochromatic-clique score.
-        """
+        """int: Current exact monochromatic-clique score."""
         return self._score
 
     @property
     def version(self) -> int:
-        """
-        Return the number of mutations applied to this state.
+        """int: Number of mutations applied to this state so far.
+
+        Used by cached analyses (e.g. :class:`ramsey.RAction.RActionAnalysis`)
+        to detect staleness after a state has been mutated.
         """
         return self._version
 
@@ -111,8 +137,12 @@ class RSearchState:
     def colors(
         self,
     ) -> NDArray[np.uint8]:
-        """
-        Return a read-only view of the current edge colors.
+        """NDArray[np.uint8]: Read-only view of the current edge colors.
+
+        Shape ``(number_of_edges,)``; entry ``e`` is the color (``0`` or
+        ``1``) currently assigned to host edge ``e``. The view shares
+        memory with this state's internal buffer and becomes stale after
+        the next mutation.
         """
         return self._read_only_view(self._colors)
 
@@ -120,8 +150,10 @@ class RSearchState:
     def color_one_counts(
         self,
     ) -> NDArray[np.uint8]:
-        """
-        Return a read-only view of per-clique color-one counts.
+        """NDArray[np.uint8]: Read-only view of per-clique color-one counts.
+
+        Shape ``(clique_count,)``; entry ``c`` is the number of
+        color-one edges currently in indexed clique ``c``.
         """
         return self._read_only_view(self._color_one_counts)
 
@@ -129,8 +161,11 @@ class RSearchState:
     def histogram(
         self,
     ) -> NDArray[np.int64]:
-        """
-        Return a read-only view of the current count histogram.
+        """NDArray[np.int64]: Read-only view of the current count histogram.
+
+        Shape ``(edges_per_clique + 1,)``; bin ``k`` is the number of
+        indexed cliques currently containing exactly ``k`` color-one
+        edges. ``score`` equals ``histogram[0] + histogram[-1]``.
         """
         return self._read_only_view(self._histogram)
 
@@ -138,15 +173,18 @@ class RSearchState:
     def action_profiles(
         self,
     ) -> NDArray[np.uint16]:
-        """
-        Return incrementally maintained all-edge clique profiles.
+        """NDArray[np.uint16]: Incrementally maintained all-edge clique profiles.
 
-        profiles[e, k] is the number of indexed cliques containing
-        edge e that currently contain exactly k color-one edges.
+        ``profiles[e, k]`` is the number of indexed cliques containing
+        edge ``e`` that currently contain exactly ``k`` color-one edges.
+        Shape is ``(number_of_edges, edges_per_clique + 1)``.
 
-        The profiles are constructed only on first use.  Once they
-        exist, every edge flip updates only the profile contributions
-        of cliques affected by that flip.
+        The profiles are constructed only on first use (via
+        :meth:`_build_action_profiles`). Once built, every edge flip
+        updates only the profile contributions of cliques affected by
+        that flip (via :meth:`_update_action_profiles`), rather than
+        rebuilding the table. The returned array is a read-only view
+        that becomes stale after the next mutation.
         """
         if self._action_profiles is None:
             self._action_profiles = self._build_action_profiles()
@@ -156,8 +194,12 @@ class RSearchState:
     def coloring_snapshot(
         self,
     ) -> RColoring:
-        """
-        Return an immutable coloring containing the current state.
+        """Return an immutable coloring containing the current state.
+
+        Returns:
+            RColoring: New immutable coloring holding a copy of the
+            current edge colors, decoupled from further mutations of
+            this state.
         """
         return RColoring(
             graph=self._graph,
@@ -167,11 +209,16 @@ class RSearchState:
     def copy(
         self,
     ) -> "RSearchState":
-        """
-        Return an independent state with the same current coloring.
+        """Return an independent state with the same current coloring.
 
         The copied state begins at version zero because it has its own
-        independent mutation history.
+        independent mutation history; it is not comparable via
+        :meth:`ramsey.RAction.RActionAnalysis.applies_to` to analyses
+        built from ``self``.
+
+        Returns:
+            RSearchState: New state, independently mutable, initialized
+            to a copy of this state's current coloring.
         """
         return RSearchState(self.coloring_snapshot())
 
@@ -179,11 +226,25 @@ class RSearchState:
         self,
         edge: int,
     ) -> int:
-        """
-        Flip one edge and return the exact score reduction.
+        """Flip one edge and return the exact score reduction.
 
-        A positive result means the score improved.
-        A negative result means the score became worse.
+        Recolors ``edge`` to the other color, then updates, for every
+        clique incident to ``edge``, the color-one count, the global
+        histogram, the exact score, and (if already built) the
+        action-profile cache — all incrementally, without touching any
+        clique not incident to ``edge``.
+
+        Args:
+            edge (int): Index of the host edge to flip.
+
+        Returns:
+            int: Exact score reduction from this flip
+            (``old_score - new_score``). A positive result means the
+            score improved (fewer monochromatic K5s); a negative result
+            means it became worse.
+
+        Raises:
+            IndexError: If ``edge`` is out of range.
         """
         self._validate_edge(edge)
 
@@ -235,14 +296,13 @@ class RSearchState:
         edges: NDArray[np.integer],
         colors: NDArray[np.integer],
     ) -> int:
-        """
-        Recolor several distinct edges and return exact score reduction.
+        """Recolor several distinct edges and return exact score reduction.
 
         Only edges whose requested color differs from the current color
         are mutated.
 
-        Each changed edge goes through apply_edge_flip(), preserving all
-        incrementally maintained state:
+        Each changed edge goes through :meth:`apply_edge_flip`,
+        preserving all incrementally maintained state:
 
         - edge colors
         - K5 color counts
@@ -250,6 +310,27 @@ class RSearchState:
         - monochromatic score
         - action-profile cache
         - state version
+
+        Args:
+            edges (NDArray[np.integer]): One-dimensional array of
+                distinct host-edge indices to recolor.
+            colors (NDArray[np.integer]): One-dimensional array, the
+                same length as ``edges``, of requested colors (``0`` or
+                ``1``) for each edge.
+
+        Returns:
+            int: Exact total score reduction from all resulting flips
+            (``old_score - new_score``).
+
+        Raises:
+            ValueError: If ``edges`` or ``colors`` is not
+                one-dimensional, if their lengths differ, if ``edges``
+                contains duplicates, or if ``colors`` contains a value
+                other than ``0`` or ``1``.
+            TypeError: If ``edges`` or ``colors`` does not have an
+                integer dtype.
+            IndexError: If ``edges`` contains an out-of-range edge
+                index.
         """
         edges = np.asarray(edges)
         colors = np.asarray(colors)
@@ -327,12 +408,21 @@ class RSearchState:
     def _build_action_profiles(
         self,
     ) -> NDArray[np.uint16]:
-        """
-        Construct the complete action-profile cache from current state.
+        """Construct the complete action-profile cache from current state.
 
-        This is the expensive full reconstruction.  It occurs at most
-        once per RSearchState; subsequent mutations use the incremental
-        update path.
+        This is the expensive full reconstruction: for every edge it
+        counts, across all cliques incident to that edge, how many fall
+        into each color-one-count bin. It occurs at most once per
+        ``RSearchState`` instance; subsequent mutations use the
+        incremental update path in :meth:`_update_action_profiles`.
+
+        Returns:
+            NDArray[np.uint16]: Owned array of shape
+            ``(number_of_edges, edges_per_clique + 1)``.
+
+        Raises:
+            ValueError: If the number of cliques per edge exceeds the
+                ``uint16`` capacity of the action-profile cache.
         """
         if self._index.cliques_per_edge > np.iinfo(np.uint16).max:
             raise ValueError(
@@ -369,14 +459,27 @@ class RSearchState:
         old_counts: NDArray[np.uint8],
         new_counts: NDArray[np.uint8],
     ) -> None:
-        """
-        Update cached profiles after one edge flip.
+        """Update cached action profiles in place after one edge flip.
 
         Each affected clique moves from one histogram bin to an
-        adjacent bin.  That move changes the action profile of every
-        edge contained in the clique.  Flattening (edge, bin) to one
-        integer lets two small bincount operations accumulate all
-        repeated updates efficiently in compiled NumPy code.
+        adjacent bin. That move changes the action profile of every
+        edge contained in the clique. Flattening ``(edge, bin)`` to one
+        integer lets two small ``bincount`` operations accumulate all
+        repeated updates efficiently in compiled NumPy code, avoiding a
+        Python-level loop over affected cliques.
+
+        Args:
+            affected_cliques (NDArray[np.uint32]): Indices of the
+                cliques whose color-one count changed.
+            old_counts (NDArray[np.uint8]): Color-one count of each
+                affected clique before the flip.
+            new_counts (NDArray[np.uint8]): Color-one count of each
+                affected clique after the flip.
+
+        Raises:
+            RuntimeError: If the updated profile values would fall
+                outside the valid ``uint16`` range, indicating a
+                corrupted incremental-update invariant.
         """
         if self._action_profiles is None:
             return
@@ -443,8 +546,14 @@ class RSearchState:
         self,
         edge: int,
     ) -> None:
-        """
-        Validate an encoded edge index.
+        """Validate an encoded edge index.
+
+        Args:
+            edge (int): Edge index to validate.
+
+        Raises:
+            IndexError: If ``edge`` is negative or not less than
+                ``number_of_edges``.
         """
         if edge < 0 or edge >= self.number_of_edges:
             raise IndexError(f"Invalid edge index: {edge}")
@@ -453,8 +562,14 @@ class RSearchState:
     def _read_only_view(
         array: NDArray,
     ) -> NDArray:
-        """
-        Return a non-writeable view without copying array data.
+        """Return a non-writeable view without copying array data.
+
+        Args:
+            array (NDArray): Owned array to expose read-only.
+
+        Returns:
+            NDArray: View sharing memory with ``array``, with
+            ``flags.writeable`` set to ``False``.
         """
         view = array.view()
         view.flags.writeable = False

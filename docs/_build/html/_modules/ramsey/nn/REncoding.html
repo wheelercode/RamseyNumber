@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.nn.REncoding</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot; &quot;Conversion of Ramsey search information into neural model inputs.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Conversion of Ramsey search information into neural model inputs.</span>
+
+<span class="sd">Encodes an :class:`~ramsey.RState.RSearchState` (a coloring of the</span>
+<span class="sd">host graph together with which edges are candidate actions) as dense</span>
+<span class="sd">NumPy/PyTorch tensors suitable for the pairwise policy/value network</span>
+<span class="sd">in :mod:`ramsey.nn.RModel`. Also provides the vertex-permutation</span>
+<span class="sd">bookkeeping used to keep encoded edge order consistent when the host</span>
+<span class="sd">graph&#39;s vertices are renamed.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -90,21 +102,48 @@
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="n">available_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Encode one state as a symmetric vertex-pair feature array.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Encode one search state as a symmetric vertex-pair feature array.</span>
 
-<span class="sd">    Channels</span>
-<span class="sd">    --------</span>
-<span class="sd">    0:</span>
-<span class="sd">        Edge color represented as -1 for color zero and +1 for</span>
-<span class="sd">        color one.</span>
+<span class="sd">    Builds a dense ``(n_vertices, n_vertices, PAIR_INPUT_CHANNELS)``</span>
+<span class="sd">    array indexed by ordered vertex pairs ``(i, j)``, which the</span>
+<span class="sd">    pairwise policy/value network consumes directly. Because the host</span>
+<span class="sd">    graph is undirected, every real edge&#39;s features are written</span>
+<span class="sd">    symmetrically at both ``[i, j]`` and ``[j, i]``; vertex-diagonal</span>
+<span class="sd">    positions ``[k, k]`` carry no edge information but are flagged by</span>
+<span class="sd">    ``DIAGONAL_CHANNEL`` so the network can distinguish them from real</span>
+<span class="sd">    edges. Positions corresponding to a pair of vertices with no edge</span>
+<span class="sd">    in the host graph (i.e. not covered by ``state.graph.edges``) are</span>
+<span class="sd">    left at zero in every channel.</span>
 
-<span class="sd">    1:</span>
-<span class="sd">        Diagonal indicator. This distinguishes diagonal positions</span>
-<span class="sd">        from real edge positions.</span>
+<span class="sd">    Channels (last axis, indexed by the module constants):</span>
 
-<span class="sd">    2:</span>
-<span class="sd">        Action availability represented as zero or one.</span>
+<span class="sd">    - ``EDGE_COLOR_CHANNEL`` (0): The edge&#39;s color, signed to -1.0 for</span>
+<span class="sd">      color zero and +1.0 for color one. Zero at non-edge and diagonal</span>
+<span class="sd">      positions.</span>
+<span class="sd">    - ``DIAGONAL_CHANNEL`` (1): 1.0 at vertex-diagonal positions</span>
+<span class="sd">      ``[k, k]``, 0.0 everywhere else.</span>
+<span class="sd">    - ``AVAILABILITY_CHANNEL`` (2): 1.0 if the edge is a currently</span>
+<span class="sd">      available action per ``available_mask``, 0.0 otherwise</span>
+<span class="sd">      (including at non-edge and diagonal positions).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state supplying the host graph</span>
+<span class="sd">            and current edge coloring to encode.</span>
+<span class="sd">        available_mask (numpy.typing.NDArray[numpy.bool_]): Boolean</span>
+<span class="sd">            array of shape ``(state.number_of_edges,)``, aligned with</span>
+<span class="sd">            ``state.graph.edges``, where ``True`` marks an edge as a</span>
+<span class="sd">            currently available action.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.typing.NDArray[numpy.float32]: Newly allocated array of</span>
+<span class="sd">        shape ``(n_vertices, n_vertices, PAIR_INPUT_CHANNELS)`` and</span>
+<span class="sd">        dtype ``float32``, symmetric in its first two axes.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``available_mask`` does not have shape</span>
+<span class="sd">            ``(state.number_of_edges,)`` or contains no available</span>
+<span class="sd">            actions.</span>
+<span class="sd">        TypeError: If ``available_mask`` does not have boolean dtype.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">available_mask</span> <span class="o">=</span> <span class="n">_validate_available_mask</span><span class="p">(</span>
         <span class="n">available_mask</span><span class="p">,</span>
@@ -177,20 +216,35 @@
     <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
 <span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Build one batched pair-input tensor and action-mask tensor.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build one batched pair-input tensor and action-mask tensor.</span>
 
-<span class="sd">    Returns</span>
-<span class="sd">    -------</span>
-<span class="sd">    pair_tensor:</span>
-<span class="sd">        Shape:</span>
+<span class="sd">    Calls :func:`encode_pair_features` to build the NumPy feature</span>
+<span class="sd">    array, then converts it (and the action mask) to PyTorch tensors</span>
+<span class="sd">    with an added leading batch dimension of size 1, ready to pass</span>
+<span class="sd">    directly to :class:`~ramsey.nn.RModel.RPairPolicyValueNetwork`.</span>
 
-<span class="sd">            (1, n_vertices, n_vertices, 3)</span>
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state supplying the host graph</span>
+<span class="sd">            and current edge coloring to encode.</span>
+<span class="sd">        available_mask (numpy.typing.NDArray[numpy.bool_]): Boolean</span>
+<span class="sd">            array of shape ``(state.number_of_edges,)`` marking which</span>
+<span class="sd">            edges are currently available actions.</span>
+<span class="sd">        device (torch.device | str | None): Device on which the</span>
+<span class="sd">            returned tensors are allocated. ``None`` uses PyTorch&#39;s</span>
+<span class="sd">            default device placement.</span>
 
-<span class="sd">    mask_tensor:</span>
-<span class="sd">        Shape:</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[torch.Tensor, torch.Tensor]: A pair</span>
+<span class="sd">        ``(pair_tensor, mask_tensor)`` where ``pair_tensor`` has shape</span>
+<span class="sd">        ``(1, n_vertices, n_vertices, PAIR_INPUT_CHANNELS)`` and dtype</span>
+<span class="sd">        ``torch.float32``, and ``mask_tensor`` has shape</span>
+<span class="sd">        ``(1, number_of_edges)`` and dtype ``torch.bool``.</span>
 
-<span class="sd">            (1, number_of_edges)</span>
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``available_mask`` does not have shape</span>
+<span class="sd">            ``(state.number_of_edges,)`` or contains no available</span>
+<span class="sd">            actions.</span>
+<span class="sd">        TypeError: If ``available_mask`` does not have boolean dtype.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">normalized_mask</span> <span class="o">=</span> <span class="n">_validate_available_mask</span><span class="p">(</span>
         <span class="n">available_mask</span><span class="p">,</span>
@@ -227,14 +281,37 @@
     <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="n">vertex_permutation</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Map old edge indexes to new indexes after vertex renaming.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map old edge indexes to new indexes after vertex renaming.</span>
 
-<span class="sd">    If the returned array is named edge_mapping, then:</span>
+<span class="sd">    Given a permutation of vertex labels, computes, for each original</span>
+<span class="sd">    edge index, the index that the same edge (now between renamed</span>
+<span class="sd">    vertices) occupies in ``graph.edges``. If the returned array is</span>
+<span class="sd">    named ``edge_mapping``, then::</span>
 
 <span class="sd">        new_values[edge_mapping] = old_values</span>
 
-<span class="sd">    applies the vertex permutation to an edge-indexed array.</span>
+<span class="sd">    applies the vertex permutation to any edge-indexed array (such as</span>
+<span class="sd">    a coloring or action mask), reordering it to match the renamed</span>
+<span class="sd">    vertex labeling.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        graph (RGraph): Host graph whose edge ordering defines both</span>
+<span class="sd">            the old and new edge index spaces.</span>
+<span class="sd">        vertex_permutation (numpy.typing.NDArray[numpy.integer]):</span>
+<span class="sd">            Array of shape ``(n_vertices,)`` giving, for each new</span>
+<span class="sd">            vertex label, the original vertex it corresponds to (i.e.</span>
+<span class="sd">            a permutation of ``range(n_vertices)``).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.typing.NDArray[numpy.int64]: Read-only array of shape</span>
+<span class="sd">        ``(graph.number_of_edges,)`` mapping each original edge index</span>
+<span class="sd">        to its index after the permutation is applied.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``vertex_permutation`` does not have shape</span>
+<span class="sd">            ``(n_vertices,)`` or is not a permutation of every vertex</span>
+<span class="sd">            exactly once.</span>
+<span class="sd">        TypeError: If ``vertex_permutation`` does not contain integers.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
 
@@ -314,8 +391,23 @@
     <span class="n">available_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
     <span class="n">number_of_edges</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Return a validated boolean action mask without copying it.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a validated boolean action mask without copying it.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        available_mask (numpy.typing.NDArray[numpy.bool_]): Candidate</span>
+<span class="sd">            action-availability mask to validate.</span>
+<span class="sd">        number_of_edges (int): Expected length of ``available_mask``,</span>
+<span class="sd">            i.e. the host graph&#39;s number of edges.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.typing.NDArray[numpy.bool_]: ``available_mask`` converted</span>
+<span class="sd">        via :func:`numpy.asarray` (a view when possible, otherwise a</span>
+<span class="sd">        copy), unchanged in content.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``available_mask`` does not have shape</span>
+<span class="sd">            ``(number_of_edges,)`` or contains no available actions.</span>
+<span class="sd">        TypeError: If ``available_mask`` does not have boolean dtype.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">available_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">available_mask</span><span class="p">)</span>
 

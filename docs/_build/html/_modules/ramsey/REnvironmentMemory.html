@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -86,6 +90,13 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return an owned, read-only boolean array.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        values (numpy.ndarray): Source values, coerced to ``bool``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: An independent boolean copy of ``values`` with</span>
+<span class="sd">        the ``writeable`` flag cleared.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
         <span class="n">values</span><span class="p">,</span>
@@ -108,15 +119,17 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Action restrictions produced by search history.</span>
 
-<span class="sd">    edge_tabu_mask:</span>
-<span class="sd">        True for actions blocked by edge tenure.</span>
-
-<span class="sd">    revisit_mask:</span>
-<span class="sd">        True for actions whose successor state is contained in</span>
-<span class="sd">        visited-state memory.</span>
-
-<span class="sd">    blocked_mask:</span>
-<span class="sd">        The union of the edge-tabu and revisit masks.</span>
+<span class="sd">    Attributes:</span>
+<span class="sd">        edge_tabu_mask (numpy.ndarray): Boolean array, shape</span>
+<span class="sd">            ``(number_of_edges,)``. True for edges still within their</span>
+<span class="sd">            tabu tenure (recently flipped and not yet eligible again).</span>
+<span class="sd">        revisit_mask (numpy.ndarray): Boolean array, shape</span>
+<span class="sd">            ``(number_of_edges,)``. True for actions whose resulting</span>
+<span class="sd">            coloring is present in the bounded visited-state memory.</span>
+<span class="sd">        blocked_mask (numpy.ndarray): Boolean array, shape</span>
+<span class="sd">            ``(number_of_edges,)``. The union ``edge_tabu_mask |</span>
+<span class="sd">            revisit_mask``, i.e. every action forbidden by search</span>
+<span class="sd">            memory before aspiration or deadlock fallback are applied.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">edge_tabu_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]</span>
@@ -124,6 +137,14 @@
     <span class="n">blocked_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate mask shapes/consistency and freeze the arrays.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the three masks do not share one shape, if</span>
+<span class="sd">                that shape is not one-dimensional, or if</span>
+<span class="sd">                ``blocked_mask`` does not equal</span>
+<span class="sd">                ``edge_tabu_mask | revisit_mask``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">edge_tabu_mask</span> <span class="o">=</span> <span class="n">_read_only_bool_array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edge_tabu_mask</span><span class="p">)</span>
 
         <span class="n">revisit_mask</span> <span class="o">=</span> <span class="n">_read_only_bool_array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">revisit_mask</span><span class="p">)</span>
@@ -187,6 +208,10 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Forget the previous episode and remember the new</span>
 <span class="sd">        episode&#39;s initial state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Initial search state of the new</span>
+<span class="sd">                episode.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -201,6 +226,15 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RMemoryStatus</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the actions blocked by current search history.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Current search state.</span>
+<span class="sd">            step_number (int): Number of transitions completed so far</span>
+<span class="sd">                in the episode.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RMemoryStatus: Masks describing which actions history</span>
+<span class="sd">            currently forbids.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -216,6 +250,13 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Record one completed transition and its resulting state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge (int): Encoded edge index that was flipped.</span>
+<span class="sd">            state (RSearchState): Search state after the flip was</span>
+<span class="sd">                applied.</span>
+<span class="sd">            step_number (int): Environment step number after the</span>
+<span class="sd">                transition.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 </div>
@@ -237,6 +278,13 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Do nothing; ``RNullMemory`` retains no episode history.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Initial search state of the new</span>
+<span class="sd">                episode (unused).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">None</span></div>
 
 
@@ -247,6 +295,18 @@
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
         <span class="n">step_number</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RMemoryStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return masks that block no actions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Current search state, used only to</span>
+<span class="sd">                determine the number of edge actions.</span>
+<span class="sd">            step_number (int): Current environment step number (unused).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RMemoryStatus: All-false ``edge_tabu_mask``, ``revisit_mask``,</span>
+<span class="sd">            and ``blocked_mask``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">empty</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
             <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">,</span>
@@ -267,6 +327,15 @@
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
         <span class="n">step_number</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Do nothing; ``RNullMemory`` retains no transition history.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge (int): Encoded edge index that was flipped (unused).</span>
+<span class="sd">            state (RSearchState): Search state after the flip (unused).</span>
+<span class="sd">            step_number (int): Environment step number after the</span>
+<span class="sd">                transition (unused).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">None</span></div>
 </div>
 
@@ -288,6 +357,19 @@
         <span class="n">number_of_edges</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">RTabuMemoryConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize empty tabu and visited-state memory.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            number_of_edges (int): Number of edge actions tracked by</span>
+<span class="sd">                memory; must match the host graph&#39;s edge count.</span>
+<span class="sd">            config (RTabuMemoryConfig | None): Tenure and window</span>
+<span class="sd">                settings. Defaults to ``RTabuMemoryConfig()`` when</span>
+<span class="sd">                omitted.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``number_of_edges`` is not an integer.</span>
+<span class="sd">            ValueError: If ``number_of_edges`` is not positive.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">number_of_edges</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="n">number_of_edges</span><span class="p">,</span>
             <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
@@ -333,6 +415,12 @@
     <span class="k">def</span> <span class="nf">tabu_until</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return a read-only view of edge expiration steps.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            numpy.ndarray: Int32 array, shape ``(number_of_edges,)``,</span>
+<span class="sd">            read-only view (not a copy). Entry ``e`` is the first step</span>
+<span class="sd">            number at which edge ``e`` stops being edge-tabu; edge</span>
+<span class="sd">            ``e`` is blocked while ``tabu_until[e] &gt; step_number``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">view</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tabu_until</span><span class="o">.</span><span class="n">view</span><span class="p">()</span>
         <span class="n">view</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
@@ -354,6 +442,18 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Clear all memory and remember the initial state.</span>
+
+<span class="sd">        Every edge&#39;s tabu expiration is reset to zero (immediately</span>
+<span class="sd">        available) and the visited-state history is emptied before the</span>
+<span class="sd">        new episode&#39;s initial coloring is remembered.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Initial search state of the new</span>
+<span class="sd">                episode.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``state``&#39;s edge count does not match this</span>
+<span class="sd">                memory&#39;s configured ``number_of_edges``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_compatible_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
@@ -373,6 +473,21 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RMemoryStatus</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return exact edge-tenure and revisit restrictions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Current search state.</span>
+<span class="sd">            step_number (int): Number of transitions completed so far</span>
+<span class="sd">                in the episode.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RMemoryStatus: ``edge_tabu_mask`` for edges still within</span>
+<span class="sd">            tenure, ``revisit_mask`` for actions leading back into the</span>
+<span class="sd">            visited-state window, and their union as ``blocked_mask``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``state``&#39;s edge count does not match this</span>
+<span class="sd">                memory&#39;s configured ``number_of_edges``.</span>
+<span class="sd">            TypeError: If ``step_number`` is not an integer.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_compatible_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_nonnegative_step</span><span class="p">(</span><span class="n">step_number</span><span class="p">)</span>
@@ -401,8 +516,24 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Make the selected edge tabu and remember the new state.</span>
 
-<span class="sd">        step_number is the environment&#39;s step number after the</span>
-<span class="sd">        transition has been applied.</span>
+<span class="sd">        The flipped edge becomes blocked until</span>
+<span class="sd">        ``step_number + config.edge_tenure``. The resulting coloring</span>
+<span class="sd">        is then added to the bounded visited-state window (see</span>
+<span class="sd">        ``_remember_state``).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge (int): Encoded edge index that was flipped.</span>
+<span class="sd">            state (RSearchState): Search state after the flip was</span>
+<span class="sd">                applied.</span>
+<span class="sd">            step_number (int): The environment&#39;s step number after the</span>
+<span class="sd">                transition has been applied; must be positive.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``state``&#39;s edge count does not match this</span>
+<span class="sd">                memory&#39;s configured ``number_of_edges`` or</span>
+<span class="sd">                ``step_number`` is not positive.</span>
+<span class="sd">            TypeError: If ``edge`` or ``step_number`` is not an integer.</span>
+<span class="sd">            IndexError: If ``edge`` is out of range.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_compatible_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
@@ -441,7 +572,18 @@
 <span class="sd">        Return successors found in exact visited-state memory.</span>
 
 <span class="sd">        Every possible successor differs from the current coloring</span>
-<span class="sd">        by exactly one edge bit.</span>
+<span class="sd">        by exactly one edge bit. For every edge, this flips that bit</span>
+<span class="sd">        in a packed copy of the current coloring and checks whether</span>
+<span class="sd">        the resulting exact key is present in the bounded</span>
+<span class="sd">        visited-state history.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Current search state.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            numpy.ndarray: Boolean array, shape ``(number_of_edges,)``.</span>
+<span class="sd">            True for edges whose single-flip successor coloring is</span>
+<span class="sd">            currently held in visited-state memory.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="o">.</span><span class="n">visited_state_window</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visited_counts</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
@@ -494,6 +636,17 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Add one exact state key to the bounded history.</span>
+
+<span class="sd">        The state&#39;s packed key is appended to a FIFO queue and its</span>
+<span class="sd">        occurrence count incremented. While the queue exceeds</span>
+<span class="sd">        ``config.visited_state_window`` the oldest key is evicted; its</span>
+<span class="sd">        count is decremented, and the count entry is removed once it</span>
+<span class="sd">        reaches zero. Counting (rather than a plain set) is required</span>
+<span class="sd">        because the same exact coloring can recur more than once</span>
+<span class="sd">        within the bounded window.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state to remember.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">window</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="o">.</span><span class="n">visited_state_window</span>
 
@@ -523,7 +676,15 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Pack a binary coloring into an exact compact key.</span>
 
-<span class="sd">        This is exact representation, not probabilistic hashing.</span>
+<span class="sd">        This is exact representation, not probabilistic hashing:</span>
+<span class="sd">        distinct colorings always produce distinct keys.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state to key.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bytes: Bit-packed representation of ``state.colors``,</span>
+<span class="sd">            suitable for use as a dictionary key.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">packbits</span><span class="p">(</span>
             <span class="n">state</span><span class="o">.</span><span class="n">colors</span><span class="p">,</span>
@@ -536,6 +697,13 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Require the configured number of edge actions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state to check.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``state.number_of_edges`` does not match</span>
+<span class="sd">                this memory&#39;s configured ``number_of_edges``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_number_of_edges</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Search-state edge count does not &quot;</span> <span class="s2">&quot;match memory.&quot;</span><span class="p">)</span>
@@ -546,6 +714,13 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Validate an environment step number.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            step_number (int): Candidate step number.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``step_number`` is not an integer.</span>
+<span class="sd">            ValueError: If ``step_number`` is negative.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step_number</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="n">step_number</span><span class="p">,</span>

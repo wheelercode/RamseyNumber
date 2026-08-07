@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,13 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RVerification</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Independent verification of colorings and incremental state.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Independent verification of colorings and incremental search state.</span>
+
+<span class="sd">Recomputes exact scores directly from a coloring&#39;s edge colors, bypassing</span>
+<span class="sd">any incrementally maintained bookkeeping, so that results produced by</span>
+<span class="sd">faster incremental code paths (such as :class:`~ramsey.RState.RSearchState`)</span>
+<span class="sd">can be cross-checked for correctness.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -92,6 +102,12 @@
 <span class="k">class</span> <span class="nc">RColoringVerification</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Independent exact result for one immutable coloring.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        coloring_hash (str): Exact content hash of the verified coloring,</span>
+<span class="sd">            as returned by :meth:`~ramsey.RColoring.RColoring.exact_hash`.</span>
+<span class="sd">        score_report (RScoreReport): Exact monochromatic score, freshly</span>
+<span class="sd">            computed by :func:`~ramsey.RScoring.evaluate_coloring`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">coloring_hash</span><span class="p">:</span> <span class="nb">str</span>
@@ -100,7 +116,8 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">ramsey_free</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return whether no forbidden monochromatic clique exists.</span>
+<span class="sd">        bool: Whether no forbidden monochromatic clique exists, i.e.</span>
+<span class="sd">        ``score_report.total == 0``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_report</span><span class="o">.</span><span class="n">total</span> <span class="o">==</span> <span class="mi">0</span></div>
 
@@ -115,6 +132,13 @@
 <span class="k">class</span> <span class="nc">RStateVerification</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Independent consistency result for incremental search state.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        coloring (RColoringVerification): Independent verification of</span>
+<span class="sd">            the state&#39;s current coloring snapshot.</span>
+<span class="sd">        errors (tuple[str, ...]): Human-readable descriptions of every</span>
+<span class="sd">            incremental field found to disagree with an independently</span>
+<span class="sd">            recomputed value; empty when the state is fully consistent.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoringVerification</span>
@@ -123,14 +147,16 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">consistent</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return whether every incremental field was correct.</span>
+<span class="sd">        bool: Whether every incremental field matched its independently</span>
+<span class="sd">        recomputed value, i.e. ``errors`` is empty.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">ramsey_free</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the independently calculated Ramsey-free result.</span>
+<span class="sd">        bool: The independently calculated Ramsey-free result, from</span>
+<span class="sd">        ``coloring.ramsey_free``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">coloring</span><span class="o">.</span><span class="n">ramsey_free</span>
 
@@ -140,7 +166,11 @@
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Raise RuntimeError when any state inconsistency exists.</span>
+<span class="sd">        Raise an error when any state inconsistency was found.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If ``errors`` is nonempty, with a message</span>
+<span class="sd">                listing every detected inconsistency.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
             <span class="n">details</span> <span class="o">=</span> <span class="s2">&quot;; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">)</span>
@@ -159,6 +189,13 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoringVerification</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Independently score one immutable coloring.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        coloring (RColoring): Coloring to verify.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RColoringVerification: The coloring&#39;s exact content hash paired</span>
+<span class="sd">        with a freshly computed exact score report.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">RColoringVerification</span><span class="p">(</span>
         <span class="n">coloring_hash</span><span class="o">=</span><span class="n">coloring</span><span class="o">.</span><span class="n">exact_hash</span><span class="p">(),</span>
@@ -176,7 +213,18 @@
 <span class="sd">    Recompute every incremental field from the current colors.</span>
 
 <span class="sd">    This function does not trust the state&#39;s stored clique counts,</span>
-<span class="sd">    histogram, or score.</span>
+<span class="sd">    histogram, or score. It takes an immutable snapshot of the state&#39;s</span>
+<span class="sd">    current coloring, independently recomputes the color-one edge count</span>
+<span class="sd">    per clique, the resulting histogram, and the total score, and</span>
+<span class="sd">    compares each against the state&#39;s incrementally maintained values.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Incremental search state to verify.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RStateVerification: The independent coloring verification</span>
+<span class="sd">        together with a description of every incremental field found</span>
+<span class="sd">        to disagree with the recomputed values (empty when consistent).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">snapshot</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">coloring_snapshot</span><span class="p">()</span>
 

@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,20 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RVertexBalanceAction</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Objective-neutral vertex color-balance transfer actions.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Objective-neutral vertex color-balance transfer actions.</span>
+
+<span class="sd">A vertex balance transfer recolors two host-graph edges that share a</span>
+<span class="sd">pivot vertex: one blue edge incident to a &quot;donor&quot; vertex becomes red,</span>
+<span class="sd">and one red edge incident to a &quot;recipient&quot; vertex becomes blue. The</span>
+<span class="sd">total number of blue edges is unchanged, so a transfer is a structural</span>
+<span class="sd">move rather than a net recoloring: it reduces the spread of blue degree</span>
+<span class="sd">across vertices (the vertex color-balance energy defined by</span>
+<span class="sd">:func:`vertex_balance_energy`) while incidentally producing its own</span>
+<span class="sd">exact score reward. This module analyzes and applies such transfers,</span>
+<span class="sd">computing their exact structural and score consequences directly,</span>
+<span class="sd">distinct from (though built on top of) the single-edge-flip analysis in</span>
+<span class="sd">:mod:`ramsey.RAction`.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -82,6 +99,15 @@
 <span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span>
     <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Copy an array and mark the copy read-only.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        values (NDArray): Source array; may be any array-like value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray: An independently owned copy with ``flags.writeable``</span>
+<span class="sd">        set to ``False``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
     <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="k">return</span> <span class="n">result</span>
@@ -92,7 +118,16 @@
 <span class="k">def</span> <span class="nf">vertex_blue_degrees</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the number of blue (color-one) edges at every vertex.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the number of blue (color-one) edges at every vertex.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state whose coloring is inspected.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int16]: Array of length ``n_vertices`` where entry</span>
+<span class="sd">        ``v`` is the number of edges incident to vertex ``v`` currently</span>
+<span class="sd">        colored blue (color one).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
 
     <span class="n">degrees</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
@@ -122,7 +157,21 @@
 <span class="k">def</span> <span class="nf">vertex_color_imbalances</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return blue degree minus red degree for every vertex.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return blue degree minus red degree for every vertex.</span>
+
+<span class="sd">    Every vertex has degree ``n_vertices - 1`` in the complete host</span>
+<span class="sd">    graph, so red degree equals ``n_vertices - 1 - blue_degree`` and</span>
+<span class="sd">    the imbalance simplifies to ``2 * blue_degree - (n_vertices - 1)``.</span>
+<span class="sd">    A positive value means the vertex is blue-heavy; a negative value</span>
+<span class="sd">    means it is red-heavy.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state whose coloring is inspected.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int16]: Array of length ``n_vertices`` with each</span>
+<span class="sd">        vertex&#39;s signed color imbalance.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
 
     <span class="n">blue_degrees</span> <span class="o">=</span> <span class="n">vertex_blue_degrees</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
@@ -139,7 +188,19 @@
 <span class="k">def</span> <span class="nf">vertex_balance_energy</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return sum of squared vertex color imbalances; lower is better.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return sum of squared vertex color imbalances; lower is better.</span>
+
+<span class="sd">    This is the structural energy that vertex-balance transfers are</span>
+<span class="sd">    designed to reduce: it is zero when every vertex has equal blue and</span>
+<span class="sd">    red degree, and grows quadratically with the spread of blue degree</span>
+<span class="sd">    across vertices.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state whose coloring is inspected.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: Sum, over all vertices, of the squared color imbalance.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">imbalances</span> <span class="o">=</span> <span class="n">vertex_color_imbalances</span><span class="p">(</span>
         <span class="n">state</span><span class="p">,</span>
     <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
@@ -160,7 +221,24 @@
     <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RVertexBalanceTransfer</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One blue-degree transfer from donor to recipient through a pivot.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One blue-degree transfer from donor to recipient through a pivot.</span>
+
+<span class="sd">    Recoloring ``donor_edge`` (donor-pivot) from blue to red and</span>
+<span class="sd">    ``recipient_edge`` (recipient-pivot) from red to blue moves one</span>
+<span class="sd">    unit of blue degree from ``donor_vertex`` to ``recipient_vertex``</span>
+<span class="sd">    while leaving ``pivot_vertex``&#39;s degree and the global blue-edge</span>
+<span class="sd">    count unchanged.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        donor_vertex (int): Vertex losing one unit of blue degree.</span>
+<span class="sd">        recipient_vertex (int): Vertex gaining one unit of blue degree.</span>
+<span class="sd">        pivot_vertex (int): Shared vertex through which the transfer</span>
+<span class="sd">            edges pass; its degree is unaffected.</span>
+<span class="sd">        donor_edge (int): Encoded edge index of the donor-pivot edge,</span>
+<span class="sd">            currently blue, to be recolored red.</span>
+<span class="sd">        recipient_edge (int): Encoded edge index of the recipient-pivot</span>
+<span class="sd">            edge, currently red, to be recolored blue.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">donor_vertex</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">recipient_vertex</span><span class="p">:</span> <span class="nb">int</span>
@@ -178,7 +256,45 @@
     <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RVertexBalanceAnalysis</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exact structural consequences of all legal balance transfers.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exact structural consequences of all legal balance transfers.</span>
+
+<span class="sd">    An instance is a snapshot: it is tied to the exact</span>
+<span class="sd">    ``source_state``/``state_version`` pair it was built from, and</span>
+<span class="sd">    :meth:`applies_to` must be used to confirm it is still valid before</span>
+<span class="sd">    reusing it against a state that may since have been mutated.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        source_state (RSearchState): Search state this analysis was</span>
+<span class="sd">            computed from.</span>
+<span class="sd">        state_version (int): ``source_state.version`` at the time of</span>
+<span class="sd">            computation, used to detect staleness after later</span>
+<span class="sd">            mutation.</span>
+<span class="sd">        donor_vertices (NDArray[np.uint8]): Donor vertex of each</span>
+<span class="sd">            candidate transfer.</span>
+<span class="sd">        recipient_vertices (NDArray[np.uint8]): Recipient vertex of</span>
+<span class="sd">            each candidate transfer.</span>
+<span class="sd">        pivot_vertices (NDArray[np.uint8]): Pivot vertex of each</span>
+<span class="sd">            candidate transfer.</span>
+<span class="sd">        donor_edges (NDArray[np.uint16]): Encoded donor-pivot edge</span>
+<span class="sd">            index of each candidate transfer.</span>
+<span class="sd">        recipient_edges (NDArray[np.uint16]): Encoded recipient-pivot</span>
+<span class="sd">            edge index of each candidate transfer.</span>
+<span class="sd">        balance_rewards (NDArray[np.int32]): Exact reduction in vertex</span>
+<span class="sd">            color-balance energy (see :func:`vertex_balance_energy`)</span>
+<span class="sd">            that each transfer would produce.</span>
+<span class="sd">        histogram_deltas (NDArray[np.int32]): ``int32`` array of shape</span>
+<span class="sd">            ``(number_of_actions, edges_per_clique + 1)``. Row ``i`` is</span>
+<span class="sd">            the exact change to the global color-one-count histogram</span>
+<span class="sd">            that transfer ``i`` would produce.</span>
+<span class="sd">        exact_rewards (NDArray[np.int32]): Exact score reduction that</span>
+<span class="sd">            each transfer would produce, derived from</span>
+<span class="sd">            ``histogram_deltas``.</span>
+<span class="sd">        resulting_scores (NDArray[np.int32]): Exact score that would</span>
+<span class="sd">            result from applying each transfer, equal to</span>
+<span class="sd">            ``source_state.score - exact_rewards``.</span>
+
+<span class="sd">    All array fields are owned, read-only copies.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
     <span class="n">state_version</span><span class="p">:</span> <span class="nb">int</span>
@@ -195,6 +311,14 @@
     <span class="n">resulting_scores</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate array shapes, normalize dtypes, and freeze all fields.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If any per-action array does not have shape</span>
+<span class="sd">                ``(number_of_actions,)``, or if ``histogram_deltas``</span>
+<span class="sd">                does not have shape</span>
+<span class="sd">                ``(number_of_actions, edges_per_clique + 1)``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">arrays</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;donor_vertices&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">donor_vertices</span><span class="p">,</span>
@@ -276,6 +400,9 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">number_of_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        int: Number of candidate balance transfers in this analysis.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">balance_rewards</span><span class="p">)</span>
 
 <div class="viewcode-block" id="RVertexBalanceAnalysis.transfer">
@@ -284,6 +411,20 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">action_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RVertexBalanceTransfer</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the fully described transfer at one action index.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            action_index (int): Index into this analysis&#39;s parallel</span>
+<span class="sd">                arrays.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RVertexBalanceTransfer: The donor, recipient, pivot, and</span>
+<span class="sd">            edge indices describing that candidate transfer.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If ``action_index`` is outside</span>
+<span class="sd">                ``[0, number_of_actions)``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">action_index</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">action_index</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">number_of_actions</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span>
                 <span class="s2">&quot;action_index is out of range.&quot;</span>
@@ -314,6 +455,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this analysis belongs to the current state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Candidate state to check freshness</span>
+<span class="sd">                against.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if ``state`` is the exact object this</span>
+<span class="sd">            analysis was computed from and has not been mutated since.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span>
             <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span>
@@ -325,6 +476,18 @@
 <span class="k">def</span> <span class="nf">_edge_index_matrix</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a dense vertex-pair-to-edge-index lookup table.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state supplying the host graph&#39;s</span>
+<span class="sd">            edge list.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int32]: ``(n_vertices, n_vertices)`` symmetric</span>
+<span class="sd">        matrix where entry ``[u, v]`` is the encoded edge index between</span>
+<span class="sd">        vertices ``u`` and ``v``, or ``-1`` on the diagonal (no self</span>
+<span class="sd">        edges).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
 
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
@@ -358,7 +521,32 @@
     <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">],</span>
     <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">],</span>
 <span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enumerate transfers that strictly reduce squared imbalance.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enumerate transfers that strictly reduce squared imbalance.</span>
+
+<span class="sd">    For every donor/recipient pair whose transfer would strictly</span>
+<span class="sd">    reduce total squared vertex imbalance, and every pivot distinct</span>
+<span class="sd">    from both, this checks whether the pivot connects to the donor</span>
+<span class="sd">    with a blue edge and to the recipient with a red edge -- the exact</span>
+<span class="sd">    precondition for a valid transfer. The reduction in squared</span>
+<span class="sd">    imbalance energy from a single transfer is derived algebraically:</span>
+<span class="sd">    moving one unit of blue degree changes the donor&#39;s imbalance by</span>
+<span class="sd">    ``-2`` and the recipient&#39;s by ``+2``, so the change in the sum of</span>
+<span class="sd">    their squared imbalances is</span>
+<span class="sd">    ``4 * (imbalances[donor] - imbalances[recipient] - 2)``,</span>
+<span class="sd">    independent of the pivot.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state whose coloring is</span>
+<span class="sd">            inspected.</span>
+<span class="sd">        imbalances (NDArray[np.int16]): Per-vertex color imbalance, as</span>
+<span class="sd">            returned by :func:`vertex_color_imbalances`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: Six parallel arrays, one entry per candidate transfer</span>
+<span class="sd">        found -- donor vertices, recipient vertices, pivot vertices,</span>
+<span class="sd">        donor edge indices, recipient edge indices, and balance</span>
+<span class="sd">        rewards, in that order.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">donors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
         <span class="n">imbalances</span> <span class="o">&gt;</span> <span class="mi">0</span>
     <span class="p">)</span>
@@ -467,14 +655,37 @@
 <span class="sd">    Analyze every pivot transfer that moves both endpoint imbalances</span>
 <span class="sd">    toward zero.</span>
 
-<span class="sd">    For donor u, recipient v, and pivot w the required colors are:</span>
+<span class="sd">    For donor ``u``, recipient ``v``, and pivot ``w`` the required</span>
+<span class="sd">    colors are::</span>
 
 <span class="sd">        u-w = blue (1)</span>
 <span class="sd">        v-w = red  (0)</span>
 
-<span class="sd">    Recoloring those edges to red and blue transfers one unit of blue</span>
-<span class="sd">    degree from u to v while leaving w and the global blue-edge count</span>
-<span class="sd">    unchanged.</span>
+<span class="sd">    Recoloring those edges to red and blue respectively transfers one</span>
+<span class="sd">    unit of blue degree from ``u`` to ``v`` while leaving ``w`` and the</span>
+<span class="sd">    global blue-edge count unchanged.</span>
+
+<span class="sd">    The exact score consequence of each transfer is derived from the</span>
+<span class="sd">    single-edge histogram deltas computed by</span>
+<span class="sd">    :func:`~ramsey.RAction.analyze_actions`. Naively summing the donor</span>
+<span class="sd">    edge&#39;s and recipient edge&#39;s individual deltas double-counts any</span>
+<span class="sd">    clique containing both edges: such a clique loses one blue edge</span>
+<span class="sd">    (the donor edge) and gains one blue edge (the recipient edge), so</span>
+<span class="sd">    its final color-one count is unchanged, but each individual delta</span>
+<span class="sd">    was computed as if only its own edge had flipped. This function</span>
+<span class="sd">    identifies cliques shared by both edges (via</span>
+<span class="sd">    ``state.index.edge_to_cliques``) and removes the two artificial</span>
+<span class="sd">    one-edge transitions those shared cliques were credited with,</span>
+<span class="sd">    leaving the exact combined histogram delta.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to analyze.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RVertexBalanceAnalysis: Every candidate transfer that strictly</span>
+<span class="sd">        reduces vertex color-balance energy, together with its exact</span>
+<span class="sd">        structural and score consequences. Empty arrays are returned</span>
+<span class="sd">        when no such transfer exists.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">imbalances</span> <span class="o">=</span> <span class="n">vertex_color_imbalances</span><span class="p">(</span>
         <span class="n">state</span><span class="p">,</span>
@@ -616,7 +827,34 @@
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="n">transfer</span><span class="p">:</span> <span class="n">RVertexBalanceTransfer</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply one validated pivot transfer and return exact score reward.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate and apply one pivot transfer, returning its exact score reward.</span>
+
+<span class="sd">    Revalidates the transfer against the current state before mutating</span>
+<span class="sd">    it: vertex bounds, vertex distinctness, that the supplied edge</span>
+<span class="sd">    indices match the vertex pairs, that the donor-pivot edge is</span>
+<span class="sd">    currently blue and the recipient-pivot edge is currently red, and</span>
+<span class="sd">    that the donor and recipient vertices are still, respectively,</span>
+<span class="sd">    blue-heavy and red-heavy. The two edges are then recolored via</span>
+<span class="sd">    ``state.apply_edge_recoloring``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to mutate.</span>
+<span class="sd">        transfer (RVertexBalanceTransfer): Transfer to apply, typically</span>
+<span class="sd">            obtained from :meth:`RVertexBalanceAnalysis.transfer`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: Exact score reduction produced by applying the transfer.</span>
+<span class="sd">        A positive value means the score improved.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        IndexError: If any of the transfer&#39;s vertices is out of range.</span>
+<span class="sd">        ValueError: If the donor, recipient, and pivot are not</span>
+<span class="sd">            distinct; if the transfer&#39;s edge indices do not match its</span>
+<span class="sd">            vertices; if the donor-pivot edge is not currently blue;</span>
+<span class="sd">            if the recipient-pivot edge is not currently red; or if</span>
+<span class="sd">            the donor or recipient vertex is no longer blue-heavy or</span>
+<span class="sd">            red-heavy, respectively.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
 
     <span class="n">vertices</span> <span class="o">=</span> <span class="p">(</span>

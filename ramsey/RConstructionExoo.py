@@ -1,4 +1,10 @@
-"""Published Exoo zero-score construction for the R(5,5) K42 graph."""
+"""Published Exoo zero-score construction for the R(5,5) K42 graph.
+
+Reproduces the specific 42-vertex, two-color, K5-free coloring published
+by Exoo as a lower-bound construction for the Ramsey number R(5,5), by
+deriving it deterministically from the cyclic K43 construction plus a
+fixed list of edge corrections.
+"""
 
 from __future__ import annotations
 
@@ -62,12 +68,39 @@ class RConstructionExoo(RConstruction):
 
     @property
     def name(self) -> str:
+        """
+        str: Always ``"exoo-k42"``.
+        """
         return "exoo-k42"
 
     def construct(
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Build Exoo's published K42 coloring for the supplied graph.
+
+        Computes the Cyclic(43) distance coloring under the label shift
+        implied by deleting original vertex 0 (canonical vertex ``k``
+        maps to original vertex ``k + 1``), then flips the sixteen edges
+        listed in :data:`EXOO_42_BLUE_CORRECTIONS` from red to blue.
+
+        Args:
+            graph (RGraph): Host graph to color. Must have exactly 42
+                vertices and a symmetric two-color problem.
+
+        Returns:
+            RColoring: The published Exoo zero-score coloring of K42.
+
+        Raises:
+            ValueError: If ``graph.problem`` does not have exactly 42
+                vertices, or is not a symmetric two-color problem.
+            RuntimeError: If a correction edge in
+                :data:`EXOO_42_BLUE_CORRECTIONS` was not red in the
+                Cyclic(43) precursor coloring, indicating the
+                correction list is inconsistent with the base cyclic
+                coloring.
+        """
         problem = graph.problem
 
         if problem.n_vertices != 42:

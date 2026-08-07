@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,12 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RMetricStore</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;SQLite persistence for versioned Ramsey structural metric snapshots.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;SQLite persistence for versioned Ramsey structural metric snapshots.</span>
+
+<span class="sd">Stores :class:`ramsey.RMetric.RMetricSnapshot` values keyed by the</span>
+<span class="sd">coloring they describe and the metric schema version they were computed</span>
+<span class="sd">under, without altering the schema of any existing ``colorings`` table.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -82,7 +91,17 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RMetricStore.RStoredMetric">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RStoredMetric</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One metric snapshot restored from persistent storage.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One metric snapshot restored from persistent storage.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        coloring_id (int): Identifier of the coloring this snapshot</span>
+<span class="sd">            describes, matching a row in the ``colorings`` table.</span>
+<span class="sd">        metric_version (int): Metric schema version the snapshot was</span>
+<span class="sd">            computed under.</span>
+<span class="sd">        computed_at (str): Timestamp string (SQLite ``CURRENT_TIMESTAMP``</span>
+<span class="sd">            format) of when the row was last inserted or updated.</span>
+<span class="sd">        snapshot (RMetricSnapshot): The restored structural fingerprint.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">coloring_id</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">metric_version</span><span class="p">:</span> <span class="nb">int</span>
@@ -94,12 +113,30 @@
 <div class="viewcode-block" id="RMetricStore">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RMetricStore.RMetricStore">[docs]</a>
 <span class="k">class</span> <span class="nc">RMetricStore</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Store metric snapshots beside colorings without changing their table.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Store metric snapshots beside colorings without changing their table.</span>
+
+<span class="sd">    Snapshots are stored in a dedicated ``coloring_metrics`` table keyed</span>
+<span class="sd">    by ``(coloring_id, metric_version)``, with a foreign key back to</span>
+<span class="sd">    ``colorings(coloring_id)`` (cascading on delete) so metrics never</span>
+<span class="sd">    outlive the coloring they describe. Multiple metric versions can</span>
+<span class="sd">    coexist for the same coloring, which lets callers keep old snapshots</span>
+<span class="sd">    while migrating to a new :data:`ramsey.RMetric.METRIC_VERSION`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">database_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Open (creating if necessary) a metric store at a SQLite database path.</span>
+
+<span class="sd">        Configures the connection with foreign keys enabled, WAL journal</span>
+<span class="sd">        mode, and normal synchronous durability, then ensures the</span>
+<span class="sd">        ``coloring_metrics`` table and its version index exist.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            database_path (str | Path): Filesystem path to the SQLite</span>
+<span class="sd">                database file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">database_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">database_path</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">connection</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">database_path</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">row_factory</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">Row</span>
@@ -110,6 +147,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_create_schema</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">_create_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create the ``coloring_metrics`` table and version index if absent.&quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">                CREATE TABLE IF NOT EXISTS coloring_metrics (</span>
@@ -146,7 +184,27 @@
         <span class="n">coloring_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">snapshot</span><span class="p">:</span> <span class="n">RMetricSnapshot</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RStoredMetric</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Insert or replace one versioned metric snapshot.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Insert or replace one versioned metric snapshot.</span>
+
+<span class="sd">        Upserts on the ``(coloring_id, metric_version)`` primary key: an</span>
+<span class="sd">        existing row for the same coloring and version is overwritten and</span>
+<span class="sd">        its ``computed_at`` timestamp refreshed.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring_id (int): Identifier of the coloring the snapshot</span>
+<span class="sd">                describes.</span>
+<span class="sd">            snapshot (RMetricSnapshot): Snapshot to persist. Its</span>
+<span class="sd">                ``metric_version`` must match the software&#39;s current</span>
+<span class="sd">                :data:`ramsey.RMetric.METRIC_VERSION`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RStoredMetric: The freshly saved row, reloaded from storage.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``snapshot.metric_version`` does not match</span>
+<span class="sd">                :data:`ramsey.RMetric.METRIC_VERSION`.</span>
+<span class="sd">            RuntimeError: If the store has been closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="n">snapshot</span><span class="o">.</span><span class="n">metric_version</span> <span class="o">!=</span> <span class="n">METRIC_VERSION</span><span class="p">:</span>
@@ -195,7 +253,22 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">metric_version</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">METRIC_VERSION</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RStoredMetric</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore one stored snapshot.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore one stored snapshot.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring_id (int): Identifier of the coloring to look up.</span>
+<span class="sd">            metric_version (int): Metric schema version to look up.</span>
+<span class="sd">                Defaults to the current :data:`ramsey.RMetric.METRIC_VERSION`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RStoredMetric: The stored row for ``(coloring_id,</span>
+<span class="sd">            metric_version)``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If no snapshot is stored for that coloring and</span>
+<span class="sd">                metric version.</span>
+<span class="sd">            RuntimeError: If the store has been closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
         <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
@@ -239,7 +312,20 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">metric_version</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">METRIC_VERSION</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether one coloring already has stored metrics.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether one coloring already has stored metrics.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring_id (int): Identifier of the coloring to check.</span>
+<span class="sd">            metric_version (int): Metric schema version to check.</span>
+<span class="sd">                Defaults to the current :data:`ramsey.RMetric.METRIC_VERSION`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if a snapshot is stored for that coloring and</span>
+<span class="sd">            metric version.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the store has been closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
         <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
@@ -265,7 +351,18 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">metric_version</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">METRIC_VERSION</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of snapshots stored for one metric version.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of snapshots stored for one metric version.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            metric_version (int): Metric schema version to count.</span>
+<span class="sd">                Defaults to the current :data:`ramsey.RMetric.METRIC_VERSION`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of stored rows for that metric version.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the store has been closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
 
         <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
@@ -283,6 +380,11 @@
 <div class="viewcode-block" id="RMetricStore.close">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RMetricStore.RMetricStore.close">[docs]</a>
     <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Commit any pending transaction and close the database connection.</span>
+
+<span class="sd">        Idempotent: calling this more than once has no additional</span>
+<span class="sd">        effect.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
@@ -290,6 +392,14 @@
 
 
     <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RMetricStore&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Enter a context block with this already-open store.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RMetricStore: This store instance.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the store has already been closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span>
 
@@ -299,9 +409,15 @@
         <span class="n">exception_value</span><span class="p">,</span>
         <span class="n">traceback</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Close the store on exit from a context block, regardless of exception.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">_require_open</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Guard a method against use after :meth:`close`.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the store has already been closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Metric store is closed.&quot;</span><span class="p">)</span></div>
 

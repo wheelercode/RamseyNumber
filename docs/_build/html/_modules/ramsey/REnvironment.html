@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.REnvironment</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Validation and application of state transitions.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Search-step environment tying search state, memory, and objective together.</span>
+
+<span class="sd">Defines :class:`REnvironment`, which owns one Ramsey-search episode: it</span>
+<span class="sd">consults search memory for tabu/revisit restrictions, applies the</span>
+<span class="sd">aspiration criterion and a deadlock fallback to keep at least one action</span>
+<span class="sd">available, validates and applies externally selected edge flips, and</span>
+<span class="sd">tracks the episode&#39;s best exact score and coloring. It does not itself</span>
+<span class="sd">select actions; that is the responsibility of an :class:`RPolicy`.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -97,6 +109,14 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return an owned, typed, read-only array.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        values (numpy.ndarray): Source values.</span>
+<span class="sd">        dtype: NumPy dtype the returned array is coerced to.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: An independent copy of ``values`` cast to</span>
+<span class="sd">        ``dtype`` with the ``writeable`` flag cleared.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
         <span class="n">values</span><span class="p">,</span>
@@ -119,25 +139,27 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Complete action information for the current environment state.</span>
 
-<span class="sd">    action_analysis:</span>
-<span class="sd">        Exact structural and score consequences of every edge flip.</span>
-
-<span class="sd">    objective_rewards:</span>
-<span class="sd">        Reward assigned to every action by the selected objective.</span>
-
-<span class="sd">    memory_status:</span>
-<span class="sd">        Restrictions produced by tabu or other search memory.</span>
-
-<span class="sd">    aspiration_mask:</span>
-<span class="sd">        Blocked actions allowed because they establish a new best</span>
-<span class="sd">        exact score.</span>
-
-<span class="sd">    available_mask:</span>
-<span class="sd">        Actions currently permitted by the environment.</span>
-
-<span class="sd">    forced_fallback:</span>
-<span class="sd">        True when every normal action was blocked and the environment</span>
-<span class="sd">        exposed the actions producing the best exact resulting score.</span>
+<span class="sd">    Attributes:</span>
+<span class="sd">        action_analysis (RActionAnalysis): Exact structural and score</span>
+<span class="sd">            consequences of every edge flip.</span>
+<span class="sd">        objective_rewards (numpy.ndarray): Float64 array, shape</span>
+<span class="sd">            ``(number_of_actions,)``, read-only. Reward assigned to</span>
+<span class="sd">            every action by the selected objective.</span>
+<span class="sd">        memory_status (RMemoryStatus): Restrictions produced by tabu</span>
+<span class="sd">            or other search memory.</span>
+<span class="sd">        aspiration_mask (numpy.ndarray): Boolean array, shape</span>
+<span class="sd">            ``(number_of_actions,)``, read-only. True for actions that</span>
+<span class="sd">            would otherwise be blocked but are allowed because they</span>
+<span class="sd">            establish a new best exact score (the aspiration</span>
+<span class="sd">            criterion).</span>
+<span class="sd">        available_mask (numpy.ndarray): Boolean array, shape</span>
+<span class="sd">            ``(number_of_actions,)``, read-only. Actions currently</span>
+<span class="sd">            permitted by the environment, after memory, aspiration,</span>
+<span class="sd">            and deadlock fallback are combined.</span>
+<span class="sd">        forced_fallback (bool): True when every normal action was</span>
+<span class="sd">            blocked and the environment exposed the actions producing</span>
+<span class="sd">            the best exact resulting score instead (deadlock</span>
+<span class="sd">            fallback).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">action_analysis</span><span class="p">:</span> <span class="n">RActionAnalysis</span>
@@ -148,6 +170,13 @@
     <span class="n">forced_fallback</span><span class="p">:</span> <span class="nb">bool</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate array shapes against the action count and freeze fields.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``objective_rewards``, ``aspiration_mask``,</span>
+<span class="sd">                ``available_mask``, or the memory status masks do not</span>
+<span class="sd">                match ``action_analysis.number_of_actions`` in shape.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">number_of_actions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action_analysis</span><span class="o">.</span><span class="n">number_of_actions</span>
 
         <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">number_of_actions</span><span class="p">,)</span>
@@ -214,6 +243,27 @@
 <span class="k">class</span> <span class="nc">RStepResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Observable result of one environment transition.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        edge (int): Encoded edge index that was flipped.</span>
+<span class="sd">        previous_score (int): Exact monochromatic-clique score before</span>
+<span class="sd">            the flip.</span>
+<span class="sd">        score (int): Exact monochromatic-clique score after the flip.</span>
+<span class="sd">        immediate_reward (int): Exact score reduction produced by the</span>
+<span class="sd">            flip (``previous_score - score``); positive means the</span>
+<span class="sd">            score improved.</span>
+<span class="sd">        previous_energy (float): Objective energy before the flip.</span>
+<span class="sd">        energy (float): Objective energy after the flip.</span>
+<span class="sd">        objective_reward (float): Objective energy reduction produced</span>
+<span class="sd">            by the flip (``previous_energy - energy``).</span>
+<span class="sd">        best_score (int): Best exact score found in the episode so</span>
+<span class="sd">            far, including this step.</span>
+<span class="sd">        step_number (int): Number of transitions completed in the</span>
+<span class="sd">            episode, including this one.</span>
+<span class="sd">        terminated (bool): Whether the episode reached an exact score</span>
+<span class="sd">            of zero after this step.</span>
+<span class="sd">        truncated (bool): Whether the episode reached its step limit</span>
+<span class="sd">            after this step.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span>
@@ -261,6 +311,22 @@
         <span class="n">memory</span><span class="p">:</span> <span class="n">RMemory</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">REnvironmentConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct an environment bound to one graph, objective, and memory.</span>
+
+<span class="sd">        No episode is active until :meth:`reset` is called; ``state``,</span>
+<span class="sd">        ``best_coloring``, and ``best_score`` raise until then.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Immutable host-graph topology and clique</span>
+<span class="sd">                index shared by every episode.</span>
+<span class="sd">            objective (RObjective): Optimization objective used to</span>
+<span class="sd">                score states and shape action rewards.</span>
+<span class="sd">            memory (RMemory): Search-history memory used to compute</span>
+<span class="sd">                per-action tabu/revisit restrictions.</span>
+<span class="sd">            config (REnvironmentConfig | None): Environment behavior</span>
+<span class="sd">                settings (step limit, aspiration). Defaults to</span>
+<span class="sd">                ``REnvironmentConfig()`` when omitted.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span> <span class="o">=</span> <span class="n">graph</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_objective</span> <span class="o">=</span> <span class="n">objective</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_memory</span> <span class="o">=</span> <span class="n">memory</span>
@@ -311,6 +377,9 @@
     <span class="k">def</span> <span class="nf">state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RSearchState</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the active mutable search state.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the environment has not been reset.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Environment has not been reset.&quot;</span><span class="p">)</span>
@@ -321,6 +390,9 @@
     <span class="k">def</span> <span class="nf">best_coloring</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return an immutable snapshot of the episode&#39;s best coloring.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the environment has not been reset.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_best_coloring</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Environment has not been reset.&quot;</span><span class="p">)</span>
@@ -331,6 +403,9 @@
     <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the best exact score found in the episode.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the environment has not been reset.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_best_score</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Environment has not been reset.&quot;</span><span class="p">)</span>
@@ -374,6 +449,24 @@
 <span class="sd">        Seed generation is deliberately kept outside the environment.</span>
 <span class="sd">        This allows random, constructive, database, mutated, or</span>
 <span class="sd">        manually supplied seed generators to use the same environment.</span>
+<span class="sd">        The best coloring/score are initialized from the seed, memory</span>
+<span class="sd">        is reset, the step count returns to zero, and any cached</span>
+<span class="sd">        action analysis is discarded.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring (RColoring): Seed coloring for the new episode.</span>
+<span class="sd">                If it was built against a different but compatible</span>
+<span class="sd">                graph object (same ``problem``), an equivalent</span>
+<span class="sd">                coloring bound to this environment&#39;s graph is used</span>
+<span class="sd">                instead.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RSearchState: The freshly created mutable search state for</span>
+<span class="sd">            the episode.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``coloring``&#39;s graph belongs to a different</span>
+<span class="sd">                problem than this environment&#39;s graph.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
@@ -409,6 +502,24 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REnvironmentAnalysis</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Calculate exact consequences and availability for all actions.</span>
+
+<span class="sd">        Combines :func:`analyze_actions` (exact per-edge structural and</span>
+<span class="sd">        score consequences), the objective&#39;s shaped rewards, current</span>
+<span class="sd">        memory restrictions, the aspiration criterion (allowing a</span>
+<span class="sd">        blocked action that would set a new best exact score, when</span>
+<span class="sd">        ``config.use_aspiration`` is true), and the deadlock fallback</span>
+<span class="sd">        (exposing the actions with the best resulting exact score if</span>
+<span class="sd">        every action would otherwise be blocked).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            use_cache (bool): If true and a cached analysis already</span>
+<span class="sd">                applies to the current search-state version, return it</span>
+<span class="sd">                instead of recomputing. Defaults to True.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            REnvironmentAnalysis: Complete action analysis, objective</span>
+<span class="sd">            rewards, memory status, and derived availability masks for</span>
+<span class="sd">            the current state.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">use_cache</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">cached_action_analysis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span><span class="o">.</span><span class="n">action_analysis</span>
@@ -475,7 +586,19 @@
 <span class="sd">        Exact score rewards are calculated only for blocked edges</span>
 <span class="sd">        when aspiration must be evaluated. If every action is blocked,</span>
 <span class="sd">        exact score rewards are calculated for all edges to provide</span>
-<span class="sd">        the deadlock fallback.</span>
+<span class="sd">        the deadlock fallback. This is the fast path used by policies</span>
+<span class="sd">        that do not require complete action analysis (see</span>
+<span class="sd">        ``RPolicy.requires_full_analysis``).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            use_cache (bool): If true, reuse a cached full analysis or</span>
+<span class="sd">                a cached fast-path mask when either already applies to</span>
+<span class="sd">                the current search-state version. Defaults to True.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            numpy.ndarray: Boolean array, shape ``(number_of_edges,)``,</span>
+<span class="sd">            read-only. True for edges currently permitted by the</span>
+<span class="sd">            environment.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">use_cache</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -547,6 +670,10 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the indexes of currently available edge actions.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            numpy.ndarray: Int32 array of encoded edge indexes for</span>
+<span class="sd">            which :meth:`available_action_mask_fast` is true.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">available_action_mask_fast</span><span class="p">())</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span></div>
 
@@ -562,17 +689,35 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Validate and apply one externally selected edge flip.</span>
 
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        edge:</span>
-<span class="sd">            Encoded edge index selected by a search strategy.</span>
+<span class="sd">        Applies the flip to the search state, updates search memory</span>
+<span class="sd">        with the transition, and refreshes the episode&#39;s best score</span>
+<span class="sd">        and coloring if the new state improves on it. Raises instead</span>
+<span class="sd">        of applying the flip if the episode has already ended or the</span>
+<span class="sd">        edge is not currently available.</span>
 
-<span class="sd">        full_analysis:</span>
-<span class="sd">            If true, verify the selected action against complete</span>
-<span class="sd">            all-action analysis.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            edge (int): Encoded edge index selected by a search</span>
+<span class="sd">                strategy.</span>
+<span class="sd">            full_analysis (bool): If true, verify the selected action</span>
+<span class="sd">                against complete all-action analysis, and cross-check</span>
+<span class="sd">                the actual immediate and objective rewards against the</span>
+<span class="sd">                analysis&#39;s predictions. If false, use the lightweight</span>
+<span class="sd">                availability path and calculate the selected action&#39;s</span>
+<span class="sd">                reward during mutation, skipping cross-checks.</span>
+<span class="sd">                Defaults to True.</span>
 
-<span class="sd">            If false, use the lightweight availability path and</span>
-<span class="sd">            calculate the selected action&#39;s reward during mutation.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            RStepResult: Observable outcome of the transition,</span>
+<span class="sd">            including scores, rewards, and updated termination state.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the episode has already terminated or</span>
+<span class="sd">                been truncated, or if ``full_analysis`` is true and</span>
+<span class="sd">                the actual immediate or objective reward disagrees</span>
+<span class="sd">                with the value predicted by the pre-flip analysis.</span>
+<span class="sd">            TypeError: If ``edge`` is not an integer.</span>
+<span class="sd">            IndexError: If ``edge`` is out of range.</span>
+<span class="sd">            ValueError: If ``edge`` is not currently available.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">terminated</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">truncated</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;The environment episode has ended.&quot;</span><span class="p">)</span>
@@ -683,6 +828,21 @@
     <span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Apply the exact-score deadlock fallback when necessary.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            available_mask (numpy.ndarray): Boolean array of actions</span>
+<span class="sd">                available before deadlock fallback is considered.</span>
+<span class="sd">            resulting_scores (numpy.ndarray): Exact score that results</span>
+<span class="sd">                from taking each action.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[numpy.ndarray, bool]: The (possibly replaced)</span>
+<span class="sd">            availability mask, and whether the deadlock fallback was</span>
+<span class="sd">            applied. When ``available_mask`` already allows at least</span>
+<span class="sd">            one action, it is returned unchanged with ``False``.</span>
+<span class="sd">            Otherwise every action tied for the best (lowest)</span>
+<span class="sd">            resulting score is made available, and ``True`` is</span>
+<span class="sd">            returned.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">available_mask</span><span class="p">):</span>
             <span class="k">return</span> <span class="p">(</span>

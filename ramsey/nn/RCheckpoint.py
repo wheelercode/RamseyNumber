@@ -1,4 +1,12 @@
-"""Versioned persistence and restoration of neural training state."""
+"""Versioned persistence and restoration of neural training state.
+
+Saves and restores everything a PPO training loop needs to resume:
+the policy/value network's architecture and weights, the optimizer's
+state, the rollout and PPO configurations, the training loop's
+position, and NumPy/PyTorch random-number generator state. Supports
+both the current checkpoint format and the legacy version-1 format
+that combined rollout and optimization settings into one object.
+"""
 
 from __future__ import annotations
 
@@ -29,11 +37,34 @@ CHECKPOINT_VERSION = 2
 
 @dataclass(frozen=True, slots=True)
 class RTrainingCheckpoint:
-    """
-    Restored model, optimizer, configurations, and run position.
+    """Restored model, optimizer, configurations, and run position.
 
-    This object collects everything a training loop needs to
-    continue from a saved checkpoint.
+    This object collects everything a training loop needs to continue
+    from a saved checkpoint: the rebuilt policy/value network with its
+    weights loaded, an optimizer with its state loaded, the
+    configurations that produced them, and the training loop's
+    position within the overall run.
+
+    Attributes:
+        network (RPairPolicyValueNetwork): Policy/value network with
+            weights restored from the checkpoint, already moved to the
+            requested device.
+        optimizer (torch.optim.Optimizer): Optimizer with restored
+            state, rebuilt to match ``network`` and ``ppo_config``.
+        model_config (RModelConfig): Architecture settings used to
+            reconstruct ``network``.
+        rollout_config (RRolloutConfig): Rollout collection settings
+            recovered from the checkpoint (or reconstructed from a
+            legacy combined configuration).
+        ppo_config (RPPOConfig): PPO optimization settings recovered
+            from the checkpoint, with ``new_learning_rate`` applied if
+            one was requested.
+        completed_iteration (int): Number of training iterations
+            already completed as of this checkpoint, so a resumed
+            training loop knows where to continue.
+        metadata (dict[str, Any]): Free-form metadata that was stored
+            alongside the checkpoint, or an empty dictionary if none
+            was present.
     """
 
     network: RPairPolicyValueNetwork
@@ -57,12 +88,47 @@ def save_training_checkpoint(
     rng: np.random.Generator,
     metadata: dict[str, Any] | None = None,
 ) -> Path:
-    """
-    Atomically save everything required to resume training.
+    """Atomically save everything required to resume training.
 
-    The temporary file is written first and then renamed over the
-    destination. This avoids leaving a partially written checkpoint
-    if saving is interrupted.
+    The checkpoint dictionary bundles the model architecture and
+    weights, optimizer state, rollout/PPO configurations, the problem
+    definition, NumPy and PyTorch random-number generator state, and
+    optional metadata. A temporary file is written first and then
+    renamed over the destination, so an interruption during saving
+    cannot leave a partially written checkpoint at ``checkpoint_path``.
+
+    Args:
+        checkpoint_path (str | Path): Destination file path. Parent
+            directories are created if they do not already exist.
+        network (RPairPolicyValueNetwork): Policy/value network whose
+            configuration and ``state_dict()`` are persisted.
+        optimizer (torch.optim.Optimizer): Optimizer whose
+            ``state_dict()`` is persisted so training can resume with
+            matching momentum/Adam state.
+        graph (RGraph): Host graph defining the Ramsey problem, used
+            to validate that ``network`` matches it and to record the
+            problem definition in the checkpoint.
+        rollout_config (RRolloutConfig): Rollout collection settings
+            to persist.
+        ppo_config (RPPOConfig): PPO optimization settings to persist.
+        completed_iteration (int): Number of training iterations
+            completed so far. Must be a nonnegative integer.
+        rng (np.random.Generator): NumPy random generator whose bit
+            generator state is persisted for reproducible resumption.
+        metadata (dict[str, Any] | None): Optional free-form metadata
+            to store alongside the checkpoint. Defaults to an empty
+            dictionary when ``None``.
+
+    Returns:
+        Path: ``checkpoint_path``, unchanged, for convenient chaining.
+
+    Raises:
+        TypeError: If ``completed_iteration`` is not an integer, if
+            ``rng`` is not a NumPy ``Generator``, or if ``metadata`` is
+            neither a dictionary nor ``None``.
+        ValueError: If ``completed_iteration`` is negative, or if
+            ``graph``'s vertex or edge count does not match
+            ``network``.
     """
 
     if isinstance(
@@ -150,28 +216,47 @@ def load_training_checkpoint(
     rng: np.random.Generator,
     new_learning_rate: float | None = None,
 ) -> RTrainingCheckpoint:
-    """
-    Restore a current or legacy training checkpoint.
+    """Restore a current or legacy training checkpoint.
 
-    Parameters
-    ----------
-    checkpoint_path:
-        Path to a trusted local PyTorch checkpoint.
+    Handles both the current (version 2) checkpoint format and the
+    legacy version-1 format, which stored rollout and PPO settings
+    together in a single combined configuration object. After loading,
+    the network is rebuilt from ``graph`` and the restored model
+    configuration, its weights are loaded, and the optimizer is
+    rebuilt and its state loaded and moved to ``device``. The supplied
+    ``rng`` and PyTorch's global RNG state (CPU and, if available,
+    CUDA) are restored in place for reproducible resumption.
 
-    graph:
-        Graph scaffolding used to rebuild the network.
+    Args:
+        checkpoint_path (str | Path): Path to a trusted local PyTorch
+            checkpoint. Must not be loaded from an untrusted source,
+            since restoration uses ``weights_only=False``.
+        graph (RGraph): Host graph scaffolding used to rebuild the
+            network architecture and validated against the problem
+            recorded in the checkpoint.
+        device (torch.device | str): Device on which the restored
+            network and optimizer should operate.
+        rng (np.random.Generator): Existing NumPy generator whose bit
+            generator state is overwritten with the saved state.
+        new_learning_rate (float | None): Optional learning-rate
+            override. It is applied after loading the optimizer state,
+            because ``optimizer.load_state_dict()`` would otherwise
+            restore the learning rate that was saved in the
+            checkpoint.
 
-    device:
-        Device on which the restored network and optimizer should
-        operate.
+    Returns:
+        RTrainingCheckpoint: The rebuilt network and optimizer,
+        recovered configurations, completed iteration count, and
+        stored metadata.
 
-    rng:
-        Existing NumPy generator whose saved state will be restored.
-
-    new_learning_rate:
-        Optional learning-rate override. It is applied after loading
-        the optimizer state because optimizer.load_state_dict()
-        restores the old learning rate.
+    Raises:
+        FileNotFoundError: If ``checkpoint_path`` does not exist.
+        TypeError: If ``rng`` is not a NumPy ``Generator``, if the
+            loaded checkpoint contents are not a dictionary, or if
+            ``new_learning_rate`` is neither numeric nor ``None``.
+        ValueError: If the checkpoint version is unsupported, if the
+            recorded problem does not match ``graph``, or if
+            ``new_learning_rate`` is not positive.
     """
 
     checkpoint_path = Path(checkpoint_path)
@@ -300,7 +385,18 @@ def _read_current_configuration(
     RPPOConfig,
     int,
 ]:
-    """Read configuration values from a version-two checkpoint."""
+    """Read configuration values from a version-two checkpoint.
+
+    Args:
+        checkpoint (dict[str, Any]): Loaded checkpoint dictionary
+            containing ``model_config``, ``rollout_config``,
+            ``ppo_config``, and ``completed_iteration`` entries.
+
+    Returns:
+        tuple[RModelConfig, RRolloutConfig, RPPOConfig, int]: The
+        reconstructed model, rollout, and PPO configurations, together
+        with the completed iteration count.
+    """
 
     return (
         RModelConfig(**dict(checkpoint["model_config"])),
@@ -318,12 +414,31 @@ def _read_legacy_configuration(
     RPPOConfig,
     int,
 ]:
-    """
-    Convert the original combined PPO configuration.
+    """Convert the original combined PPO configuration.
 
-    Older checkpoints stored rollout and optimization settings in
-    one PPOConfig object. That object could be either a dictionary
-    or a frozen dataclass.
+    Older (version-1) checkpoints stored rollout and optimization
+    settings together in one combined PPO configuration object, and
+    stored network architecture settings separately under
+    ``network_architecture`` rather than ``model_config``. This
+    reconstructs the current, split ``RModelConfig``, ``RRolloutConfig``,
+    and ``RPPOConfig`` objects from that legacy layout, falling back to
+    each config's current default value for any field the legacy
+    checkpoint did not record. The reward source for a legacy rollout
+    is always assumed to be the exact score, since that predates the
+    reward-source option, and advantage normalization is always
+    enabled.
+
+    Args:
+        checkpoint (dict[str, Any]): Loaded version-1 checkpoint
+            dictionary, containing ``ppo_config``,
+            ``network_architecture``, and ``iteration`` entries. Its
+            ``ppo_config`` entry may be either a dictionary or a
+            frozen dataclass instance.
+
+    Returns:
+        tuple[RModelConfig, RRolloutConfig, RPPOConfig, int]: The
+        reconstructed model, rollout, and PPO configurations, together
+        with the completed iteration count.
     """
 
     legacy_config = checkpoint["ppo_config"]
@@ -430,7 +545,24 @@ def _require_matching_problem(
     graph: RGraph,
     version: int,
 ) -> None:
-    """Require the supplied graph to match the saved problem."""
+    """Require the supplied graph to match the saved problem.
+
+    Args:
+        checkpoint (dict[str, Any]): Loaded checkpoint dictionary.
+        graph (RGraph): Host graph to validate against the problem
+            recorded in the checkpoint.
+        version (int): Checkpoint format version, which determines
+            where the problem definition is recorded (a version-1
+            checkpoint records only ``n_vertices`` under
+            ``network_architecture``, while later versions record
+            ``n_vertices`` and ``forbidden_clique_sizes`` under
+            ``problem``).
+
+    Raises:
+        ValueError: If ``graph``'s vertex count (and, for version 2
+            and later, its forbidden clique sizes) does not match the
+            checkpoint's recorded problem.
+    """
 
     if version == 1:
         expected_vertices = int(checkpoint["network_architecture"]["n_vertices"])
@@ -454,7 +586,20 @@ def _move_optimizer_state(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
 ) -> None:
-    """Move every tensor stored by the optimizer to one device."""
+    """Move every tensor stored by the optimizer to one device.
+
+    ``optimizer.load_state_dict()`` restores tensors (such as Adam's
+    running moment estimates) on whichever device they were saved
+    from, which may not match ``network``'s device. This mutates
+    ``optimizer.state`` in place so all such tensors reside on
+    ``device``.
+
+    Args:
+        optimizer (torch.optim.Optimizer): Optimizer whose per-parameter
+            state tensors are moved in place.
+        device (torch.device): Target device for every tensor found in
+            the optimizer's state.
+    """
 
     for optimizer_state in optimizer.state.values():
         for key, value in optimizer_state.items():
@@ -465,12 +610,22 @@ def _move_optimizer_state(
 def _trusted_torch_load(
     checkpoint_path: Path,
 ) -> dict[str, Any]:
-    """
-    Load a trusted local checkpoint across PyTorch versions.
+    """Load a trusted local checkpoint across PyTorch versions.
 
-    weights_only=False is intentional because the checkpoint contains
-    Python and NumPy RNG metadata. Do not use this function on an
-    untrusted checkpoint file.
+    ``weights_only=False`` is intentional because the checkpoint
+    contains Python and NumPy RNG metadata in addition to tensors. Do
+    not use this function on an untrusted checkpoint file, since
+    unpickling arbitrary objects can execute code. PyTorch versions
+    that predate the ``weights_only`` parameter are supported by
+    falling back to a call without it.
+
+    Args:
+        checkpoint_path (Path): Path to the trusted local checkpoint
+            file.
+
+    Returns:
+        dict[str, Any]: The deserialized checkpoint dictionary, loaded
+        onto the CPU.
     """
 
     try:

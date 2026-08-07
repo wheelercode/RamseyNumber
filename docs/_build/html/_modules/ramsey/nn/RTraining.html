@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -108,7 +112,22 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RTrainingConfig">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RTrainingConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for a sequence of PPO training iterations.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Settings for a sequence of PPO training iterations.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        run_name (str): Nonempty label identifying this training run,</span>
+<span class="sd">            used when archiving colorings and saving checkpoints.</span>
+<span class="sd">        iterations (int): Number of training iterations to run,</span>
+<span class="sd">            starting at ``start_iteration``.</span>
+<span class="sd">        start_iteration (int): Index of the first iteration, used to</span>
+<span class="sd">            number iterations (and checkpoints) when resuming a run.</span>
+<span class="sd">            Defaults to ``0``.</span>
+<span class="sd">        stop_on_solution (bool): When ``True``, :meth:`RPPOTrainer.run`</span>
+<span class="sd">            stops after the first iteration whose rollout reaches a</span>
+<span class="sd">            score-zero coloring, instead of continuing through the</span>
+<span class="sd">            full requested ``iterations``. Defaults to ``True``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">iterations</span><span class="p">:</span> <span class="nb">int</span>
@@ -116,6 +135,22 @@
     <span class="n">stop_on_solution</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate, coerce, and normalize every configuration field in place.</span>
+
+<span class="sd">        ``run_name`` must be a nonempty string; ``iterations`` must be</span>
+<span class="sd">        a positive integer; ``start_iteration`` must be a nonnegative</span>
+<span class="sd">        integer; ``stop_on_solution`` must be a ``bool``. Integer</span>
+<span class="sd">        fields are rewritten with their coerced ``int`` values via</span>
+<span class="sd">        ``object.__setattr__`` because the dataclass is frozen.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If a field has the wrong type (including</span>
+<span class="sd">                ``bool`` where an integer is expected).</span>
+<span class="sd">            ValueError: If ``run_name`` is empty/whitespace, if</span>
+<span class="sd">                ``iterations`` is less than ``1``, or if</span>
+<span class="sd">                ``start_iteration`` is negative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="p">(</span>
             <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span>
@@ -165,13 +200,38 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RCheckpointSchedule">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RCheckpointSchedule</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Optional periodic and final checkpoint schedule.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Optional periodic and final checkpoint schedule.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        directory (Path): Directory checkpoint files are written</span>
+<span class="sd">            into.</span>
+<span class="sd">        interval (int): Save a checkpoint every ``interval``</span>
+<span class="sd">            completed iterations. Defaults to ``100``.</span>
+<span class="sd">        save_final (bool): When ``True``, also save a checkpoint at</span>
+<span class="sd">            the final requested iteration, or when training stops</span>
+<span class="sd">            early on a solution (subject to</span>
+<span class="sd">            ``RTrainingConfig.stop_on_solution``). Defaults to</span>
+<span class="sd">            ``True``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">directory</span><span class="p">:</span> <span class="n">Path</span>
     <span class="n">interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span>
     <span class="n">save_final</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Coerce ``directory`` to a ``Path`` and validate the remaining fields.</span>
+
+<span class="sd">        ``interval`` must be a positive integer and ``save_final``</span>
+<span class="sd">        must be a ``bool``. Fields are rewritten via</span>
+<span class="sd">        ``object.__setattr__`` because the dataclass is frozen.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``interval`` is not an integer (including</span>
+<span class="sd">                ``bool``), or if ``save_final`` is not a ``bool``.</span>
+<span class="sd">            ValueError: If ``interval`` is not positive.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">directory</span><span class="p">)</span>
 
         <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
@@ -212,7 +272,17 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the checkpoint path for one iteration.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the checkpoint path for one iteration.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            iteration (int): Training iteration index the checkpoint</span>
+<span class="sd">                corresponds to.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Path: ``directory`` joined with a zero-padded,</span>
+<span class="sd">            iteration-numbered file name.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">directory</span> <span class="o">/</span> <span class="p">(</span><span class="s2">&quot;ramsey_policy_iteration_&quot;</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">iteration</span><span class="si">:</span><span class="s2">06d</span><span class="si">}</span><span class="s2">.pt&quot;</span><span class="p">)</span></div>
 </div>
@@ -223,7 +293,46 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RTrainingIteration">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RTrainingIteration</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compact outcome and persistence data for one iteration.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compact outcome and persistence data for one iteration.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        iteration (int): Index of this training iteration.</span>
+<span class="sd">        construction_name (str): Name of the construction used to</span>
+<span class="sd">            build this iteration&#39;s seed coloring.</span>
+<span class="sd">        construction_source (str): Identifier of the specific source</span>
+<span class="sd">            (for example, an archived coloring or a random</span>
+<span class="sd">            construction) the seed coloring was built from.</span>
+<span class="sd">        initial_score (int): Exact score of the seed coloring before</span>
+<span class="sd">            the rollout.</span>
+<span class="sd">        final_score (int): Exact score of the coloring at the end of</span>
+<span class="sd">            the rollout.</span>
+<span class="sd">        best_score (int): Lowest exact score observed during the</span>
+<span class="sd">            rollout.</span>
+<span class="sd">        steps_completed (int): Number of environment steps collected</span>
+<span class="sd">            in the rollout.</span>
+<span class="sd">        total_scaled_reward (float): Sum of the rollout&#39;s scaled</span>
+<span class="sd">            per-step rewards.</span>
+<span class="sd">        final_coloring (RColoring): Coloring snapshot at the end of</span>
+<span class="sd">            the rollout.</span>
+<span class="sd">        best_coloring (RColoring): Best (lowest-score) coloring</span>
+<span class="sd">            snapshot observed during the rollout.</span>
+<span class="sd">        terminated (bool): Whether the rollout ended in a true</span>
+<span class="sd">            terminal search state.</span>
+<span class="sd">        truncated (bool): Whether the rollout ended due to a step or</span>
+<span class="sd">            other time limit.</span>
+<span class="sd">        metrics (RPPOMetrics | None): PPO update diagnostics, or</span>
+<span class="sd">            ``None`` if the rollout was empty and no update was</span>
+<span class="sd">            performed.</span>
+<span class="sd">        archive_record (RArchiveRecord | None): Archive record for</span>
+<span class="sd">            the rollout&#39;s best coloring, or ``None`` if no archive was</span>
+<span class="sd">            configured.</span>
+<span class="sd">        new_archive_best (bool): Whether this iteration&#39;s archived</span>
+<span class="sd">            coloring improved on the archive&#39;s previous best score for</span>
+<span class="sd">            this graph.</span>
+<span class="sd">        checkpoint_path (Path | None): Path a checkpoint was saved to</span>
+<span class="sd">            for this iteration, or ``None`` if no checkpoint was due.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">construction_name</span><span class="p">:</span> <span class="nb">str</span>
@@ -246,7 +355,7 @@
     <span class="k">def</span> <span class="nf">parameter_update_performed</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this iteration trained the network.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Whether this iteration&#39;s rollout was nonempty and a PPO update ran.&quot;&quot;&quot;</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></div>
 
@@ -256,7 +365,17 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RTrainingResult">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RTrainingResult</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of a complete PPO training run.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Outcome of a complete PPO training run.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        run_name (str): Label identifying the training run.</span>
+<span class="sd">        requested_iterations (int): Number of iterations that were</span>
+<span class="sd">            requested via :class:`RTrainingConfig`, which may exceed</span>
+<span class="sd">            :attr:`completed_iterations` if training stopped early.</span>
+<span class="sd">        iteration_results (tuple[RTrainingIteration, ...]): Per-iteration</span>
+<span class="sd">            outcomes, in the order iterations were run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">requested_iterations</span><span class="p">:</span> <span class="nb">int</span>
@@ -266,7 +385,7 @@
     <span class="k">def</span> <span class="nf">completed_iterations</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of completed training iterations.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of iterations actually completed.&quot;&quot;&quot;</span>
 
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">)</span>
 
@@ -274,7 +393,16 @@
     <span class="k">def</span> <span class="nf">best_iteration</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RTrainingIteration</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the iteration with the lowest score.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the iteration with the lowest score.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RTrainingIteration: The iteration result whose</span>
+<span class="sd">            ``best_score`` is lowest across the run.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no iterations completed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Training contains no iteration results.&quot;</span><span class="p">)</span>
@@ -288,7 +416,7 @@
     <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the lowest score found during training.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Lowest exact score found during training.&quot;&quot;&quot;</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_iteration</span><span class="o">.</span><span class="n">best_score</span>
 
@@ -296,7 +424,7 @@
     <span class="k">def</span> <span class="nf">solved</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether training found a score-zero coloring.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;bool: Whether training found a score-zero (fully valid) coloring.&quot;&quot;&quot;</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span> <span class="o">==</span> <span class="mi">0</span></div>
 
@@ -306,6 +434,7 @@
     <span class="p">[</span><span class="n">RTrainingIteration</span><span class="p">],</span>
     <span class="kc">None</span><span class="p">,</span>
 <span class="p">]</span>
+<span class="sd">&quot;&quot;&quot;Callback type invoked with each :class:`RTrainingIteration` as it completes.&quot;&quot;&quot;</span>
 
 
 <div class="viewcode-block" id="RPPOTrainer">
@@ -333,6 +462,41 @@
         <span class="n">ppo_config</span><span class="p">:</span> <span class="n">RPPOConfig</span><span class="p">,</span>
         <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Construct a trainer coordinating one graph/network/environment set.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph training runs against.</span>
+<span class="sd">            construction (RConstruction): Construction strategy used</span>
+<span class="sd">                to build a new seed coloring at the start of each</span>
+<span class="sd">                iteration.</span>
+<span class="sd">            environment (REnvironment): Search environment driven</span>
+<span class="sd">                during rollouts. Must operate on the same problem as</span>
+<span class="sd">                ``graph``.</span>
+<span class="sd">            network (RPairPolicyValueNetwork): Policy/value network</span>
+<span class="sd">                being trained. Must have vertex/edge dimensions</span>
+<span class="sd">                matching ``graph``.</span>
+<span class="sd">            optimizer (torch.optim.Optimizer): Optimizer stepping</span>
+<span class="sd">                ``network``&#39;s parameters during PPO updates.</span>
+<span class="sd">            device (torch.device | str): Device ``network`` and</span>
+<span class="sd">                rollout/update tensors reside on.</span>
+<span class="sd">            rng (numpy.random.Generator): NumPy random generator</span>
+<span class="sd">                available to collaborating components (for example,</span>
+<span class="sd">                stochastic constructions).</span>
+<span class="sd">            rollout_config (RRolloutConfig): Settings used to collect</span>
+<span class="sd">                each iteration&#39;s rollout.</span>
+<span class="sd">            ppo_config (RPPOConfig): Settings used for each PPO</span>
+<span class="sd">                update.</span>
+<span class="sd">            archive (RArchive | None): Optional archive that each</span>
+<span class="sd">                iteration&#39;s best coloring is saved to. ``None``</span>
+<span class="sd">                disables archiving. Defaults to ``None``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``environment.graph.problem`` does not</span>
+<span class="sd">                match ``graph.problem``, or if ``network``&#39;s</span>
+<span class="sd">                vertex/edge dimensions do not match ``graph``&#39;s.</span>
+<span class="sd">            TypeError: If ``rng`` is not a ``numpy.random.Generator``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">environment</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Environment problem does not match &quot;</span> <span class="s2">&quot;training graph.&quot;</span><span class="p">)</span>
 
@@ -363,60 +527,70 @@
     <span class="k">def</span> <span class="nf">graph</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RGraph</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RGraph: Host graph training runs against.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">construction</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RConstruction</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RConstruction: Strategy used to build each iteration&#39;s seed coloring.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">environment</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REnvironment</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;REnvironment: Search environment driven during rollouts.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">network</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RPairPolicyValueNetwork: Policy/value network being trained.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">optimizer</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;torch.optim.Optimizer: Optimizer stepping the network&#39;s parameters.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">device</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;torch.device: Device the network and training tensors reside on.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">rng</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;numpy.random.Generator: Random generator shared with collaborating components.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rng</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">rollout_config</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RRolloutConfig</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RRolloutConfig: Settings used to collect each iteration&#39;s rollout.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rollout_config</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">ppo_config</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RPPOConfig</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RPPOConfig: Settings used for each PPO update.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ppo_config</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">archive</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchive</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RArchive | None: Archive each iteration&#39;s best coloring is saved to, if any.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span>
 
 <div class="viewcode-block" id="RPPOTrainer.run">
@@ -431,8 +605,39 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run sequential PPO iterations.</span>
 
-<span class="sd">        A new seed coloring is constructed for every iteration.</span>
-<span class="sd">        Each nonempty rollout is immediately used for one PPO update.</span>
+<span class="sd">        For each iteration from ``config.start_iteration`` through</span>
+<span class="sd">        ``config.start_iteration + config.iterations - 1``: a new seed</span>
+<span class="sd">        coloring is built with ``self.construction``; a rollout is</span>
+<span class="sd">        collected from that seed with :func:`~ramsey.nn.RRollout.collect_rollout`;</span>
+<span class="sd">        if the rollout is nonempty, one PPO update</span>
+<span class="sd">        (:func:`~ramsey.nn.RPPO.ppo_update`) is immediately performed on</span>
+<span class="sd">        it (a terminal seed coloring yields an empty rollout with</span>
+<span class="sd">        nothing to train from, but its result is still archived and</span>
+<span class="sd">        reported); the rollout&#39;s best coloring is archived, if an</span>
+<span class="sd">        archive is configured; a checkpoint is saved if one is due per</span>
+<span class="sd">        ``checkpoint_schedule``; and an :class:`RTrainingIteration` is</span>
+<span class="sd">        appended to the results and passed to ``observer``, if given.</span>
+<span class="sd">        If ``config.stop_on_solution`` is ``True`` and the iteration&#39;s</span>
+<span class="sd">        rollout reached a score-zero coloring, the loop stops after</span>
+<span class="sd">        that iteration even if further iterations were requested.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config (RTrainingConfig): Settings controlling the</span>
+<span class="sd">                iteration range and stop-on-solution behavior for this</span>
+<span class="sd">                run.</span>
+<span class="sd">            checkpoint_schedule (RCheckpointSchedule | None): Optional</span>
+<span class="sd">                schedule controlling when checkpoints are written.</span>
+<span class="sd">                ``None`` disables checkpointing. Defaults to ``None``.</span>
+<span class="sd">            observer (RTrainingObserver | None): Optional callback</span>
+<span class="sd">                invoked with each :class:`RTrainingIteration` as it</span>
+<span class="sd">                completes. Defaults to ``None``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RTrainingResult: Aggregated results for every iteration</span>
+<span class="sd">            that completed before the loop ended.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``observer`` is given and is not callable.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">observer</span><span class="p">):</span>
@@ -540,7 +745,23 @@
         <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="nb">bool</span><span class="p">,</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Archive the best coloring found during one rollout.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Archive the best coloring found during one rollout.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            rollout (RRolloutBatch): Rollout whose ``best_coloring``</span>
+<span class="sd">                is saved.</span>
+<span class="sd">            run_name (str): Run label recorded with the archive</span>
+<span class="sd">                entry.</span>
+<span class="sd">            iteration (int): Iteration index recorded with the</span>
+<span class="sd">                archive entry.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[RArchiveRecord | None, bool]: The saved archive</span>
+<span class="sd">            record (``None`` if no archive is configured) and whether</span>
+<span class="sd">            it improved on the archive&#39;s previous best score for</span>
+<span class="sd">            ``self.graph``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span>
@@ -571,7 +792,41 @@
         <span class="n">archive_record</span><span class="p">:</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">construction_source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save and return a checkpoint path when scheduled.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Save and return a checkpoint path when scheduled.</span>
+
+<span class="sd">        A checkpoint is saved when the number of iterations completed</span>
+<span class="sd">        since ``config.start_iteration`` is a multiple of</span>
+<span class="sd">        ``schedule.interval`` (periodic), or when</span>
+<span class="sd">        ``schedule.save_final`` is set and either this is the final</span>
+<span class="sd">        requested iteration or ``config.stop_on_solution`` is set and</span>
+<span class="sd">        ``solved`` is ``True`` (final). Checkpoint metadata records</span>
+<span class="sd">        the run name, construction name/source, and, when available,</span>
+<span class="sd">        the archived coloring&#39;s id and score.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            schedule (RCheckpointSchedule | None): Checkpoint schedule</span>
+<span class="sd">                to consult; ``None`` disables checkpointing for this</span>
+<span class="sd">                call.</span>
+<span class="sd">            config (RTrainingConfig): Training configuration supplying</span>
+<span class="sd">                ``run_name``, ``start_iteration``, and</span>
+<span class="sd">                ``stop_on_solution``.</span>
+<span class="sd">            iteration (int): Index of the current iteration.</span>
+<span class="sd">            final_requested_iteration (bool): Whether ``iteration`` is</span>
+<span class="sd">                the last one requested by ``config``.</span>
+<span class="sd">            solved (bool): Whether this iteration&#39;s rollout reached a</span>
+<span class="sd">                score-zero coloring.</span>
+<span class="sd">            archive_record (RArchiveRecord | None): This iteration&#39;s</span>
+<span class="sd">                archive record, if any, used to enrich checkpoint</span>
+<span class="sd">                metadata.</span>
+<span class="sd">            construction_source (str): Identifier of the seed</span>
+<span class="sd">                coloring&#39;s construction source, recorded in checkpoint</span>
+<span class="sd">                metadata.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Path | None: The path the checkpoint was written to, or</span>
+<span class="sd">            ``None`` if no checkpoint was due.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="n">schedule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>

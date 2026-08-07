@@ -1,4 +1,17 @@
-"""Objective-neutral vertex color-balance transfer actions."""
+"""Objective-neutral vertex color-balance transfer actions.
+
+A vertex balance transfer recolors two host-graph edges that share a
+pivot vertex: one blue edge incident to a "donor" vertex becomes red,
+and one red edge incident to a "recipient" vertex becomes blue. The
+total number of blue edges is unchanged, so a transfer is a structural
+move rather than a net recoloring: it reduces the spread of blue degree
+across vertices (the vertex color-balance energy defined by
+:func:`vertex_balance_energy`) while incidentally producing its own
+exact score reward. This module analyzes and applies such transfers,
+computing their exact structural and score consequences directly,
+distinct from (though built on top of) the single-edge-flip analysis in
+:mod:`ramsey.RAction`.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +27,15 @@ from .RState import RSearchState
 def _read_only_copy(
     values: NDArray,
 ) -> NDArray:
+    """Copy an array and mark the copy read-only.
+
+    Args:
+        values (NDArray): Source array; may be any array-like value.
+
+    Returns:
+        NDArray: An independently owned copy with ``flags.writeable``
+        set to ``False``.
+    """
     result = np.asarray(values).copy()
     result.flags.writeable = False
     return result
@@ -22,7 +44,16 @@ def _read_only_copy(
 def vertex_blue_degrees(
     state: RSearchState,
 ) -> NDArray[np.int16]:
-    """Return the number of blue (color-one) edges at every vertex."""
+    """Return the number of blue (color-one) edges at every vertex.
+
+    Args:
+        state (RSearchState): Search state whose coloring is inspected.
+
+    Returns:
+        NDArray[np.int16]: Array of length ``n_vertices`` where entry
+        ``v`` is the number of edges incident to vertex ``v`` currently
+        colored blue (color one).
+    """
     n_vertices = state.graph.problem.n_vertices
 
     degrees = np.zeros(
@@ -49,7 +80,21 @@ def vertex_blue_degrees(
 def vertex_color_imbalances(
     state: RSearchState,
 ) -> NDArray[np.int16]:
-    """Return blue degree minus red degree for every vertex."""
+    """Return blue degree minus red degree for every vertex.
+
+    Every vertex has degree ``n_vertices - 1`` in the complete host
+    graph, so red degree equals ``n_vertices - 1 - blue_degree`` and
+    the imbalance simplifies to ``2 * blue_degree - (n_vertices - 1)``.
+    A positive value means the vertex is blue-heavy; a negative value
+    means it is red-heavy.
+
+    Args:
+        state (RSearchState): Search state whose coloring is inspected.
+
+    Returns:
+        NDArray[np.int16]: Array of length ``n_vertices`` with each
+        vertex's signed color imbalance.
+    """
     n_vertices = state.graph.problem.n_vertices
 
     blue_degrees = vertex_blue_degrees(state)
@@ -63,7 +108,19 @@ def vertex_color_imbalances(
 def vertex_balance_energy(
     state: RSearchState,
 ) -> int:
-    """Return sum of squared vertex color imbalances; lower is better."""
+    """Return sum of squared vertex color imbalances; lower is better.
+
+    This is the structural energy that vertex-balance transfers are
+    designed to reduce: it is zero when every vertex has equal blue and
+    red degree, and grows quadratically with the spread of blue degree
+    across vertices.
+
+    Args:
+        state (RSearchState): Search state whose coloring is inspected.
+
+    Returns:
+        int: Sum, over all vertices, of the squared color imbalance.
+    """
     imbalances = vertex_color_imbalances(
         state,
     ).astype(np.int32)
@@ -81,7 +138,24 @@ def vertex_balance_energy(
     slots=True,
 )
 class RVertexBalanceTransfer:
-    """One blue-degree transfer from donor to recipient through a pivot."""
+    """One blue-degree transfer from donor to recipient through a pivot.
+
+    Recoloring ``donor_edge`` (donor-pivot) from blue to red and
+    ``recipient_edge`` (recipient-pivot) from red to blue moves one
+    unit of blue degree from ``donor_vertex`` to ``recipient_vertex``
+    while leaving ``pivot_vertex``'s degree and the global blue-edge
+    count unchanged.
+
+    Attributes:
+        donor_vertex (int): Vertex losing one unit of blue degree.
+        recipient_vertex (int): Vertex gaining one unit of blue degree.
+        pivot_vertex (int): Shared vertex through which the transfer
+            edges pass; its degree is unaffected.
+        donor_edge (int): Encoded edge index of the donor-pivot edge,
+            currently blue, to be recolored red.
+        recipient_edge (int): Encoded edge index of the recipient-pivot
+            edge, currently red, to be recolored blue.
+    """
 
     donor_vertex: int
     recipient_vertex: int
@@ -96,7 +170,45 @@ class RVertexBalanceTransfer:
     eq=False,
 )
 class RVertexBalanceAnalysis:
-    """Exact structural consequences of all legal balance transfers."""
+    """Exact structural consequences of all legal balance transfers.
+
+    An instance is a snapshot: it is tied to the exact
+    ``source_state``/``state_version`` pair it was built from, and
+    :meth:`applies_to` must be used to confirm it is still valid before
+    reusing it against a state that may since have been mutated.
+
+    Attributes:
+        source_state (RSearchState): Search state this analysis was
+            computed from.
+        state_version (int): ``source_state.version`` at the time of
+            computation, used to detect staleness after later
+            mutation.
+        donor_vertices (NDArray[np.uint8]): Donor vertex of each
+            candidate transfer.
+        recipient_vertices (NDArray[np.uint8]): Recipient vertex of
+            each candidate transfer.
+        pivot_vertices (NDArray[np.uint8]): Pivot vertex of each
+            candidate transfer.
+        donor_edges (NDArray[np.uint16]): Encoded donor-pivot edge
+            index of each candidate transfer.
+        recipient_edges (NDArray[np.uint16]): Encoded recipient-pivot
+            edge index of each candidate transfer.
+        balance_rewards (NDArray[np.int32]): Exact reduction in vertex
+            color-balance energy (see :func:`vertex_balance_energy`)
+            that each transfer would produce.
+        histogram_deltas (NDArray[np.int32]): ``int32`` array of shape
+            ``(number_of_actions, edges_per_clique + 1)``. Row ``i`` is
+            the exact change to the global color-one-count histogram
+            that transfer ``i`` would produce.
+        exact_rewards (NDArray[np.int32]): Exact score reduction that
+            each transfer would produce, derived from
+            ``histogram_deltas``.
+        resulting_scores (NDArray[np.int32]): Exact score that would
+            result from applying each transfer, equal to
+            ``source_state.score - exact_rewards``.
+
+    All array fields are owned, read-only copies.
+    """
 
     source_state: RSearchState
     state_version: int
@@ -113,6 +225,14 @@ class RVertexBalanceAnalysis:
     resulting_scores: NDArray[np.int32]
 
     def __post_init__(self) -> None:
+        """Validate array shapes, normalize dtypes, and freeze all fields.
+
+        Raises:
+            ValueError: If any per-action array does not have shape
+                ``(number_of_actions,)``, or if ``histogram_deltas``
+                does not have shape
+                ``(number_of_actions, edges_per_clique + 1)``.
+        """
         arrays = {
             "donor_vertices": np.asarray(
                 self.donor_vertices,
@@ -194,12 +314,29 @@ class RVertexBalanceAnalysis:
 
     @property
     def number_of_actions(self) -> int:
+        """
+        int: Number of candidate balance transfers in this analysis.
+        """
         return len(self.balance_rewards)
 
     def transfer(
         self,
         action_index: int,
     ) -> RVertexBalanceTransfer:
+        """Return the fully described transfer at one action index.
+
+        Args:
+            action_index (int): Index into this analysis's parallel
+                arrays.
+
+        Returns:
+            RVertexBalanceTransfer: The donor, recipient, pivot, and
+            edge indices describing that candidate transfer.
+
+        Raises:
+            IndexError: If ``action_index`` is outside
+                ``[0, number_of_actions)``.
+        """
         if action_index < 0 or action_index >= self.number_of_actions:
             raise IndexError(
                 "action_index is out of range."
@@ -227,6 +364,16 @@ class RVertexBalanceAnalysis:
         self,
         state: RSearchState,
     ) -> bool:
+        """Return whether this analysis belongs to the current state.
+
+        Args:
+            state (RSearchState): Candidate state to check freshness
+                against.
+
+        Returns:
+            bool: ``True`` if ``state`` is the exact object this
+            analysis was computed from and has not been mutated since.
+        """
         return (
             self.source_state is state
             and self.state_version == state.version
@@ -236,6 +383,18 @@ class RVertexBalanceAnalysis:
 def _edge_index_matrix(
     state: RSearchState,
 ) -> NDArray[np.int32]:
+    """Build a dense vertex-pair-to-edge-index lookup table.
+
+    Args:
+        state (RSearchState): Search state supplying the host graph's
+            edge list.
+
+    Returns:
+        NDArray[np.int32]: ``(n_vertices, n_vertices)`` symmetric
+        matrix where entry ``[u, v]`` is the encoded edge index between
+        vertices ``u`` and ``v``, or ``-1`` on the diagonal (no self
+        edges).
+    """
     n_vertices = state.graph.problem.n_vertices
 
     result = np.full(
@@ -269,7 +428,32 @@ def _candidate_transfers(
     NDArray[np.uint16],
     NDArray[np.int32],
 ]:
-    """Enumerate transfers that strictly reduce squared imbalance."""
+    """Enumerate transfers that strictly reduce squared imbalance.
+
+    For every donor/recipient pair whose transfer would strictly
+    reduce total squared vertex imbalance, and every pivot distinct
+    from both, this checks whether the pivot connects to the donor
+    with a blue edge and to the recipient with a red edge -- the exact
+    precondition for a valid transfer. The reduction in squared
+    imbalance energy from a single transfer is derived algebraically:
+    moving one unit of blue degree changes the donor's imbalance by
+    ``-2`` and the recipient's by ``+2``, so the change in the sum of
+    their squared imbalances is
+    ``4 * (imbalances[donor] - imbalances[recipient] - 2)``,
+    independent of the pivot.
+
+    Args:
+        state (RSearchState): Search state whose coloring is
+            inspected.
+        imbalances (NDArray[np.int16]): Per-vertex color imbalance, as
+            returned by :func:`vertex_color_imbalances`.
+
+    Returns:
+        tuple: Six parallel arrays, one entry per candidate transfer
+        found -- donor vertices, recipient vertices, pivot vertices,
+        donor edge indices, recipient edge indices, and balance
+        rewards, in that order.
+    """
     donors = np.flatnonzero(
         imbalances > 0
     )
@@ -376,14 +560,37 @@ def analyze_vertex_balance_transfers(
     Analyze every pivot transfer that moves both endpoint imbalances
     toward zero.
 
-    For donor u, recipient v, and pivot w the required colors are:
+    For donor ``u``, recipient ``v``, and pivot ``w`` the required
+    colors are::
 
         u-w = blue (1)
         v-w = red  (0)
 
-    Recoloring those edges to red and blue transfers one unit of blue
-    degree from u to v while leaving w and the global blue-edge count
-    unchanged.
+    Recoloring those edges to red and blue respectively transfers one
+    unit of blue degree from ``u`` to ``v`` while leaving ``w`` and the
+    global blue-edge count unchanged.
+
+    The exact score consequence of each transfer is derived from the
+    single-edge histogram deltas computed by
+    :func:`~ramsey.RAction.analyze_actions`. Naively summing the donor
+    edge's and recipient edge's individual deltas double-counts any
+    clique containing both edges: such a clique loses one blue edge
+    (the donor edge) and gains one blue edge (the recipient edge), so
+    its final color-one count is unchanged, but each individual delta
+    was computed as if only its own edge had flipped. This function
+    identifies cliques shared by both edges (via
+    ``state.index.edge_to_cliques``) and removes the two artificial
+    one-edge transitions those shared cliques were credited with,
+    leaving the exact combined histogram delta.
+
+    Args:
+        state (RSearchState): Search state to analyze.
+
+    Returns:
+        RVertexBalanceAnalysis: Every candidate transfer that strictly
+        reduces vertex color-balance energy, together with its exact
+        structural and score consequences. Empty arrays are returned
+        when no such transfer exists.
     """
     imbalances = vertex_color_imbalances(
         state,
@@ -522,7 +729,34 @@ def apply_vertex_balance_transfer(
     state: RSearchState,
     transfer: RVertexBalanceTransfer,
 ) -> int:
-    """Apply one validated pivot transfer and return exact score reward."""
+    """Validate and apply one pivot transfer, returning its exact score reward.
+
+    Revalidates the transfer against the current state before mutating
+    it: vertex bounds, vertex distinctness, that the supplied edge
+    indices match the vertex pairs, that the donor-pivot edge is
+    currently blue and the recipient-pivot edge is currently red, and
+    that the donor and recipient vertices are still, respectively,
+    blue-heavy and red-heavy. The two edges are then recolored via
+    ``state.apply_edge_recoloring``.
+
+    Args:
+        state (RSearchState): Search state to mutate.
+        transfer (RVertexBalanceTransfer): Transfer to apply, typically
+            obtained from :meth:`RVertexBalanceAnalysis.transfer`.
+
+    Returns:
+        int: Exact score reduction produced by applying the transfer.
+        A positive value means the score improved.
+
+    Raises:
+        IndexError: If any of the transfer's vertices is out of range.
+        ValueError: If the donor, recipient, and pivot are not
+            distinct; if the transfer's edge indices do not match its
+            vertices; if the donor-pivot edge is not currently blue;
+            if the recipient-pivot edge is not currently red; or if
+            the donor or recipient vertex is no longer blue-heavy or
+            red-heavy, respectively.
+    """
     n_vertices = state.graph.problem.n_vertices
 
     vertices = (

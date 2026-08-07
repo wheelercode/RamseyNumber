@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -82,6 +86,15 @@
 
 
 <span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an owned, read-only copy of ``array``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        array (numpy.ndarray): Source array or array-like value to copy.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: A new array that owns its memory, with the</span>
+<span class="sd">        ``writeable`` flag cleared.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
     <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="k">return</span> <span class="n">result</span>
@@ -90,6 +103,21 @@
 <span class="k">def</span> <span class="nf">_normalize_budgets</span><span class="p">(</span>
     <span class="n">budgets</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate and canonicalize a sequence of flexibility damage budgets.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        budgets (Iterable[int]): Candidate damage budgets, which must be</span>
+<span class="sd">            non-negative integers given in strictly increasing order.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.ndarray: ``int32`` array of the validated budget values,</span>
+<span class="sd">        in the order supplied.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If any budget is not an integer (or is a ``bool``).</span>
+<span class="sd">        ValueError: If ``budgets`` is empty, contains a negative value,</span>
+<span class="sd">            or is not strictly increasing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">values</span> <span class="o">=</span> <span class="p">[]</span>
 
     <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">budgets</span><span class="p">:</span>
@@ -120,7 +148,26 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibility.RFlexibilityProfile">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RFlexibilityProfile</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The fraction of available actions within each damage budget.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The fraction of available actions within each damage budget.</span>
+
+<span class="sd">    Produced by :func:`calculate_flexibility`. For each budget ``b`` in</span>
+<span class="sd">    :attr:`budgets`, the profile records how many of the considered</span>
+<span class="sd">    actions have an exact reward of at least ``-b`` (i.e. worsen the</span>
+<span class="sd">    score by no more than ``b``), both as a raw count and as a fraction</span>
+<span class="sd">    of the total.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        budgets (numpy.ndarray): Read-only ``int32`` array of strictly</span>
+<span class="sd">            increasing, non-negative damage budgets.</span>
+<span class="sd">        counts (numpy.ndarray): Read-only ``int32`` array, parallel to</span>
+<span class="sd">            ``budgets``, of how many considered actions have exact</span>
+<span class="sd">            reward at least ``-budget``.</span>
+<span class="sd">        fractions (numpy.ndarray): Read-only ``float64`` array, parallel</span>
+<span class="sd">            to ``budgets``, of ``counts / number_of_actions``.</span>
+<span class="sd">        number_of_actions (int): Total number of actions considered</span>
+<span class="sd">            when computing the profile (after any ``action_mask`` was</span>
+<span class="sd">            applied).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">budgets</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
     <span class="n">counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
@@ -128,6 +175,15 @@
     <span class="n">number_of_actions</span><span class="p">:</span> <span class="nb">int</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate array shapes and value ranges, then freeze the arrays.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``budgets`` is not one-dimensional, if</span>
+<span class="sd">                ``counts`` or ``fractions`` does not have one value per</span>
+<span class="sd">                budget, if ``number_of_actions`` is not positive, if any</span>
+<span class="sd">                count is out of range ``[0, number_of_actions]``, or if</span>
+<span class="sd">                any fraction is out of range ``[0.0, 1.0]``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">budgets</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">budgets</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
         <span class="n">counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">counts</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
         <span class="n">fractions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fractions</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
@@ -160,7 +216,19 @@
 <div class="viewcode-block" id="RFlexibilityProfile.fraction_at">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibility.RFlexibilityProfile.fraction_at">[docs]</a>
     <span class="k">def</span> <span class="nf">fraction_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">budget</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return F(budget), requiring that budget to be in the profile.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return F(budget), requiring that budget to be in the profile.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            budget (int): Damage budget to look up. Must be one of the</span>
+<span class="sd">                values in :attr:`budgets`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: F(budget), the fraction of considered actions whose</span>
+<span class="sd">            exact reward is at least ``-budget``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If ``budget`` is not present in :attr:`budgets`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">budgets</span> <span class="o">==</span> <span class="n">budget</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">indexes</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -172,7 +240,14 @@
 <div class="viewcode-block" id="RFlexibilityProfile.summary">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibility.RFlexibilityProfile.summary">[docs]</a>
     <span class="k">def</span> <span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return copy-friendly names such as flexibility_5.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return copy-friendly names such as flexibility_5.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, int | float]: ``&quot;flexibility_action_count&quot;`` mapped</span>
+<span class="sd">            to :attr:`number_of_actions`, plus one ``&quot;flexibility_{b}&quot;``</span>
+<span class="sd">            entry per budget ``b`` in :attr:`budgets` mapped to its</span>
+<span class="sd">            fraction.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;flexibility_action_count&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">number_of_actions</span><span class="p">,</span>
         <span class="p">}</span>
@@ -204,6 +279,31 @@
 <span class="sd">    ``action_mask`` can restrict the measurement to actions available to</span>
 <span class="sd">    a particular search mechanism. Omit it to measure the structural</span>
 <span class="sd">    flexibility of the complete action space.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rewards (numpy.ndarray): One-dimensional array of exact</span>
+<span class="sd">            immediate rewards (score reduction) for every candidate</span>
+<span class="sd">            action, e.g. ``RActionAnalysis.immediate_rewards``.</span>
+<span class="sd">        budgets (Iterable[int]): Strictly increasing, non-negative</span>
+<span class="sd">            damage budgets ``b`` at which to evaluate F(b). Defaults to</span>
+<span class="sd">            :data:`DEFAULT_FLEXIBILITY_BUDGETS`.</span>
+<span class="sd">        action_mask (numpy.ndarray | None): Optional boolean array, the</span>
+<span class="sd">            same shape as ``rewards``, selecting which actions to</span>
+<span class="sd">            include in the measurement. Omit to consider every action</span>
+<span class="sd">            in ``rewards``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RFlexibilityProfile: The flexibility profile giving, for every</span>
+<span class="sd">        requested budget, the count and fraction of considered actions</span>
+<span class="sd">        whose exact reward is at least ``-budget``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``rewards`` is not one-dimensional, if</span>
+<span class="sd">            ``budgets`` is empty, contains a negative or non-increasing</span>
+<span class="sd">            value, if ``action_mask`` does not match the shape of</span>
+<span class="sd">            ``rewards``, or if no actions remain to measure after</span>
+<span class="sd">            masking.</span>
+<span class="sd">        TypeError: If any budget is not an integer (or is a ``bool``).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">rewards</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rewards</span><span class="p">)</span>
 

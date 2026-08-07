@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -88,7 +92,23 @@
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate an optional nonnegative integer.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validate and coerce an optional nonnegative integer parameter.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): Parameter name used in raised error messages.</span>
+<span class="sd">        value (int | None): Candidate value; ``None`` is passed through</span>
+<span class="sd">            unchanged.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int | None: ``None`` if ``value`` is ``None``, otherwise</span>
+<span class="sd">        ``value`` coerced to ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``value`` is neither ``None`` nor an integer</span>
+<span class="sd">            (``bool`` values are rejected).</span>
+<span class="sd">        ValueError: If ``value`` is negative.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
 
@@ -110,7 +130,23 @@
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate an optional positive integer.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validate and coerce an optional positive integer parameter.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): Parameter name used in raised error messages.</span>
+<span class="sd">        value (int | None): Candidate value; ``None`` is passed through</span>
+<span class="sd">            unchanged.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int | None: ``None`` if ``value`` is ``None``, otherwise</span>
+<span class="sd">        ``value`` coerced to ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``value`` is neither ``None`` nor an integer</span>
+<span class="sd">            (``bool`` values are rejected).</span>
+<span class="sd">        ValueError: If ``value`` is zero or negative.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">_optional_nonnegative_integer</span><span class="p">(</span>
         <span class="n">name</span><span class="p">,</span>
         <span class="n">value</span><span class="p">,</span>
@@ -138,6 +174,18 @@
 <span class="sd">    If ``limit`` is supplied, the archive query first selects the best</span>
 <span class="sd">    ``limit`` eligible records by its normal score ordering and this</span>
 <span class="sd">    construction then shuffles that active pool.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        archive (RArchive): Archive queried for each queue generation.</span>
+<span class="sd">        rng (numpy.random.Generator): Source of randomness used to</span>
+<span class="sd">            shuffle each queue generation.</span>
+<span class="sd">        minimum_score (int | None): Inclusive lower score bound, or</span>
+<span class="sd">            ``None`` for no lower bound.</span>
+<span class="sd">        maximum_score (int | None): Inclusive upper score bound, or</span>
+<span class="sd">            ``None`` for no upper bound.</span>
+<span class="sd">        limit (int | None): Maximum number of best-scoring eligible</span>
+<span class="sd">            records to include in each queue generation, or ``None``</span>
+<span class="sd">            for no cap.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span>
@@ -178,6 +226,18 @@
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate ``archive``, ``rng``, and the score/limit bounds.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``archive`` does not implement</span>
+<span class="sd">                :class:`RArchive`, or ``rng`` is not a NumPy</span>
+<span class="sd">                ``Generator``.</span>
+<span class="sd">            ValueError: If ``minimum_score`` and ``maximum_score`` are</span>
+<span class="sd">                both supplied with ``minimum_score`` greater than</span>
+<span class="sd">                ``maximum_score``, or if a score/limit value fails</span>
+<span class="sd">                integer validation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">archive</span><span class="p">,</span> <span class="n">RArchive</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
                 <span class="s2">&quot;archive must implement RArchive.&quot;</span>
@@ -223,6 +283,10 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: Name encoding the configured score range, e.g.</span>
+<span class="sd">        ``&quot;archive-queue-score-0-to-5&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">lower</span> <span class="o">=</span> <span class="p">(</span>
             <span class="s2">&quot;any&quot;</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimum_score</span> <span class="ow">is</span> <span class="kc">None</span>
@@ -282,6 +346,20 @@
 <span class="sd">        Normal construct() usage calls this automatically after the</span>
 <span class="sd">        current queue is exhausted.  Calling it explicitly abandons</span>
 <span class="sd">        any unconsumed records in the current queue.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph identifying which Ramsey</span>
+<span class="sd">                problem&#39;s archive to query.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of records in the freshly queried and</span>
+<span class="sd">            shuffled queue generation.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If this construction was already used for a</span>
+<span class="sd">                different Ramsey problem than ``graph.problem``.</span>
+<span class="sd">            RuntimeError: If no archived coloring falls within the</span>
+<span class="sd">                configured queue score range for ``graph``&#39;s problem.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_problem</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -329,6 +407,26 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Consume and return the next queued archive record.</span>
+
+<span class="sd">        Refreshes the queue (see :meth:`refresh_queue`) whenever the</span>
+<span class="sd">        current generation is missing or fully consumed, then hands out</span>
+<span class="sd">        the next record in that generation&#39;s shuffled order.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph to bind the loaded coloring to.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: The coloring loaded from the next queued</span>
+<span class="sd">            archive record.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If this construction was already used for a</span>
+<span class="sd">                different Ramsey problem than ``graph.problem``.</span>
+<span class="sd">            RuntimeError: If no archived coloring falls within the</span>
+<span class="sd">                configured queue score range for ``graph``&#39;s problem.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_records</span> <span class="ow">is</span> <span class="kc">None</span>
             <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_next_record</span>

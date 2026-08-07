@@ -1,4 +1,12 @@
-"""Validated, immutable edge-coloring values and conversions."""
+"""Validated, immutable edge-coloring values and conversions.
+
+Defines :class:`RColoring`, the immutable value type for one complete
+assignment of colors to every edge of an :class:`ramsey.RGraph.RGraph`.
+It validates colors against the graph's problem definition and provides
+conversions to and from color/adjacency matrix representations, along
+with content-addressable hashing used by archives and duplicate
+detection.
+"""
 
 from __future__ import annotations
 
@@ -19,14 +27,28 @@ ColorArray = NDArray[np.uint8]
     eq=False,
 )
 class RColoring:
-    """
-    One immutable assignment of colors to the edges of an RGraph.
+    """One immutable assignment of colors to the edges of an RGraph.
+
+    Attributes:
+        graph (RGraph): Host graph whose edges are colored.
+        colors (ColorArray): Read-only ``uint8`` array of shape
+            ``(graph.number_of_edges,)``. Entry ``e`` is the color of
+            host edge ``e``, aligned with ``graph.edges``.
     """
 
     graph: RGraph
     colors: ColorArray
 
     def __post_init__(self) -> None:
+        """Validate the supplied colors and normalize/freeze them.
+
+        Raises:
+            ValueError: If ``colors`` does not have shape
+                ``(graph.number_of_edges,)``, or contains a value
+                outside the problem's valid color range.
+            TypeError: If ``colors`` does not have an integer or
+                boolean dtype.
+        """
         supplied = np.asarray(self.colors)
 
         expected_shape = (self.graph.number_of_edges,)
@@ -69,8 +91,11 @@ class RColoring:
         )
 
     def mutable_copy(self) -> ColorArray:
-        """
-        Return a writable copy for use by mutable search state.
+        """Return a writable copy for use by mutable search state.
+
+        Returns:
+            ColorArray: Independently owned, writable copy of
+            ``colors``.
         """
         return self.colors.copy()
 
@@ -78,8 +103,16 @@ class RColoring:
         self,
         edge: int,
     ) -> int:
-        """
-        Return the color assigned to one encoded edge.
+        """Return the color assigned to one encoded edge.
+
+        Args:
+            edge (int): Index of the host edge to look up.
+
+        Returns:
+            int: Color currently assigned to ``edge``.
+
+        Raises:
+            IndexError: If ``edge`` is out of range.
         """
         if edge < 0 or edge >= len(self.colors):
             raise IndexError(f"Invalid edge index: {edge}")
@@ -89,11 +122,15 @@ class RColoring:
     def to_color_matrix(
         self,
     ) -> ColorArray:
-        """
-        Return the symmetric matrix of edge colors.
+        """Return the symmetric matrix of edge colors.
 
         Diagonal entries are zero and do not represent colored
         self-edges. They are unused.
+
+        Returns:
+            ColorArray: Owned ``uint8`` array of shape
+            ``(n_vertices, n_vertices)``, symmetric, with entry
+            ``[i, j]`` equal to the color of edge ``(i, j)``.
         """
         n_vertices = self.graph.problem.n_vertices
 
@@ -119,8 +156,22 @@ class RColoring:
         graph: RGraph,
         matrix: NDArray[np.integer],
     ) -> "RColoring":
-        """
-        Construct a coloring from a symmetric edge-color matrix.
+        """Construct a coloring from a symmetric edge-color matrix.
+
+        Args:
+            graph (RGraph): Host graph the coloring is defined over.
+            matrix (NDArray[np.integer]): Symmetric ``(n_vertices,
+                n_vertices)`` matrix whose entry ``[i, j]`` gives the
+                color of edge ``(i, j)``. Diagonal entries are ignored.
+
+        Returns:
+            RColoring: New coloring extracted from ``matrix`` along
+            ``graph.edges``.
+
+        Raises:
+            ValueError: If ``matrix`` does not have shape
+                ``(n_vertices, n_vertices)``, is not symmetric, or
+                contains a color outside the problem's valid range.
         """
         matrix = np.asarray(matrix)
 
@@ -163,11 +214,21 @@ class RColoring:
         self,
         edge_color: int = 1,
     ) -> NDArray[np.uint8]:
-        """
-        Project one selected color to ordinary graph edges.
+        """Project one selected color to ordinary graph edges.
 
-        An entry is one exactly when its edge has edge_color.
+        An entry is one exactly when its edge has ``edge_color``.
         Every other edge color becomes a non-edge.
+
+        Args:
+            edge_color (int): Color to project into the adjacency
+                matrix.
+
+        Returns:
+            NDArray[np.uint8]: Owned, symmetric ``(n_vertices,
+            n_vertices)`` binary adjacency matrix for ``edge_color``.
+
+        Raises:
+            IndexError: If ``edge_color`` is out of range.
         """
         self._validate_color(edge_color)
 
@@ -196,8 +257,28 @@ class RColoring:
         matrix: NDArray[np.integer],
         edge_color: int = 1,
     ) -> "RColoring":
-        """
-        Construct a binary coloring from an ordinary adjacency matrix.
+        """Construct a binary coloring from an ordinary adjacency matrix.
+
+        Edges present in ``matrix`` (value ``1``) receive ``edge_color``;
+        absent edges (value ``0``) receive the other color.
+
+        Args:
+            graph (RGraph): Host graph the coloring is defined over;
+                must be a two-color problem.
+            matrix (NDArray[np.integer]): Symmetric, binary, zero-
+                diagonal ``(n_vertices, n_vertices)`` adjacency matrix.
+            edge_color (int): Color assigned to edges present in
+                ``matrix``; must be ``0`` or ``1``.
+
+        Returns:
+            RColoring: New two-color coloring built from ``matrix``.
+
+        Raises:
+            ValueError: If ``graph.problem.n_colors`` is not ``2``, if
+                ``edge_color`` is not ``0`` or ``1``, if ``matrix`` does
+                not have shape ``(n_vertices, n_vertices)``, is not
+                symmetric, contains values other than ``0``/``1``, or
+                has a nonzero diagonal.
         """
         if graph.problem.n_colors != 2:
             raise ValueError(
@@ -255,8 +336,14 @@ class RColoring:
         )
 
     def complement(self) -> "RColoring":
-        """
-        Swap the two colors in a binary Ramsey coloring.
+        """Swap the two colors in a binary Ramsey coloring.
+
+        Returns:
+            RColoring: New coloring with every edge's color flipped
+            (``1 - color``).
+
+        Raises:
+            ValueError: If ``graph.problem.n_colors`` is not ``2``.
         """
         if self.graph.problem.n_colors != 2:
             raise ValueError("Color complement is defined here " "only for two colors.")
@@ -270,8 +357,15 @@ class RColoring:
         self,
         edge_color: int = 1,
     ) -> NDArray[np.int64]:
-        """
-        Return ordinary-graph degrees for one selected edge color.
+        """Return ordinary-graph degrees for one selected edge color.
+
+        Args:
+            edge_color (int): Color whose adjacency projection is used.
+
+        Returns:
+            NDArray[np.int64]: Degree of each vertex, shape
+            ``(n_vertices,)``, in the ``edge_color`` adjacency
+            projection.
         """
         adjacency = self.to_adjacency_matrix(edge_color=edge_color)
 
@@ -284,16 +378,28 @@ class RColoring:
         self,
         edge_color: int = 1,
     ) -> NDArray[np.int32]:
-        """
-        Return vertices having degree zero in one color projection.
+        """Return vertices having degree zero in one color projection.
+
+        Args:
+            edge_color (int): Color whose adjacency projection is used.
+
+        Returns:
+            NDArray[np.int32]: Indices of vertices with no incident
+            edge of ``edge_color``.
         """
         degrees = self.vertex_degrees(edge_color=edge_color)
 
         return np.flatnonzero(degrees == 0).astype(np.int32)
 
     def packed(self) -> bytes:
-        """
-        Return a compact deterministic byte representation.
+        """Return a compact deterministic byte representation.
+
+        For a two-color problem, colors are bit-packed (one bit per
+        edge); otherwise the raw color array bytes are used.
+
+        Returns:
+            bytes: Compact byte encoding of ``colors``, deterministic
+            for a given coloring.
         """
         if self.graph.problem.n_colors == 2:
             return np.packbits(
@@ -304,8 +410,15 @@ class RColoring:
         return self.colors.tobytes()
 
     def exact_hash(self) -> str:
-        """
-        Return an identifier containing problem and coloring data.
+        """Return an identifier containing problem and coloring data.
+
+        Combines the problem's vertex count, forbidden clique sizes,
+        and edge count with :meth:`packed` into a SHA-256 digest,
+        suitable as a content-addressable key for archives and
+        duplicate detection.
+
+        Returns:
+            str: Hexadecimal SHA-256 digest identifying this coloring.
         """
         problem = self.graph.problem
 
@@ -321,8 +434,18 @@ class RColoring:
         self,
         other: object,
     ) -> bool:
-        """
-        Return whether another coloring has identical semantics.
+        """Return whether another coloring has identical semantics.
+
+        Unlike default dataclass equality (disabled here via
+        ``eq=False``), this compares the problem definition and color
+        values rather than object identity.
+
+        Args:
+            other (object): Value to compare against.
+
+        Returns:
+            bool: ``True`` if ``other`` is an ``RColoring`` with an
+            equal problem and identical colors.
         """
         if not isinstance(
             other,
@@ -339,8 +462,14 @@ class RColoring:
         self,
         color: int,
     ) -> None:
-        """
-        Validate a color index used for a graph projection.
+        """Validate a color index used for a graph projection.
+
+        Args:
+            color (int): Color index to validate.
+
+        Raises:
+            IndexError: If ``color`` is negative or not less than the
+                problem's number of colors.
         """
         if color < 0 or color >= self.graph.problem.n_colors:
             raise IndexError(f"Invalid color index: {color}")

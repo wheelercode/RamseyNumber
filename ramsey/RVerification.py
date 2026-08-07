@@ -1,4 +1,10 @@
-"""Independent verification of colorings and incremental state."""
+"""Independent verification of colorings and incremental search state.
+
+Recomputes exact scores directly from a coloring's edge colors, bypassing
+any incrementally maintained bookkeeping, so that results produced by
+faster incremental code paths (such as :class:`~ramsey.RState.RSearchState`)
+can be cross-checked for correctness.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +28,12 @@ from .RState import RSearchState
 class RColoringVerification:
     """
     Independent exact result for one immutable coloring.
+
+    Attributes:
+        coloring_hash (str): Exact content hash of the verified coloring,
+            as returned by :meth:`~ramsey.RColoring.RColoring.exact_hash`.
+        score_report (RScoreReport): Exact monochromatic score, freshly
+            computed by :func:`~ramsey.RScoring.evaluate_coloring`.
     """
 
     coloring_hash: str
@@ -30,7 +42,8 @@ class RColoringVerification:
     @property
     def ramsey_free(self) -> bool:
         """
-        Return whether no forbidden monochromatic clique exists.
+        bool: Whether no forbidden monochromatic clique exists, i.e.
+        ``score_report.total == 0``.
         """
         return self.score_report.total == 0
 
@@ -42,6 +55,13 @@ class RColoringVerification:
 class RStateVerification:
     """
     Independent consistency result for incremental search state.
+
+    Attributes:
+        coloring (RColoringVerification): Independent verification of
+            the state's current coloring snapshot.
+        errors (tuple[str, ...]): Human-readable descriptions of every
+            incremental field found to disagree with an independently
+            recomputed value; empty when the state is fully consistent.
     """
 
     coloring: RColoringVerification
@@ -50,14 +70,16 @@ class RStateVerification:
     @property
     def consistent(self) -> bool:
         """
-        Return whether every incremental field was correct.
+        bool: Whether every incremental field matched its independently
+        recomputed value, i.e. ``errors`` is empty.
         """
         return not self.errors
 
     @property
     def ramsey_free(self) -> bool:
         """
-        Return the independently calculated Ramsey-free result.
+        bool: The independently calculated Ramsey-free result, from
+        ``coloring.ramsey_free``.
         """
         return self.coloring.ramsey_free
 
@@ -65,7 +87,11 @@ class RStateVerification:
         self,
     ) -> None:
         """
-        Raise RuntimeError when any state inconsistency exists.
+        Raise an error when any state inconsistency was found.
+
+        Raises:
+            RuntimeError: If ``errors`` is nonempty, with a message
+                listing every detected inconsistency.
         """
         if self.errors:
             details = "; ".join(self.errors)
@@ -80,6 +106,13 @@ def verify_coloring(
 ) -> RColoringVerification:
     """
     Independently score one immutable coloring.
+
+    Args:
+        coloring (RColoring): Coloring to verify.
+
+    Returns:
+        RColoringVerification: The coloring's exact content hash paired
+        with a freshly computed exact score report.
     """
     return RColoringVerification(
         coloring_hash=coloring.exact_hash(),
@@ -94,7 +127,18 @@ def verify_search_state(
     Recompute every incremental field from the current colors.
 
     This function does not trust the state's stored clique counts,
-    histogram, or score.
+    histogram, or score. It takes an immutable snapshot of the state's
+    current coloring, independently recomputes the color-one edge count
+    per clique, the resulting histogram, and the total score, and
+    compares each against the state's incrementally maintained values.
+
+    Args:
+        state (RSearchState): Incremental search state to verify.
+
+    Returns:
+        RStateVerification: The independent coloring verification
+        together with a description of every incremental field found
+        to disagree with the recomputed values (empty when consistent).
     """
     snapshot = state.coloring_snapshot()
 

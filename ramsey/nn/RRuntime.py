@@ -17,6 +17,19 @@ def create_numpy_generator(
     Separate generators should be created for logically independent
     experiments so one workflow cannot silently consume another
     workflow's random-number sequence.
+
+    Args:
+        seed (int): Nonnegative integer seed. Validated with
+            ``_validate_seed`` before being passed to
+            ``numpy.random.default_rng``.
+
+    Returns:
+        numpy.random.Generator: A freshly constructed generator seeded
+        independently of any other generator in the process.
+
+    Raises:
+        TypeError: If ``seed`` is not an integer (or is a ``bool``).
+        ValueError: If ``seed`` is negative.
     """
     return np.random.default_rng(
         _validate_seed(seed)
@@ -32,6 +45,15 @@ def seed_torch(
     This controls random-number initialization but does not enable
     deterministic algorithms, which can reduce performance and are
     a separate runtime choice.
+
+    Args:
+        seed (int): Nonnegative integer seed. Validated with
+            ``_validate_seed`` before being applied to PyTorch's
+            generators.
+
+    Raises:
+        TypeError: If ``seed`` is not an integer (or is a ``bool``).
+        ValueError: If ``seed`` is negative.
     """
     seed = _validate_seed(seed)
 
@@ -52,6 +74,15 @@ def resolve_torch_device(
     CUDA device is converted to the current indexed CUDA device so
     comparisons such as ``cuda`` versus ``cuda:0`` remain reliable.
     Other explicit PyTorch device specifications are preserved.
+
+    Args:
+        device (torch.device | str | None): Requested device.
+            ``None`` or ``"auto"`` triggers automatic resolution; any
+            other string or ``torch.device`` is treated as an
+            explicit request. Defaults to ``"auto"``.
+
+    Returns:
+        torch.device: The resolved, comparison-stable device.
     """
     if device is None or device == "auto":
         if torch.cuda.is_available():
@@ -80,7 +111,20 @@ def resolve_torch_device(
 def _validate_seed(
     seed: int,
 ) -> int:
-    """Return a nonnegative built-in integer seed."""
+    """
+    Return a nonnegative built-in integer seed.
+
+    Args:
+        seed (int): Candidate seed value, which must be an integral
+            type (excluding ``bool``) and nonnegative.
+
+    Returns:
+        int: ``seed`` coerced to a built-in ``int``.
+
+    Raises:
+        TypeError: If ``seed`` is not an integer (or is a ``bool``).
+        ValueError: If ``seed`` is negative.
+    """
     if isinstance(seed, bool) or not isinstance(
         seed,
         Integral,

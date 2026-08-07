@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -87,6 +91,19 @@
 <span class="sd">    Separate generators should be created for logically independent</span>
 <span class="sd">    experiments so one workflow cannot silently consume another</span>
 <span class="sd">    workflow&#39;s random-number sequence.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        seed (int): Nonnegative integer seed. Validated with</span>
+<span class="sd">            ``_validate_seed`` before being passed to</span>
+<span class="sd">            ``numpy.random.default_rng``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        numpy.random.Generator: A freshly constructed generator seeded</span>
+<span class="sd">        independently of any other generator in the process.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``seed`` is not an integer (or is a ``bool``).</span>
+<span class="sd">        ValueError: If ``seed`` is negative.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span>
         <span class="n">_validate_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
@@ -105,6 +122,15 @@
 <span class="sd">    This controls random-number initialization but does not enable</span>
 <span class="sd">    deterministic algorithms, which can reduce performance and are</span>
 <span class="sd">    a separate runtime choice.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        seed (int): Nonnegative integer seed. Validated with</span>
+<span class="sd">            ``_validate_seed`` before being applied to PyTorch&#39;s</span>
+<span class="sd">            generators.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``seed`` is not an integer (or is a ``bool``).</span>
+<span class="sd">        ValueError: If ``seed`` is negative.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">seed</span> <span class="o">=</span> <span class="n">_validate_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 
@@ -128,6 +154,15 @@
 <span class="sd">    CUDA device is converted to the current indexed CUDA device so</span>
 <span class="sd">    comparisons such as ``cuda`` versus ``cuda:0`` remain reliable.</span>
 <span class="sd">    Other explicit PyTorch device specifications are preserved.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        device (torch.device | str | None): Requested device.</span>
+<span class="sd">            ``None`` or ``&quot;auto&quot;`` triggers automatic resolution; any</span>
+<span class="sd">            other string or ``torch.device`` is treated as an</span>
+<span class="sd">            explicit request. Defaults to ``&quot;auto&quot;``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.device: The resolved, comparison-stable device.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">device</span> <span class="o">==</span> <span class="s2">&quot;auto&quot;</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
@@ -157,7 +192,20 @@
 <span class="k">def</span> <span class="nf">_validate_seed</span><span class="p">(</span>
     <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a nonnegative built-in integer seed.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return a nonnegative built-in integer seed.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        seed (int): Candidate seed value, which must be an integral</span>
+<span class="sd">            type (excluding ``bool``) and nonnegative.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: ``seed`` coerced to a built-in ``int``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``seed`` is not an integer (or is a ``bool``).</span>
+<span class="sd">        ValueError: If ``seed`` is negative.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
         <span class="n">seed</span><span class="p">,</span>
         <span class="n">Integral</span><span class="p">,</span>

@@ -1,4 +1,12 @@
-"""Incremental edge construction guided by partial-K5 future risk."""
+"""Incremental edge construction guided by partial-K5 future risk.
+
+Builds one coloring by assigning edges to a symmetric two-color K5 problem
+in random order, one edge at a time. Each edge normally receives the
+globally balanced alternating color, but is overridden whenever the
+partial K5s touching that edge show a clear expected-risk advantage for
+the opposite color, in an attempt to steer away from future monochromatic
+K5 completions.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +23,23 @@ from .RGraph import RGraph
 
 @dataclass(frozen=True, slots=True)
 class REdgeRiskConstructionReport:
-    """Diagnostics from one completed edge-risk construction."""
+    """
+    Diagnostics from one completed edge-risk construction.
+
+    Attributes:
+        alternating_decisions (int): Number of edges colored by the
+            globally balanced alternating rule (risk was tied within
+            ``risk_epsilon``).
+        risk_decisions (int): Number of edges colored by comparing
+            expected future monochromatic risk between the two colors.
+        risk_overrides (int): Subset of ``risk_decisions`` where the
+            risk-driven color differed from the alternating proposal.
+        first_risk_step (int | None): Zero-based edge-processing step at
+            which risk first broke a tie, or ``None`` if risk never
+            differed from the alternating proposal.
+        red_edges (int): Total edges assigned color 0 (red).
+        blue_edges (int): Total edges assigned color 1 (blue).
+    """
 
     alternating_decisions: int
     risk_decisions: int
@@ -26,12 +50,57 @@ class REdgeRiskConstructionReport:
 
     @property
     def total_edges(self) -> int:
+        """
+        int: Total number of colored edges (``red_edges + blue_edges``).
+        """
         return self.red_edges + self.blue_edges
 
 
 @dataclass(frozen=True, slots=True)
 class REdgeRiskConstructionProgress:
-    """One observable edge-assignment event during construction."""
+    """
+    One observable edge-assignment event during construction.
+
+    Passed to the construction's ``observer`` callback (if any) after
+    each edge is colored, giving a full account of that step's decision.
+
+    Attributes:
+        step_number (int): One-based index of this edge within the
+            random processing order.
+        total_edges (int): Total number of edges being colored.
+        edge (int): Index of the edge that was just colored.
+        endpoints (tuple[int, int]): Vertex pair joined by ``edge``.
+        color (int): Color actually assigned to ``edge`` (0 or 1).
+        alternating_color (int): Color the globally balanced alternating
+            rule would have proposed for this step.
+        risk_red (float): Expected future monochromatic risk summed over
+            partial K5s containing ``edge`` if it were colored red.
+        risk_blue (float): Expected future monochromatic risk summed
+            over partial K5s containing ``edge`` if it were colored
+            blue.
+        red_completions (int): Number of partial K5s containing
+            ``edge`` that would become a monochromatic red K5 if
+            ``edge`` were colored red.
+        blue_completions (int): Number of partial K5s containing
+            ``edge`` that would become a monochromatic blue K5 if
+            ``edge`` were colored blue.
+        risk_driven (bool): Whether ``risk_red`` and ``risk_blue``
+            differed by more than ``risk_epsilon``, making this a
+            risk-driven decision rather than an alternating one.
+        overrode_alternating (bool): Whether the color actually chosen
+            differs from ``alternating_color``.
+        red_edges (int): Cumulative red edges assigned through this
+            step, inclusive.
+        blue_edges (int): Cumulative blue edges assigned through this
+            step, inclusive.
+        alternating_decisions (int): Cumulative alternating-rule
+            decisions through this step, inclusive.
+        risk_decisions (int): Cumulative risk-driven decisions through
+            this step, inclusive.
+        risk_overrides (int): Cumulative risk-driven decisions that
+            overrode the alternating proposal, through this step,
+            inclusive.
+    """
 
     step_number: int
     total_edges: int
@@ -53,16 +122,26 @@ class REdgeRiskConstructionProgress:
 
     @property
     def completed(self) -> bool:
+        """
+        bool: Whether this step colored the final edge of the graph.
+        """
         return self.step_number == self.total_edges
 
     @property
     def unavoidable(self) -> bool:
-        """Return whether either color completes a monochromatic K5."""
+        """
+        bool: Whether coloring ``edge`` either color would complete at
+        least one monochromatic K5 (a forced trade-off between colors).
+        """
         return self.red_completions > 0 and self.blue_completions > 0
 
     @property
     def created_monochromatic_k5s(self) -> int:
-        """Return the K5s completed by the color actually chosen."""
+        """
+        int: Number of monochromatic K5s completed by the color
+        actually assigned to ``edge`` (``red_completions`` or
+        ``blue_completions``, matching ``color``).
+        """
         if self.color == 0:
             return self.red_completions
 
@@ -72,17 +151,36 @@ class REdgeRiskConstructionProgress:
 @dataclass(slots=True)
 class REdgeRiskConstruction(RConstruction):
     """
-    Color K43 one edge at a time while minimizing partial-K5 risk.
+    Color the host graph one edge at a time while minimizing K5 risk.
 
-    Edges are processed in one random order.  Step parity proposes the
-    globally balanced red/blue alternating color.  If the partial K5s
-    containing the current edge give one candidate color strictly less
-    expected future monochromatic risk, that color overrides the
-    alternating proposal.
+    Requires a symmetric two-color Ramsey problem scored by a single
+    forbidden clique size (e.g. K5). Edges are processed in one random
+    order. Step parity proposes the globally balanced red/blue
+    alternating color. If the partial K5s containing the current edge
+    give one candidate color strictly less expected future monochromatic
+    risk (beyond ``risk_epsilon``), that color overrides the alternating
+    proposal.
 
     A partial K5 contributes risk only after at least
     ``minimum_pressure_edges`` edges of one color have been assigned
-    while none of the opposite color have been assigned.
+    while none of the opposite color have been assigned; its risk weight
+    is ``2 ** -(uncolored edges remaining in that K5)``, the probability
+    that the remaining edges would all randomly complete the
+    monochromatic clique.
+
+    Attributes:
+        rng (numpy.random.Generator): Source of randomness used to
+            choose the edge processing order.
+        minimum_pressure_edges (int): Minimum same-color edge count a
+            partial K5 must reach, with no opposite-colored edges yet
+            assigned, before it contributes to risk.
+        risk_epsilon (float): Minimum absolute difference between
+            ``risk_red`` and ``risk_blue`` required to treat a decision
+            as risk-driven rather than alternating.
+        observer (Callable[[REdgeRiskConstructionProgress], None] | None):
+            Optional callback invoked with a
+            :class:`REdgeRiskConstructionProgress` after each edge is
+            colored, for diagnostics or visualization.
     """
 
     rng: np.random.Generator
@@ -97,6 +195,17 @@ class REdgeRiskConstruction(RConstruction):
     )
 
     def __post_init__(self) -> None:
+        """
+        Validate ``rng``, ``minimum_pressure_edges``, ``risk_epsilon``,
+        and ``observer``.
+
+        Raises:
+            TypeError: If ``rng`` is not a NumPy ``Generator``,
+                ``minimum_pressure_edges`` is not an integer, or
+                ``observer`` is neither ``None`` nor callable.
+            ValueError: If ``minimum_pressure_edges`` is less than 1 or
+                ``risk_epsilon`` is negative.
+        """
         if not isinstance(self.rng, np.random.Generator):
             raise TypeError("rng must be a NumPy Generator.")
 
@@ -125,6 +234,10 @@ class REdgeRiskConstruction(RConstruction):
 
     @property
     def name(self) -> str:
+        """
+        str: Name encoding ``minimum_pressure_edges``, e.g.
+        ``"edge-risk-pressure-4"``.
+        """
         return (
             "edge-risk-"
             f"pressure-{self.minimum_pressure_edges}"
@@ -134,12 +247,35 @@ class REdgeRiskConstruction(RConstruction):
     def last_report(
         self,
     ) -> REdgeRiskConstructionReport | None:
+        """
+        REdgeRiskConstructionReport | None: Diagnostics from the most
+        recent call to :meth:`construct`, or ``None`` beforehand.
+        """
         return self._last_report
 
     def construct(
         self,
         graph: RGraph,
     ) -> RColoring:
+        """
+        Color every edge of ``graph`` one at a time, minimizing K5 risk.
+
+        Args:
+            graph (RGraph): Host graph to color. Its problem must use
+                two symmetric colors and a single forbidden clique
+                size.
+
+        Returns:
+            RColoring: The completed coloring. Also records diagnostics
+            retrievable via :attr:`last_report`, and, if ``observer`` is
+            set, reports one :class:`REdgeRiskConstructionProgress`
+            event per colored edge.
+
+        Raises:
+            ValueError: If ``graph.problem`` is not a symmetric
+                two-color problem, or if ``minimum_pressure_edges``
+                exceeds the number of edges in the forbidden clique.
+        """
         problem = graph.problem
 
         if problem.n_colors != 2 or not problem.is_symmetric:

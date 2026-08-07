@@ -18,6 +18,13 @@ def _read_only_bool_array(
 ) -> NDArray[np.bool_]:
     """
     Return an owned, read-only boolean array.
+
+    Args:
+        values (numpy.ndarray): Source values, coerced to ``bool``.
+
+    Returns:
+        numpy.ndarray: An independent boolean copy of ``values`` with
+        the ``writeable`` flag cleared.
     """
     result = np.asarray(
         values,
@@ -38,15 +45,17 @@ class RMemoryStatus:
     """
     Action restrictions produced by search history.
 
-    edge_tabu_mask:
-        True for actions blocked by edge tenure.
-
-    revisit_mask:
-        True for actions whose successor state is contained in
-        visited-state memory.
-
-    blocked_mask:
-        The union of the edge-tabu and revisit masks.
+    Attributes:
+        edge_tabu_mask (numpy.ndarray): Boolean array, shape
+            ``(number_of_edges,)``. True for edges still within their
+            tabu tenure (recently flipped and not yet eligible again).
+        revisit_mask (numpy.ndarray): Boolean array, shape
+            ``(number_of_edges,)``. True for actions whose resulting
+            coloring is present in the bounded visited-state memory.
+        blocked_mask (numpy.ndarray): Boolean array, shape
+            ``(number_of_edges,)``. The union ``edge_tabu_mask |
+            revisit_mask``, i.e. every action forbidden by search
+            memory before aspiration or deadlock fallback are applied.
     """
 
     edge_tabu_mask: NDArray[np.bool_]
@@ -54,6 +63,14 @@ class RMemoryStatus:
     blocked_mask: NDArray[np.bool_]
 
     def __post_init__(self) -> None:
+        """Validate mask shapes/consistency and freeze the arrays.
+
+        Raises:
+            ValueError: If the three masks do not share one shape, if
+                that shape is not one-dimensional, or if
+                ``blocked_mask`` does not equal
+                ``edge_tabu_mask | revisit_mask``.
+        """
         edge_tabu_mask = _read_only_bool_array(self.edge_tabu_mask)
 
         revisit_mask = _read_only_bool_array(self.revisit_mask)
@@ -112,6 +129,10 @@ class RMemory(ABC):
         """
         Forget the previous episode and remember the new
         episode's initial state.
+
+        Args:
+            state (RSearchState): Initial search state of the new
+                episode.
         """
         ...
 
@@ -123,6 +144,15 @@ class RMemory(ABC):
     ) -> RMemoryStatus:
         """
         Return the actions blocked by current search history.
+
+        Args:
+            state (RSearchState): Current search state.
+            step_number (int): Number of transitions completed so far
+                in the episode.
+
+        Returns:
+            RMemoryStatus: Masks describing which actions history
+            currently forbids.
         """
         ...
 
@@ -135,6 +165,13 @@ class RMemory(ABC):
     ) -> None:
         """
         Record one completed transition and its resulting state.
+
+        Args:
+            edge (int): Encoded edge index that was flipped.
+            state (RSearchState): Search state after the flip was
+                applied.
+            step_number (int): Environment step number after the
+                transition.
         """
         ...
 
@@ -150,6 +187,13 @@ class RNullMemory(RMemory):
         self,
         state: RSearchState,
     ) -> None:
+        """
+        Do nothing; ``RNullMemory`` retains no episode history.
+
+        Args:
+            state (RSearchState): Initial search state of the new
+                episode (unused).
+        """
         return None
 
     def status(
@@ -157,6 +201,18 @@ class RNullMemory(RMemory):
         state: RSearchState,
         step_number: int,
     ) -> RMemoryStatus:
+        """
+        Return masks that block no actions.
+
+        Args:
+            state (RSearchState): Current search state, used only to
+                determine the number of edge actions.
+            step_number (int): Current environment step number (unused).
+
+        Returns:
+            RMemoryStatus: All-false ``edge_tabu_mask``, ``revisit_mask``,
+            and ``blocked_mask``.
+        """
         empty = np.zeros(
             state.number_of_edges,
             dtype=np.bool_,
@@ -174,6 +230,15 @@ class RNullMemory(RMemory):
         state: RSearchState,
         step_number: int,
     ) -> None:
+        """
+        Do nothing; ``RNullMemory`` retains no transition history.
+
+        Args:
+            edge (int): Encoded edge index that was flipped (unused).
+            state (RSearchState): Search state after the flip (unused).
+            step_number (int): Environment step number after the
+                transition (unused).
+        """
         return None
 
 
@@ -191,6 +256,19 @@ class RTabuMemory(RMemory):
         number_of_edges: int,
         config: RTabuMemoryConfig | None = None,
     ) -> None:
+        """Initialize empty tabu and visited-state memory.
+
+        Args:
+            number_of_edges (int): Number of edge actions tracked by
+                memory; must match the host graph's edge count.
+            config (RTabuMemoryConfig | None): Tenure and window
+                settings. Defaults to ``RTabuMemoryConfig()`` when
+                omitted.
+
+        Raises:
+            TypeError: If ``number_of_edges`` is not an integer.
+            ValueError: If ``number_of_edges`` is not positive.
+        """
         if isinstance(number_of_edges, bool) or not isinstance(
             number_of_edges,
             (int, np.integer),
@@ -236,6 +314,12 @@ class RTabuMemory(RMemory):
     def tabu_until(self) -> NDArray[np.int32]:
         """
         Return a read-only view of edge expiration steps.
+
+        Returns:
+            numpy.ndarray: Int32 array, shape ``(number_of_edges,)``,
+            read-only view (not a copy). Entry ``e`` is the first step
+            number at which edge ``e`` stops being edge-tabu; edge
+            ``e`` is blocked while ``tabu_until[e] > step_number``.
         """
         view = self._tabu_until.view()
         view.flags.writeable = False
@@ -255,6 +339,18 @@ class RTabuMemory(RMemory):
     ) -> None:
         """
         Clear all memory and remember the initial state.
+
+        Every edge's tabu expiration is reset to zero (immediately
+        available) and the visited-state history is emptied before the
+        new episode's initial coloring is remembered.
+
+        Args:
+            state (RSearchState): Initial search state of the new
+                episode.
+
+        Raises:
+            ValueError: If ``state``'s edge count does not match this
+                memory's configured ``number_of_edges``.
         """
         self._require_compatible_state(state)
 
@@ -271,6 +367,21 @@ class RTabuMemory(RMemory):
     ) -> RMemoryStatus:
         """
         Return exact edge-tenure and revisit restrictions.
+
+        Args:
+            state (RSearchState): Current search state.
+            step_number (int): Number of transitions completed so far
+                in the episode.
+
+        Returns:
+            RMemoryStatus: ``edge_tabu_mask`` for edges still within
+            tenure, ``revisit_mask`` for actions leading back into the
+            visited-state window, and their union as ``blocked_mask``.
+
+        Raises:
+            ValueError: If ``state``'s edge count does not match this
+                memory's configured ``number_of_edges``.
+            TypeError: If ``step_number`` is not an integer.
         """
         self._require_compatible_state(state)
         self._require_nonnegative_step(step_number)
@@ -296,8 +407,24 @@ class RTabuMemory(RMemory):
         """
         Make the selected edge tabu and remember the new state.
 
-        step_number is the environment's step number after the
-        transition has been applied.
+        The flipped edge becomes blocked until
+        ``step_number + config.edge_tenure``. The resulting coloring
+        is then added to the bounded visited-state window (see
+        ``_remember_state``).
+
+        Args:
+            edge (int): Encoded edge index that was flipped.
+            state (RSearchState): Search state after the flip was
+                applied.
+            step_number (int): The environment's step number after the
+                transition has been applied; must be positive.
+
+        Raises:
+            ValueError: If ``state``'s edge count does not match this
+                memory's configured ``number_of_edges`` or
+                ``step_number`` is not positive.
+            TypeError: If ``edge`` or ``step_number`` is not an integer.
+            IndexError: If ``edge`` is out of range.
         """
         self._require_compatible_state(state)
 
@@ -335,7 +462,18 @@ class RTabuMemory(RMemory):
         Return successors found in exact visited-state memory.
 
         Every possible successor differs from the current coloring
-        by exactly one edge bit.
+        by exactly one edge bit. For every edge, this flips that bit
+        in a packed copy of the current coloring and checks whether
+        the resulting exact key is present in the bounded
+        visited-state history.
+
+        Args:
+            state (RSearchState): Current search state.
+
+        Returns:
+            numpy.ndarray: Boolean array, shape ``(number_of_edges,)``.
+            True for edges whose single-flip successor coloring is
+            currently held in visited-state memory.
         """
         if self._config.visited_state_window == 0 or not self._visited_counts:
             return np.zeros(
@@ -388,6 +526,17 @@ class RTabuMemory(RMemory):
     ) -> None:
         """
         Add one exact state key to the bounded history.
+
+        The state's packed key is appended to a FIFO queue and its
+        occurrence count incremented. While the queue exceeds
+        ``config.visited_state_window`` the oldest key is evicted; its
+        count is decremented, and the count entry is removed once it
+        reaches zero. Counting (rather than a plain set) is required
+        because the same exact coloring can recur more than once
+        within the bounded window.
+
+        Args:
+            state (RSearchState): Search state to remember.
         """
         window = self._config.visited_state_window
 
@@ -417,7 +566,15 @@ class RTabuMemory(RMemory):
         """
         Pack a binary coloring into an exact compact key.
 
-        This is exact representation, not probabilistic hashing.
+        This is exact representation, not probabilistic hashing:
+        distinct colorings always produce distinct keys.
+
+        Args:
+            state (RSearchState): Search state to key.
+
+        Returns:
+            bytes: Bit-packed representation of ``state.colors``,
+            suitable for use as a dictionary key.
         """
         return np.packbits(
             state.colors,
@@ -430,6 +587,13 @@ class RTabuMemory(RMemory):
     ) -> None:
         """
         Require the configured number of edge actions.
+
+        Args:
+            state (RSearchState): Search state to check.
+
+        Raises:
+            ValueError: If ``state.number_of_edges`` does not match
+                this memory's configured ``number_of_edges``.
         """
         if state.number_of_edges != self._number_of_edges:
             raise ValueError("Search-state edge count does not " "match memory.")
@@ -440,6 +604,13 @@ class RTabuMemory(RMemory):
     ) -> None:
         """
         Validate an environment step number.
+
+        Args:
+            step_number (int): Candidate step number.
+
+        Raises:
+            TypeError: If ``step_number`` is not an integer.
+            ValueError: If ``step_number`` is negative.
         """
         if isinstance(step_number, bool) or not isinstance(
             step_number,

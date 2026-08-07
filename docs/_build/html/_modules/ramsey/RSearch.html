@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -86,6 +90,29 @@
 <span class="k">class</span> <span class="nc">RSearchResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Immutable outcome of one complete search attempt.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        policy_name (str): Name of the policy that selected actions.</span>
+<span class="sd">        objective_name (str): Name of the objective the environment</span>
+<span class="sd">            used.</span>
+<span class="sd">        initial_coloring (RColoring): Seed coloring the episode began</span>
+<span class="sd">            from.</span>
+<span class="sd">        final_coloring (RColoring): Coloring at the moment the episode</span>
+<span class="sd">            ended (termination or truncation); not necessarily the</span>
+<span class="sd">            best coloring seen.</span>
+<span class="sd">        best_coloring (RColoring): Coloring with the best (lowest)</span>
+<span class="sd">            exact score seen during the episode.</span>
+<span class="sd">        initial_score (int): Exact score of ``initial_coloring``.</span>
+<span class="sd">        final_score (int): Exact score of ``final_coloring``.</span>
+<span class="sd">        best_score (int): Exact score of ``best_coloring``.</span>
+<span class="sd">        steps_completed (int): Number of edge flips applied.</span>
+<span class="sd">        terminated (bool): Whether the episode ended because an exact</span>
+<span class="sd">            score of zero was reached.</span>
+<span class="sd">        truncated (bool): Whether the episode ended because it reached</span>
+<span class="sd">            its step limit.</span>
+<span class="sd">        step_results (tuple[RStepResult, ...]): Per-step transition</span>
+<span class="sd">            results, populated only when the run was requested with</span>
+<span class="sd">            ``record_steps=True``; empty otherwise.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">policy_name</span><span class="p">:</span> <span class="nb">str</span>
@@ -148,6 +175,14 @@
         <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
         <span class="n">policy</span><span class="p">:</span> <span class="n">RPolicy</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Bind a search coordinator to one environment and policy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            environment (REnvironment): Environment each attempt is</span>
+<span class="sd">                run against.</span>
+<span class="sd">            policy (RPolicy): Strategy used to select the action taken</span>
+<span class="sd">                at every step.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span> <span class="o">=</span> <span class="n">environment</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_policy</span> <span class="o">=</span> <span class="n">policy</span>
 
@@ -176,16 +211,25 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run from an explicit seed until termination or truncation.</span>
 
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        coloring:</span>
-<span class="sd">            Immutable seed coloring for the search attempt.</span>
+<span class="sd">        Resets the environment to ``coloring``, then repeatedly asks</span>
+<span class="sd">        the policy to select an available action and applies it to the</span>
+<span class="sd">        environment until the episode terminates (exact score reaches</span>
+<span class="sd">        zero) or is truncated (the step limit is reached).</span>
 
-<span class="sd">        record_steps:</span>
-<span class="sd">            If true, preserve every RStepResult in the returned result.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            coloring (RColoring): Immutable seed coloring for the</span>
+<span class="sd">                search attempt.</span>
+<span class="sd">            record_steps (bool): If true, preserve every</span>
+<span class="sd">                ``RStepResult`` in the returned result. If false, only</span>
+<span class="sd">                summary information and important coloring snapshots</span>
+<span class="sd">                are retained. Defaults to False.</span>
 
-<span class="sd">            If false, only summary information and important coloring</span>
-<span class="sd">            snapshots are retained.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            RSearchResult: Immutable summary of the completed attempt,</span>
+<span class="sd">            including initial, final, and best colorings/scores.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``record_steps`` is not a ``bool``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="n">record_steps</span><span class="p">,</span>

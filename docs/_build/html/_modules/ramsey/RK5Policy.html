@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RK5Policy</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Objective-aware policies for selecting K5 recoloring actions.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Objective-aware policies for selecting K5 recoloring actions.</span>
+
+<span class="sd">Where :mod:`ramsey.RK5Action` computes exact, objective-neutral</span>
+<span class="sd">consequences of K5 recoloring patterns, this module supplies the greedy</span>
+<span class="sd">policy layer built on top of it: ranking bad K5 targets by danger-weighted</span>
+<span class="sd">leverage, restricting candidate patterns by how many edges they change,</span>
+<span class="sd">and choosing the best target/pattern pair under either the exact score</span>
+<span class="sd">reward or the graded danger reward.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -90,6 +102,16 @@
 <span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span>
     <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Copy an array-like value and mark the copy read-only.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        values (NDArray): Source array or array-like value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray: An independently owned copy with ``flags.writeable`` set</span>
+<span class="sd">        to ``False``, safe to expose on a frozen dataclass without risking</span>
+<span class="sd">        aliasing the caller&#39;s mutable buffers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
     <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
@@ -105,12 +127,26 @@
     <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RK5TargetRanking</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Monochromatic K5 targets ranked by objective-aware leverage.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Monochromatic K5 targets ranked by objective-aware leverage.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        clique_indices (NDArray[np.uint32]): Indices of monochromatic K5</span>
+<span class="sd">            targets, ordered by descending ``leverage_scores``.</span>
+<span class="sd">        leverage_scores (NDArray[np.float64]): Danger-weighted leverage</span>
+<span class="sd">            for each target in ``clique_indices``, in the same order</span>
+<span class="sd">            (highest leverage first).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">clique_indices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">]</span>
     <span class="n">leverage_scores</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate array shapes and freeze both fields to read-only copies.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``clique_indices`` and ``leverage_scores`` do</span>
+<span class="sd">                not have equal shape, or are not one-dimensional.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">clique_indices</span> <span class="o">=</span> <span class="n">_read_only_copy</span><span class="p">(</span>
             <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">clique_indices</span><span class="p">,</span>
@@ -149,10 +185,16 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">number_of_targets</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of ranked monochromatic K5 targets.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">clique_indices</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">best_clique</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Index of the highest-leverage monochromatic K5 target.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If there are no monochromatic K5 targets.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">number_of_targets</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
                 <span class="s2">&quot;There are no monochromatic K5 targets.&quot;</span>
@@ -169,7 +211,29 @@
     <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RK5PolicyConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configure greedy selection among K5-pattern macro actions.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configure greedy selection among K5-pattern macro actions.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        target_limit (int): Maximum number of highest-leverage bad K5s</span>
+<span class="sd">            that receive the more expensive exact 1,022-pattern analysis</span>
+<span class="sd">            per policy call. Defaults to 10.</span>
+<span class="sd">        minimum_changed_edges (int): Minimum number of the target&#39;s ten</span>
+<span class="sd">            edges a candidate pattern must change to be eligible. A</span>
+<span class="sd">            minimum greater than one prevents the K5 macro action from</span>
+<span class="sd">            collapsing back into the ordinary single-edge action space.</span>
+<span class="sd">            Defaults to 2.</span>
+<span class="sd">        maximum_changed_edges (int): Maximum number of the target&#39;s ten</span>
+<span class="sd">            edges a candidate pattern may change to be eligible. Defaults</span>
+<span class="sd">            to 9 (all ten edges is excluded, since that always reproduces</span>
+<span class="sd">            the opposite monochromatic pattern).</span>
+<span class="sd">        use_danger_reward (bool): If ``True``, candidate patterns are</span>
+<span class="sd">            ranked by graded danger-energy reduction. If ``False``, they</span>
+<span class="sd">            are ranked by exact monochromatic-K5 (score) reduction.</span>
+<span class="sd">            Defaults to ``True``.</span>
+<span class="sd">        danger_decay (float): Decay rate passed to the danger-weighting</span>
+<span class="sd">            functions when ranking targets and, if ``use_danger_reward``</span>
+<span class="sd">            is ``True``, candidate patterns. Defaults to 0.25.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># Only the highest-leverage bad K5s receive the more expensive</span>
     <span class="c1"># exact 1,022-pattern analysis.</span>
@@ -186,6 +250,23 @@
     <span class="n">danger_decay</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.25</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate every configuration field.</span>
+
+<span class="sd">        Also validates ``danger_decay`` by delegating to</span>
+<span class="sd">        :func:`ramsey.RObjective.danger_weights`, reusing the objective</span>
+<span class="sd">        layer&#39;s canonical decay validation rather than duplicating it.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``target_limit``, ``minimum_changed_edges``, or</span>
+<span class="sd">                ``maximum_changed_edges`` is not an integer, or if</span>
+<span class="sd">                ``use_danger_reward`` is not a boolean.</span>
+<span class="sd">            ValueError: If ``target_limit`` is not positive, if</span>
+<span class="sd">                ``minimum_changed_edges`` is less than one, if</span>
+<span class="sd">                ``maximum_changed_edges`` exceeds nine, if</span>
+<span class="sd">                ``minimum_changed_edges`` exceeds</span>
+<span class="sd">                ``maximum_changed_edges``, or if ``danger_decay`` is</span>
+<span class="sd">                outside ``[0, 1]``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_limit</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">target_limit</span><span class="p">,</span>
             <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
@@ -259,7 +340,25 @@
     <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RActionSelectionK5</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The K5 target/pattern pair selected by one greedy policy call.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The K5 target/pattern pair selected by one greedy policy call.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        target_clique (int): Index of the chosen monochromatic K5.</span>
+<span class="sd">        pattern_id (int): Chosen nonmonochromatic replacement pattern ID</span>
+<span class="sd">            for the target clique.</span>
+<span class="sd">        target_leverage (float): The target&#39;s danger-weighted leverage</span>
+<span class="sd">            score at ranking time, from :func:`rank_monochromatic_k5_targets`.</span>
+<span class="sd">        exact_reward (int): Exact score reduction the chosen pattern</span>
+<span class="sd">            would produce.</span>
+<span class="sd">        objective_reward (float): Reward used to select this pattern;</span>
+<span class="sd">            equal to ``exact_reward`` unless</span>
+<span class="sd">            ``RK5PolicyConfig.use_danger_reward`` was ``True``, in which</span>
+<span class="sd">            case it is the graded danger-energy reduction.</span>
+<span class="sd">        resulting_score (int): Exact score the state would have after</span>
+<span class="sd">            applying the chosen pattern.</span>
+<span class="sd">        changed_edge_count (int): Number of the target&#39;s ten edges the</span>
+<span class="sd">            chosen pattern changes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">target_clique</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">pattern_id</span><span class="p">:</span> <span class="nb">int</span>
@@ -284,6 +383,22 @@
 <span class="sd">    The structural action layer identifies the monochromatic K5s.</span>
 <span class="sd">    This policy layer deliberately supplies the danger weights used to</span>
 <span class="sd">    prioritize them.</span>
+
+<span class="sd">    Each host edge&#39;s danger is its action profile (count of incident</span>
+<span class="sd">    cliques by color-one-count bin) dotted with the danger weights for</span>
+<span class="sd">    that bin count. A target K5&#39;s leverage is the sum of this per-edge</span>
+<span class="sd">    danger over its ten edges, so targets adjacent to many other</span>
+<span class="sd">    near-monochromatic cliques are ranked first.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to rank targets in.</span>
+<span class="sd">        decay (float): Decay rate passed to</span>
+<span class="sd">            :func:`ramsey.RObjective.danger_weights`. Defaults to 0.25.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RK5TargetRanking: Every monochromatic K5 index and its leverage</span>
+<span class="sd">        score, ordered by descending leverage. Empty if the state has no</span>
+<span class="sd">        monochromatic K5s.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">targets</span> <span class="o">=</span> <span class="n">monochromatic_k5_indices</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
@@ -333,6 +448,28 @@
 
 <span class="sd">    Target ranking and objective evaluation live here rather than in</span>
 <span class="sd">    RAction so the action representation remains objective-neutral.</span>
+
+<span class="sd">    Ranks monochromatic K5 targets by leverage, then for up to</span>
+<span class="sd">    ``config.target_limit`` of the highest-leverage targets, runs the</span>
+<span class="sd">    exact 1,022-pattern analysis and picks the eligible pattern (one</span>
+<span class="sd">    whose changed-edge count falls within</span>
+<span class="sd">    ``[config.minimum_changed_edges, config.maximum_changed_edges]``)</span>
+<span class="sd">    with the greatest reward. The best selection across all considered</span>
+<span class="sd">    targets is returned. Does not mutate ``state``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to select an action for.</span>
+<span class="sd">        config (RK5PolicyConfig | None): Policy configuration. If</span>
+<span class="sd">            ``None``, a default-constructed ``RK5PolicyConfig`` is used.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RActionSelectionK5: The target/pattern pair with the greatest</span>
+<span class="sd">        objective reward among all considered targets.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If ``state`` has no monochromatic K5 targets, or if</span>
+<span class="sd">            none of a considered target&#39;s candidate patterns falls within</span>
+<span class="sd">            the configured changed-edge-count range.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">config</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">config</span>

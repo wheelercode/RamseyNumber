@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,17 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RObjective</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Optimization objectives and reward shaping derived from action data.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Optimization objectives and reward shaping derived from action data.</span>
+
+<span class="sd">An objective assigns comparable numeric values to search states and to</span>
+<span class="sd">candidate actions on those states, so policies can be built independently</span>
+<span class="sd">of what &quot;better&quot; means. Two concrete objectives are provided:</span>
+<span class="sd">:class:`RMonochromaticObjective`, which uses the exact monochromatic-K5</span>
+<span class="sd">score directly, and :class:`RDangerObjective`, a heuristic that instead</span>
+<span class="sd">uses a graded, distance-weighted &quot;danger energy&quot; over the color-one-count</span>
+<span class="sd">histogram so that near-monochromatic (almost-violating) cliques also</span>
+<span class="sd">contribute, not just fully monochromatic ones.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -85,6 +99,15 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return a validated danger-decay value.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        decay (float): Candidate decay rate.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        float: ``decay`` coerced to ``float``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``decay`` is not between zero and one, inclusive.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">decay</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">decay</span><span class="p">)</span>
 
@@ -110,6 +133,26 @@
 <span class="sd">        three minority edges,</span>
 <span class="sd">        four minority edges,</span>
 <span class="sd">        balanced five-versus-five.</span>
+
+<span class="sd">    Bin ``k`` and bin ``last_bin - k`` (the color-reversed count) are</span>
+<span class="sd">    symmetric: both describe cliques with ``k`` edges of the minority</span>
+<span class="sd">    color, just with red and blue swapped. Summing each such pair</span>
+<span class="sd">    collapses a general clique_size-edge histogram into</span>
+<span class="sd">    ``last_bin // 2 + 1`` minority-count bins, with the central,</span>
+<span class="sd">    self-symmetric bin (if ``last_bin`` is even) left unsummed.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        histogram (NDArray[np.integer]): One-dimensional histogram of</span>
+<span class="sd">            clique counts by color-one edge count, with at least two</span>
+<span class="sd">            bins.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.int64]: The minority-count histogram, of length</span>
+<span class="sd">        ``(len(histogram) - 1) // 2 + 1``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``histogram`` is not one-dimensional or has fewer</span>
+<span class="sd">            than two bins.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">histogram</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">histogram</span><span class="p">)</span>
 
@@ -148,6 +191,27 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return symmetric histogram weights for graded danger.</span>
+
+<span class="sd">    Bin ``p`` receives weight ``decay ** distance``, where ``distance``</span>
+<span class="sd">    is ``p``&#39;s distance to the nearer monochromatic extreme (bin 0 or bin</span>
+<span class="sd">    ``number_of_bins - 1``). The two monochromatic bins therefore always</span>
+<span class="sd">    receive weight 1, and weights fall off geometrically at rate</span>
+<span class="sd">    ``decay`` moving toward the balanced center bin, symmetrically from</span>
+<span class="sd">    both ends.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        number_of_bins (int): Number of histogram bins (``edges_per_clique</span>
+<span class="sd">            + 1`` for a clique&#39;s color-one-count histogram).</span>
+<span class="sd">        decay (float): Geometric decay rate in ``[0, 1]`` applied per unit</span>
+<span class="sd">            of distance from a monochromatic extreme. Defaults to 0.25.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.float64]: Weight for each bin, shape</span>
+<span class="sd">        ``(number_of_bins,)``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``number_of_bins`` is less than two, or if</span>
+<span class="sd">            ``decay`` is outside ``[0, 1]``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">decay</span> <span class="o">=</span> <span class="n">_validate_decay</span><span class="p">(</span><span class="n">decay</span><span class="p">)</span>
 
@@ -181,7 +245,25 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the graded global danger energy of one histogram.</span>
 
-<span class="sd">    Lower energy is better.</span>
+<span class="sd">    Lower energy is better. Computed as the dot product of the histogram</span>
+<span class="sd">    counts with :func:`danger_weights`, so cliques closer to</span>
+<span class="sd">    monochromatic (in either color) contribute more energy than cliques</span>
+<span class="sd">    near the balanced center, and fully monochromatic cliques contribute</span>
+<span class="sd">    the most.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        histogram (NDArray[np.integer]): One-dimensional histogram of</span>
+<span class="sd">            clique counts by color-one edge count, with at least two</span>
+<span class="sd">            bins.</span>
+<span class="sd">        decay (float): Geometric decay rate in ``[0, 1]`` passed to</span>
+<span class="sd">            :func:`danger_weights`. Defaults to 0.25.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        float: The weighted sum of histogram counts.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``histogram`` is not one-dimensional or has fewer</span>
+<span class="sd">            than two bins.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">histogram</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">histogram</span><span class="p">)</span>
 
@@ -209,6 +291,25 @@
 <span class="sd">    Return the danger-energy reduction for every action.</span>
 
 <span class="sd">    Positive reward means the action reduces danger energy.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        histogram_deltas (NDArray[np.integer]): Two-dimensional array of</span>
+<span class="sd">            per-action histogram deltas, shape ``(number_of_actions,</span>
+<span class="sd">            number_of_bins)``, as produced for example by</span>
+<span class="sd">            :func:`ramsey.RAction.all_histogram_deltas` or</span>
+<span class="sd">            :attr:`ramsey.RK5Action.RK5PatternAnalysis.histogram_deltas`.</span>
+<span class="sd">        decay (float): Geometric decay rate in ``[0, 1]`` passed to</span>
+<span class="sd">            :func:`danger_weights`. Defaults to 0.25.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.float64]: Danger-energy reduction for each action,</span>
+<span class="sd">        shape ``(number_of_actions,)``. Positive values indicate reduced</span>
+<span class="sd">        danger (an improving action); negative values indicate increased</span>
+<span class="sd">        danger.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``histogram_deltas`` is not two-dimensional or has</span>
+<span class="sd">            fewer than two bins.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">histogram_deltas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">histogram_deltas</span><span class="p">)</span>
 
@@ -247,6 +348,10 @@
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the stable objective name.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: A short, stable identifier for this objective (e.g. for</span>
+<span class="sd">            logging or reporting which objective produced a result).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span>
 
@@ -259,6 +364,12 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return a state energy where lower values are better.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state to evaluate.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: The state&#39;s energy under this objective.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -273,6 +384,17 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the energy reduction produced by every action.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state the actions would be</span>
+<span class="sd">                applied to.</span>
+<span class="sd">            analysis (RActionAnalysis): Precomputed exact action analysis</span>
+<span class="sd">                for ``state``; must currently describe ``state`` (see</span>
+<span class="sd">                :meth:`ramsey.RAction.RActionAnalysis.applies_to`).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.float64]: Reward for each action, where a positive</span>
+<span class="sd">            value means the action reduces this objective&#39;s energy.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="o">...</span></div>
 
@@ -284,6 +406,15 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Reject analysis that does not describe the supplied state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state the analysis should</span>
+<span class="sd">                describe.</span>
+<span class="sd">            analysis (RActionAnalysis): Action analysis to validate.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``analysis`` does not currently describe</span>
+<span class="sd">                ``state`` (stale version or different state).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis</span><span class="o">.</span><span class="n">applies_to</span><span class="p">(</span><span class="n">state</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Action analysis does not describe &quot;</span> <span class="s2">&quot;the current state.&quot;</span><span class="p">)</span></div>
@@ -295,10 +426,16 @@
 <span class="k">class</span> <span class="nc">RMonochromaticObjective</span><span class="p">(</span><span class="n">RObjective</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Use the exact monochromatic-clique score as the objective.</span>
+
+<span class="sd">    Energy is exactly the state&#39;s monochromatic score (the count of</span>
+<span class="sd">    fully monochromatic K5s); action rewards are the exact score</span>
+<span class="sd">    reductions already computed by action analysis, with no additional</span>
+<span class="sd">    shaping.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;str: The objective name, ``&quot;monochromatic&quot;``.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;monochromatic&quot;</span>
 
 <div class="viewcode-block" id="RMonochromaticObjective.energy">
@@ -307,6 +444,15 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the state&#39;s exact monochromatic score.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state to evaluate.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: ``state.score`` as a float; zero means a valid</span>
+<span class="sd">            (violation-free) coloring has been found.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">)</span></div>
 
 
@@ -317,6 +463,22 @@
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
         <span class="n">analysis</span><span class="p">:</span> <span class="n">RActionAnalysis</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return each action&#39;s exact score reduction.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state the actions would be</span>
+<span class="sd">                applied to.</span>
+<span class="sd">            analysis (RActionAnalysis): Precomputed exact action analysis</span>
+<span class="sd">                for ``state``; must currently describe ``state``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.float64]: A float64 copy of</span>
+<span class="sd">            ``analysis.immediate_rewards``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``analysis`` does not currently describe</span>
+<span class="sd">                ``state``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_current_analysis</span><span class="p">(</span>
             <span class="n">state</span><span class="p">,</span>
             <span class="n">analysis</span><span class="p">,</span>
@@ -339,6 +501,20 @@
 <span class="k">class</span> <span class="nc">RDangerObjective</span><span class="p">(</span><span class="n">RObjective</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Use graded distance from monochromatic cliques as energy.</span>
+
+<span class="sd">    Unlike :class:`RMonochromaticObjective`, this is a heuristic</span>
+<span class="sd">    objective: it does not count only exact monochromatic violations but</span>
+<span class="sd">    also weighs near-monochromatic cliques, using</span>
+<span class="sd">    :func:`danger_energy`/:func:`all_danger_rewards` over the state&#39;s</span>
+<span class="sd">    color-one-count histogram. This can guide a policy through plateaus</span>
+<span class="sd">    where the exact score is unchanged but the coloring is moving cliques</span>
+<span class="sd">    closer to (or further from) monochromatic.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        decay (float): Geometric decay rate in ``[0, 1]`` controlling how</span>
+<span class="sd">            quickly per-bin danger weight falls off moving away from the</span>
+<span class="sd">            monochromatic extremes toward the balanced center. Defaults</span>
+<span class="sd">            to 0.25.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">decay</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.25</span>
@@ -346,6 +522,11 @@
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize ``decay``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``decay`` is outside ``[0, 1]``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="s2">&quot;decay&quot;</span><span class="p">,</span>
@@ -354,6 +535,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;str: The objective name, ``&quot;danger&quot;``.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;danger&quot;</span>
 
 <div class="viewcode-block" id="RDangerObjective.energy">
@@ -362,6 +544,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the state&#39;s graded danger energy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state to evaluate.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: ``danger_energy(state.histogram, decay=self.decay)``;</span>
+<span class="sd">            lower values indicate fewer and less-nearly-monochromatic</span>
+<span class="sd">            cliques.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">danger_energy</span><span class="p">(</span>
             <span class="n">state</span><span class="o">.</span><span class="n">histogram</span><span class="p">,</span>
             <span class="n">decay</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">decay</span><span class="p">,</span>
@@ -375,6 +567,23 @@
         <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
         <span class="n">analysis</span><span class="p">:</span> <span class="n">RActionAnalysis</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return each action&#39;s danger-energy reduction.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (RSearchState): Search state the actions would be</span>
+<span class="sd">                applied to.</span>
+<span class="sd">            analysis (RActionAnalysis): Precomputed exact action analysis</span>
+<span class="sd">                for ``state``; must currently describe ``state``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.float64]: Danger-energy reduction for each action,</span>
+<span class="sd">            from :func:`all_danger_rewards` applied to</span>
+<span class="sd">            ``analysis.histogram_deltas``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``analysis`` does not currently describe</span>
+<span class="sd">                ``state``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_require_current_analysis</span><span class="p">(</span>
             <span class="n">state</span><span class="p">,</span>
             <span class="n">analysis</span><span class="p">,</span>

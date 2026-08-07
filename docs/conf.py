@@ -25,6 +25,13 @@ extensions = [
     'sphinx.ext.viewcode',     # Adds links to the original source code lines
 ]
 
+# Render "Attributes:" sections as an :ivar:/:vartype: field list rather than
+# individual ".. attribute::" directives. Without this, Napoleon's generated
+# attribute directives collide with autodoc's own introspection of dataclass
+# fields (enabled via :undoc-members: in the .rst pages), producing
+# "duplicate object description" warnings for every documented attribute.
+napoleon_use_ivar = True
+
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
@@ -35,3 +42,12 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
+
+html_sidebars = {
+    # The '**' applies this sidebar configuration to all pages
+    '**': [
+        'globaltoc.html',  # Shows the full, static tree of your entire site
+        'relations.html',  # Shows "next" and "previous" links
+        'searchbox.html'   # Keeps the search bar at the bottom
+    ]
+}

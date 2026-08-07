@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,20 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RSearchParallel</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Process-parallel execution of independent exact-greedy searches.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Process-parallel execution of independent exact-greedy searches.</span>
+
+<span class="sd">Runs many independent exact-score greedy searches (:class:`RGreedyPolicy`</span>
+<span class="sd">with ``use_objective_reward=False`` over an :class:`RMonochromaticObjective`,</span>
+<span class="sd">each with its own :class:`RTabuMemory`) concurrently across worker</span>
+<span class="sd">processes via :class:`RExactGreedyProcessPool`. Each worker builds the</span>
+<span class="sd">host graph and clique index once and reuses it for every task it</span>
+<span class="sd">receives; the pool only parallelizes running independent searches to</span>
+<span class="sd">completion and collecting their results, preserving input task order.</span>
+<span class="sd">There is no cross-worker synchronization or shared state during a</span>
+<span class="sd">search: every task&#39;s coloring, tabu memory, and RNG are independent, and</span>
+<span class="sd">results are only aggregated back into a tuple after all tasks in a</span>
+<span class="sd">batch complete.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -100,7 +117,21 @@
     <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RExactGreedyProcessConfig</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Immutable configuration shared by exact-greedy workers.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Immutable configuration shared by exact-greedy workers.</span>
+
+<span class="sd">    Sent once to each worker process at pool startup (via</span>
+<span class="sd">    ``ProcessPoolExecutor`` initializer arguments) and used to build</span>
+<span class="sd">    that worker&#39;s graph and to construct the environment and tabu</span>
+<span class="sd">    memory for every task it subsequently runs.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        problem (RProblem): Ramsey coloring problem defining the host</span>
+<span class="sd">            graph each worker builds.</span>
+<span class="sd">        environment (REnvironmentConfig): Environment settings (step</span>
+<span class="sd">            limit, aspiration) used for every worker task.</span>
+<span class="sd">        memory (RTabuMemoryConfig): Tabu memory settings used for every</span>
+<span class="sd">            worker task.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">problem</span><span class="p">:</span> <span class="n">RProblem</span>
     <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironmentConfig</span>
@@ -116,13 +147,32 @@
     <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RParallelSearchTask</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;One coloring and deterministic policy seed sent to a worker.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One coloring and deterministic policy seed sent to a worker.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        task_id (int): Nonnegative identifier used to correlate this</span>
+<span class="sd">            task with its :class:`RParallelSearchResult`.</span>
+<span class="sd">        colors (numpy.ndarray): Uint8 array, shape ``(number_of_edges,)``,</span>
+<span class="sd">            owned and read-only. Seed edge coloring for the task&#39;s</span>
+<span class="sd">            search attempt; must match the worker graph&#39;s edge count.</span>
+<span class="sd">        action_seed (int): Nonnegative seed for the worker&#39;s random</span>
+<span class="sd">            number generator, giving each task&#39;s greedy tie-breaking a</span>
+<span class="sd">            reproducible, independent stream.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">task_id</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">colors</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]</span>
     <span class="n">action_seed</span><span class="p">:</span> <span class="nb">int</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate and normalize the task&#39;s fields.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``task_id`` or ``action_seed`` is not an</span>
+<span class="sd">                integer.</span>
+<span class="sd">            ValueError: If ``task_id`` or ``action_seed`` is negative,</span>
+<span class="sd">                or ``colors`` is not one-dimensional.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">task_id</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">task_id</span><span class="p">,</span>
             <span class="n">Integral</span><span class="p">,</span>
@@ -180,7 +230,21 @@
     <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">RParallelSearchResult</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compact worker result returned to the parent process.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compact worker result returned to the parent process.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        task_id (int): Identifier matching the originating</span>
+<span class="sd">            :class:`RParallelSearchTask`.</span>
+<span class="sd">        initial_score (int): Exact score of the task&#39;s seed coloring.</span>
+<span class="sd">        final_score (int): Exact score when the worker&#39;s search ended.</span>
+<span class="sd">        best_score (int): Best (lowest) exact score found during the</span>
+<span class="sd">            search.</span>
+<span class="sd">        best_colors (numpy.ndarray): Uint8 array, shape</span>
+<span class="sd">            ``(number_of_edges,)``, owned and read-only. Edge coloring</span>
+<span class="sd">            achieving ``best_score``.</span>
+<span class="sd">        elapsed_seconds (float): Wall-clock time spent running the</span>
+<span class="sd">            search in the worker process.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">task_id</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">initial_score</span><span class="p">:</span> <span class="nb">int</span>
@@ -190,6 +254,7 @@
     <span class="n">elapsed_seconds</span><span class="p">:</span> <span class="nb">float</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Copy ``best_colors`` and mark it read-only.&quot;&quot;&quot;</span>
         <span class="n">best_colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">best_colors</span><span class="p">,</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
@@ -205,14 +270,28 @@
 
 
 
+<span class="c1">#: Per-process configuration set once by ``_initialize_exact_greedy_worker``.</span>
 <span class="n">_WORKER_CONFIG</span><span class="p">:</span> <span class="n">RExactGreedyProcessConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="c1">#: Per-process host graph built once by ``_initialize_exact_greedy_worker``.</span>
 <span class="n">_WORKER_GRAPH</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
 
 <span class="k">def</span> <span class="nf">_initialize_exact_greedy_worker</span><span class="p">(</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">RExactGreedyProcessConfig</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build immutable graph indexing once inside a worker process.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build immutable graph indexing once inside a worker process.</span>
+
+<span class="sd">    Runs as the ``ProcessPoolExecutor`` initializer, so it executes</span>
+<span class="sd">    exactly once per worker process before any task function runs. It</span>
+<span class="sd">    stores ``config`` and the freshly built host graph in module-level</span>
+<span class="sd">    globals so subsequent calls to ``_run_exact_greedy_task`` in the</span>
+<span class="sd">    same process can reuse the (expensive to build) graph and clique</span>
+<span class="sd">    index without rebuilding them per task.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config (RExactGreedyProcessConfig): Shared configuration for</span>
+<span class="sd">            every task this worker process will run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">global</span> <span class="n">_WORKER_CONFIG</span>
     <span class="k">global</span> <span class="n">_WORKER_GRAPH</span>
 
@@ -225,7 +304,31 @@
 <span class="k">def</span> <span class="nf">_run_exact_greedy_task</span><span class="p">(</span>
     <span class="n">task</span><span class="p">:</span> <span class="n">RParallelSearchTask</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RParallelSearchResult</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute one independent exact-greedy search in a worker.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute one independent exact-greedy search in a worker.</span>
+
+<span class="sd">    Builds a fresh :class:`REnvironment`, :class:`RTabuMemory`, and</span>
+<span class="sd">    :class:`RGreedyPolicy` (seeded from ``task.action_seed``) for this</span>
+<span class="sd">    task alone, runs an :class:`RSearch` to completion from</span>
+<span class="sd">    ``task.colors``, and reports a compact summary. Each call is</span>
+<span class="sd">    independent: nothing here is shared with other tasks or workers</span>
+<span class="sd">    beyond the read-only graph and config built once in</span>
+<span class="sd">    ``_initialize_exact_greedy_worker``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        task (RParallelSearchTask): Seed coloring, task id, and action</span>
+<span class="sd">            RNG seed for this search attempt.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RParallelSearchResult: Compact outcome of the search, along</span>
+<span class="sd">        with the elapsed wall-clock time.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If this worker process was not initialized via</span>
+<span class="sd">            ``_initialize_exact_greedy_worker`` (i.e. the pool was</span>
+<span class="sd">            used incorrectly).</span>
+<span class="sd">        ValueError: If ``task.colors`` does not have one entry per</span>
+<span class="sd">            edge of the worker&#39;s host graph.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">_WORKER_CONFIG</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">_WORKER_GRAPH</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
             <span class="s2">&quot;Parallel search worker was not initialized.&quot;</span>
@@ -305,6 +408,18 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">max_workers</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Configure a process pool without starting any workers yet.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config (RExactGreedyProcessConfig): Shared configuration</span>
+<span class="sd">                passed to every worker process on startup.</span>
+<span class="sd">            max_workers (int): Number of worker processes to run</span>
+<span class="sd">                concurrently; must be positive.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``max_workers`` is not an integer.</span>
+<span class="sd">            ValueError: If ``max_workers`` is not positive.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">max_workers</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="n">max_workers</span><span class="p">,</span>
             <span class="n">Integral</span><span class="p">,</span>
@@ -322,10 +437,16 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">max_workers</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the number of worker processes the pool runs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_max_workers</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">running</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return whether the pool currently has worker processes started.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="RExactGreedyProcessPool.start">
@@ -348,7 +469,25 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">tasks</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">RParallelSearchTask</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RParallelSearchResult</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Execute one batch of tasks and preserve input order.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Execute one batch of tasks and preserve input order.</span>
+
+<span class="sd">        Starts the pool if it is not already running, then distributes</span>
+<span class="sd">        ``tasks`` across worker processes (one task per unit of work,</span>
+<span class="sd">        via ``chunksize=1``) and blocks until every task in the batch</span>
+<span class="sd">        completes. A running pool may be reused for multiple</span>
+<span class="sd">        successive calls to ``run`` before it is closed.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            tasks (Iterable[RParallelSearchTask]): Independent search</span>
+<span class="sd">                tasks to execute. An empty iterable returns immediately.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[RParallelSearchResult, ...]: One result per task, in</span>
+<span class="sd">            the same order as ``tasks``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the process pool failed to start.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -386,6 +525,11 @@
     <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RExactGreedyProcessPool&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Start the pool and return it for use in a ``with`` block.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RExactGreedyProcessPool: This pool, now running.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span>
 
@@ -395,6 +539,12 @@
         <span class="n">exception_value</span><span class="p">,</span>
         <span class="n">traceback</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shut down the pool when the ``with`` block exits.</span>
+
+<span class="sd">        Waits for any in-flight tasks to finish (``close`` uses</span>
+<span class="sd">        ``wait=True``) regardless of whether the block exited normally</span>
+<span class="sd">        or via an exception; exceptions are not suppressed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
 
 </pre></div>

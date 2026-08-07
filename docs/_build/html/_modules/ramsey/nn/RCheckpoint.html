@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.nn.RCheckpoint</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Versioned persistence and restoration of neural training state.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Versioned persistence and restoration of neural training state.</span>
+
+<span class="sd">Saves and restores everything a PPO training loop needs to resume:</span>
+<span class="sd">the policy/value network&#39;s architecture and weights, the optimizer&#39;s</span>
+<span class="sd">state, the rollout and PPO configurations, the training loop&#39;s</span>
+<span class="sd">position, and NumPy/PyTorch random-number generator state. Supports</span>
+<span class="sd">both the current checkpoint format and the legacy version-1 format</span>
+<span class="sd">that combined rollout and optimization settings into one object.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -99,11 +111,34 @@
 <a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RCheckpoint.RTrainingCheckpoint">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RTrainingCheckpoint</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Restored model, optimizer, configurations, and run position.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Restored model, optimizer, configurations, and run position.</span>
 
-<span class="sd">    This object collects everything a training loop needs to</span>
-<span class="sd">    continue from a saved checkpoint.</span>
+<span class="sd">    This object collects everything a training loop needs to continue</span>
+<span class="sd">    from a saved checkpoint: the rebuilt policy/value network with its</span>
+<span class="sd">    weights loaded, an optimizer with its state loaded, the</span>
+<span class="sd">    configurations that produced them, and the training loop&#39;s</span>
+<span class="sd">    position within the overall run.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        network (RPairPolicyValueNetwork): Policy/value network with</span>
+<span class="sd">            weights restored from the checkpoint, already moved to the</span>
+<span class="sd">            requested device.</span>
+<span class="sd">        optimizer (torch.optim.Optimizer): Optimizer with restored</span>
+<span class="sd">            state, rebuilt to match ``network`` and ``ppo_config``.</span>
+<span class="sd">        model_config (RModelConfig): Architecture settings used to</span>
+<span class="sd">            reconstruct ``network``.</span>
+<span class="sd">        rollout_config (RRolloutConfig): Rollout collection settings</span>
+<span class="sd">            recovered from the checkpoint (or reconstructed from a</span>
+<span class="sd">            legacy combined configuration).</span>
+<span class="sd">        ppo_config (RPPOConfig): PPO optimization settings recovered</span>
+<span class="sd">            from the checkpoint, with ``new_learning_rate`` applied if</span>
+<span class="sd">            one was requested.</span>
+<span class="sd">        completed_iteration (int): Number of training iterations</span>
+<span class="sd">            already completed as of this checkpoint, so a resumed</span>
+<span class="sd">            training loop knows where to continue.</span>
+<span class="sd">        metadata (dict[str, Any]): Free-form metadata that was stored</span>
+<span class="sd">            alongside the checkpoint, or an empty dictionary if none</span>
+<span class="sd">            was present.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">network</span><span class="p">:</span> <span class="n">RPairPolicyValueNetwork</span>
@@ -130,12 +165,47 @@
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">,</span>
     <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Atomically save everything required to resume training.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Atomically save everything required to resume training.</span>
 
-<span class="sd">    The temporary file is written first and then renamed over the</span>
-<span class="sd">    destination. This avoids leaving a partially written checkpoint</span>
-<span class="sd">    if saving is interrupted.</span>
+<span class="sd">    The checkpoint dictionary bundles the model architecture and</span>
+<span class="sd">    weights, optimizer state, rollout/PPO configurations, the problem</span>
+<span class="sd">    definition, NumPy and PyTorch random-number generator state, and</span>
+<span class="sd">    optional metadata. A temporary file is written first and then</span>
+<span class="sd">    renamed over the destination, so an interruption during saving</span>
+<span class="sd">    cannot leave a partially written checkpoint at ``checkpoint_path``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        checkpoint_path (str | Path): Destination file path. Parent</span>
+<span class="sd">            directories are created if they do not already exist.</span>
+<span class="sd">        network (RPairPolicyValueNetwork): Policy/value network whose</span>
+<span class="sd">            configuration and ``state_dict()`` are persisted.</span>
+<span class="sd">        optimizer (torch.optim.Optimizer): Optimizer whose</span>
+<span class="sd">            ``state_dict()`` is persisted so training can resume with</span>
+<span class="sd">            matching momentum/Adam state.</span>
+<span class="sd">        graph (RGraph): Host graph defining the Ramsey problem, used</span>
+<span class="sd">            to validate that ``network`` matches it and to record the</span>
+<span class="sd">            problem definition in the checkpoint.</span>
+<span class="sd">        rollout_config (RRolloutConfig): Rollout collection settings</span>
+<span class="sd">            to persist.</span>
+<span class="sd">        ppo_config (RPPOConfig): PPO optimization settings to persist.</span>
+<span class="sd">        completed_iteration (int): Number of training iterations</span>
+<span class="sd">            completed so far. Must be a nonnegative integer.</span>
+<span class="sd">        rng (np.random.Generator): NumPy random generator whose bit</span>
+<span class="sd">            generator state is persisted for reproducible resumption.</span>
+<span class="sd">        metadata (dict[str, Any] | None): Optional free-form metadata</span>
+<span class="sd">            to store alongside the checkpoint. Defaults to an empty</span>
+<span class="sd">            dictionary when ``None``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Path: ``checkpoint_path``, unchanged, for convenient chaining.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If ``completed_iteration`` is not an integer, if</span>
+<span class="sd">            ``rng`` is not a NumPy ``Generator``, or if ``metadata`` is</span>
+<span class="sd">            neither a dictionary nor ``None``.</span>
+<span class="sd">        ValueError: If ``completed_iteration`` is negative, or if</span>
+<span class="sd">            ``graph``&#39;s vertex or edge count does not match</span>
+<span class="sd">            ``network``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span>
@@ -226,28 +296,47 @@
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">,</span>
     <span class="n">new_learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RTrainingCheckpoint</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Restore a current or legacy training checkpoint.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Restore a current or legacy training checkpoint.</span>
 
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    checkpoint_path:</span>
-<span class="sd">        Path to a trusted local PyTorch checkpoint.</span>
+<span class="sd">    Handles both the current (version 2) checkpoint format and the</span>
+<span class="sd">    legacy version-1 format, which stored rollout and PPO settings</span>
+<span class="sd">    together in a single combined configuration object. After loading,</span>
+<span class="sd">    the network is rebuilt from ``graph`` and the restored model</span>
+<span class="sd">    configuration, its weights are loaded, and the optimizer is</span>
+<span class="sd">    rebuilt and its state loaded and moved to ``device``. The supplied</span>
+<span class="sd">    ``rng`` and PyTorch&#39;s global RNG state (CPU and, if available,</span>
+<span class="sd">    CUDA) are restored in place for reproducible resumption.</span>
 
-<span class="sd">    graph:</span>
-<span class="sd">        Graph scaffolding used to rebuild the network.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        checkpoint_path (str | Path): Path to a trusted local PyTorch</span>
+<span class="sd">            checkpoint. Must not be loaded from an untrusted source,</span>
+<span class="sd">            since restoration uses ``weights_only=False``.</span>
+<span class="sd">        graph (RGraph): Host graph scaffolding used to rebuild the</span>
+<span class="sd">            network architecture and validated against the problem</span>
+<span class="sd">            recorded in the checkpoint.</span>
+<span class="sd">        device (torch.device | str): Device on which the restored</span>
+<span class="sd">            network and optimizer should operate.</span>
+<span class="sd">        rng (np.random.Generator): Existing NumPy generator whose bit</span>
+<span class="sd">            generator state is overwritten with the saved state.</span>
+<span class="sd">        new_learning_rate (float | None): Optional learning-rate</span>
+<span class="sd">            override. It is applied after loading the optimizer state,</span>
+<span class="sd">            because ``optimizer.load_state_dict()`` would otherwise</span>
+<span class="sd">            restore the learning rate that was saved in the</span>
+<span class="sd">            checkpoint.</span>
 
-<span class="sd">    device:</span>
-<span class="sd">        Device on which the restored network and optimizer should</span>
-<span class="sd">        operate.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        RTrainingCheckpoint: The rebuilt network and optimizer,</span>
+<span class="sd">        recovered configurations, completed iteration count, and</span>
+<span class="sd">        stored metadata.</span>
 
-<span class="sd">    rng:</span>
-<span class="sd">        Existing NumPy generator whose saved state will be restored.</span>
-
-<span class="sd">    new_learning_rate:</span>
-<span class="sd">        Optional learning-rate override. It is applied after loading</span>
-<span class="sd">        the optimizer state because optimizer.load_state_dict()</span>
-<span class="sd">        restores the old learning rate.</span>
+<span class="sd">    Raises:</span>
+<span class="sd">        FileNotFoundError: If ``checkpoint_path`` does not exist.</span>
+<span class="sd">        TypeError: If ``rng`` is not a NumPy ``Generator``, if the</span>
+<span class="sd">            loaded checkpoint contents are not a dictionary, or if</span>
+<span class="sd">            ``new_learning_rate`` is neither numeric nor ``None``.</span>
+<span class="sd">        ValueError: If the checkpoint version is unsupported, if the</span>
+<span class="sd">            recorded problem does not match ``graph``, or if</span>
+<span class="sd">            ``new_learning_rate`` is not positive.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">checkpoint_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">)</span>
@@ -377,7 +466,18 @@
     <span class="n">RPPOConfig</span><span class="p">,</span>
     <span class="nb">int</span><span class="p">,</span>
 <span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read configuration values from a version-two checkpoint.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read configuration values from a version-two checkpoint.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        checkpoint (dict[str, Any]): Loaded checkpoint dictionary</span>
+<span class="sd">            containing ``model_config``, ``rollout_config``,</span>
+<span class="sd">            ``ppo_config``, and ``completed_iteration`` entries.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[RModelConfig, RRolloutConfig, RPPOConfig, int]: The</span>
+<span class="sd">        reconstructed model, rollout, and PPO configurations, together</span>
+<span class="sd">        with the completed iteration count.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">RModelConfig</span><span class="p">(</span><span class="o">**</span><span class="nb">dict</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">[</span><span class="s2">&quot;model_config&quot;</span><span class="p">])),</span>
@@ -395,12 +495,31 @@
     <span class="n">RPPOConfig</span><span class="p">,</span>
     <span class="nb">int</span><span class="p">,</span>
 <span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Convert the original combined PPO configuration.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert the original combined PPO configuration.</span>
 
-<span class="sd">    Older checkpoints stored rollout and optimization settings in</span>
-<span class="sd">    one PPOConfig object. That object could be either a dictionary</span>
-<span class="sd">    or a frozen dataclass.</span>
+<span class="sd">    Older (version-1) checkpoints stored rollout and optimization</span>
+<span class="sd">    settings together in one combined PPO configuration object, and</span>
+<span class="sd">    stored network architecture settings separately under</span>
+<span class="sd">    ``network_architecture`` rather than ``model_config``. This</span>
+<span class="sd">    reconstructs the current, split ``RModelConfig``, ``RRolloutConfig``,</span>
+<span class="sd">    and ``RPPOConfig`` objects from that legacy layout, falling back to</span>
+<span class="sd">    each config&#39;s current default value for any field the legacy</span>
+<span class="sd">    checkpoint did not record. The reward source for a legacy rollout</span>
+<span class="sd">    is always assumed to be the exact score, since that predates the</span>
+<span class="sd">    reward-source option, and advantage normalization is always</span>
+<span class="sd">    enabled.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        checkpoint (dict[str, Any]): Loaded version-1 checkpoint</span>
+<span class="sd">            dictionary, containing ``ppo_config``,</span>
+<span class="sd">            ``network_architecture``, and ``iteration`` entries. Its</span>
+<span class="sd">            ``ppo_config`` entry may be either a dictionary or a</span>
+<span class="sd">            frozen dataclass instance.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[RModelConfig, RRolloutConfig, RPPOConfig, int]: The</span>
+<span class="sd">        reconstructed model, rollout, and PPO configurations, together</span>
+<span class="sd">        with the completed iteration count.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">legacy_config</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="p">[</span><span class="s2">&quot;ppo_config&quot;</span><span class="p">]</span>
@@ -507,7 +626,24 @@
     <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="n">version</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Require the supplied graph to match the saved problem.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Require the supplied graph to match the saved problem.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        checkpoint (dict[str, Any]): Loaded checkpoint dictionary.</span>
+<span class="sd">        graph (RGraph): Host graph to validate against the problem</span>
+<span class="sd">            recorded in the checkpoint.</span>
+<span class="sd">        version (int): Checkpoint format version, which determines</span>
+<span class="sd">            where the problem definition is recorded (a version-1</span>
+<span class="sd">            checkpoint records only ``n_vertices`` under</span>
+<span class="sd">            ``network_architecture``, while later versions record</span>
+<span class="sd">            ``n_vertices`` and ``forbidden_clique_sizes`` under</span>
+<span class="sd">            ``problem``).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``graph``&#39;s vertex count (and, for version 2</span>
+<span class="sd">            and later, its forbidden clique sizes) does not match the</span>
+<span class="sd">            checkpoint&#39;s recorded problem.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="n">version</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
         <span class="n">expected_vertices</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">[</span><span class="s2">&quot;network_architecture&quot;</span><span class="p">][</span><span class="s2">&quot;n_vertices&quot;</span><span class="p">])</span>
@@ -531,7 +667,20 @@
     <span class="n">optimizer</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Move every tensor stored by the optimizer to one device.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Move every tensor stored by the optimizer to one device.</span>
+
+<span class="sd">    ``optimizer.load_state_dict()`` restores tensors (such as Adam&#39;s</span>
+<span class="sd">    running moment estimates) on whichever device they were saved</span>
+<span class="sd">    from, which may not match ``network``&#39;s device. This mutates</span>
+<span class="sd">    ``optimizer.state`` in place so all such tensors reside on</span>
+<span class="sd">    ``device``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        optimizer (torch.optim.Optimizer): Optimizer whose per-parameter</span>
+<span class="sd">            state tensors are moved in place.</span>
+<span class="sd">        device (torch.device): Target device for every tensor found in</span>
+<span class="sd">            the optimizer&#39;s state.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">for</span> <span class="n">optimizer_state</span> <span class="ow">in</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
         <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">optimizer_state</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -542,12 +691,22 @@
 <span class="k">def</span> <span class="nf">_trusted_torch_load</span><span class="p">(</span>
     <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Load a trusted local checkpoint across PyTorch versions.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load a trusted local checkpoint across PyTorch versions.</span>
 
-<span class="sd">    weights_only=False is intentional because the checkpoint contains</span>
-<span class="sd">    Python and NumPy RNG metadata. Do not use this function on an</span>
-<span class="sd">    untrusted checkpoint file.</span>
+<span class="sd">    ``weights_only=False`` is intentional because the checkpoint</span>
+<span class="sd">    contains Python and NumPy RNG metadata in addition to tensors. Do</span>
+<span class="sd">    not use this function on an untrusted checkpoint file, since</span>
+<span class="sd">    unpickling arbitrary objects can execute code. PyTorch versions</span>
+<span class="sd">    that predate the ``weights_only`` parameter are supported by</span>
+<span class="sd">    falling back to a call without it.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        checkpoint_path (Path): Path to the trusted local checkpoint</span>
+<span class="sd">            file.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[str, Any]: The deserialized checkpoint dictionary, loaded</span>
+<span class="sd">        onto the CPU.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">try</span><span class="p">:</span>

@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RConstructionK5Risk</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Incremental K5 construction guided by overlapping partial-K5 risk.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Incremental K5 construction guided by overlapping partial-K5 risk.</span>
+
+<span class="sd">Builds a symmetric two-color K5-scored coloring by repeatedly selecting a</span>
+<span class="sd">constrained, partially colored K5, choosing a full coloring for its</span>
+<span class="sd">remaining edges (preferring the twelve balanced C5/complement-C5</span>
+<span class="sd">patterns when compatible with existing colors), and committing the</span>
+<span class="sd">candidate that minimizes expected future monochromatic K5 risk summed</span>
+<span class="sd">over every partial K5 touched by the new edges.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -90,6 +102,24 @@
 <span class="sd">    is also a five-cycle.  Consequently neither color contains a</span>
 <span class="sd">    triangle and every pattern contains exactly five edges of each</span>
 <span class="sd">    color.</span>
+
+<span class="sd">    Each pattern is a length-10 array of 0/1 colors, one entry per edge</span>
+<span class="sd">    of the 5-vertex clique in the fixed order produced by</span>
+<span class="sd">    ``itertools.combinations(range(5), 2)``, describing one way to</span>
+<span class="sd">    2-color K5 as a 5-cycle plus its complementary 5-cycle. Vertex 0 is</span>
+<span class="sd">    fixed as the cycle&#39;s first vertex to remove rotational duplicates;</span>
+<span class="sd">    reversing a cycle yields the same undirected edge set and is</span>
+<span class="sd">    removed automatically by the ``set`` deduplication.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NDArray[np.uint8]: A read-only array of shape ``(12, 10)``</span>
+<span class="sd">        listing every distinct labeled balanced pattern, sorted in</span>
+<span class="sd">        ascending lexicographic order.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If the computed pattern count or shape is not</span>
+<span class="sd">            exactly ``(12, 10)`` (an internal consistency check, not</span>
+<span class="sd">            expected to trigger under normal use).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">local_edges</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
         <span class="n">combinations</span><span class="p">(</span>
@@ -135,6 +165,9 @@
     <span class="k">return</span> <span class="n">result</span>
 
 
+<span class="c1"># Precomputed once at import time: the 12 labeled balanced C5/complement</span>
+<span class="c1"># -C5 colorings of K5, used to bias new K5 completions toward this</span>
+<span class="c1"># monochromatic-clique-free structure whenever compatible.</span>
 <span class="n">K5_BALANCED_CYCLE_PATTERNS</span> <span class="o">=</span> <span class="n">_balanced_k5_cycle_patterns</span><span class="p">()</span>
 
 
@@ -142,7 +175,24 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionK5Risk.RK5RiskConstructionReport">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RK5RiskConstructionReport</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Diagnostics from one completed K5-risk construction.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Diagnostics from one completed K5-risk construction.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        macro_steps (int): Number of target-K5 completion steps taken</span>
+<span class="sd">            (each step colors every remaining edge of one selected K5).</span>
+<span class="sd">        balanced_pattern_steps (int): Subset of ``macro_steps`` where the</span>
+<span class="sd">            selected K5 was compatible with one of the 12 balanced</span>
+<span class="sd">            C5/complement-C5 patterns.</span>
+<span class="sd">        fallback_pattern_steps (int): Subset of ``macro_steps`` where no</span>
+<span class="sd">            balanced pattern was compatible, so all nonmonochromatic</span>
+<span class="sd">            completions were considered instead.</span>
+<span class="sd">        risk_ties (int): Number of steps where more than one candidate</span>
+<span class="sd">            pattern tied for minimum expected risk, requiring the</span>
+<span class="sd">            balance/random tie-break.</span>
+<span class="sd">        red_edges (int): Total edges assigned color 0 (red).</span>
+<span class="sd">        blue_edges (int): Total edges assigned color 1 (blue).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">macro_steps</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">balanced_pattern_steps</span><span class="p">:</span> <span class="nb">int</span>
@@ -153,6 +203,9 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">total_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        int: Total number of colored edges (``red_edges + blue_edges``).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_edges</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_edges</span></div>
 
 
@@ -177,7 +230,25 @@
 
 <span class="sd">    Each candidate is scored jointly over every partial K5 containing</span>
 <span class="sd">    at least one newly colored edge.  Lower expected future</span>
-<span class="sd">    monochromatic risk wins.</span>
+<span class="sd">    monochromatic risk wins. Ties are broken by preferring the candidate</span>
+<span class="sd">    that keeps the overall red/blue edge count closest to balanced,</span>
+<span class="sd">    with any remaining tie broken uniformly at random.</span>
+
+<span class="sd">    Requires a symmetric two-color Ramsey problem scored by K5 cliques.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rng (numpy.random.Generator): Source of randomness used to</span>
+<span class="sd">            select among tied target cliques and tied candidate</span>
+<span class="sd">            patterns.</span>
+<span class="sd">        minimum_pressure_edges (int): Minimum same-color edge count a</span>
+<span class="sd">            partial K5 must reach, with no opposite-colored edges yet</span>
+<span class="sd">            assigned, before it contributes to risk.</span>
+<span class="sd">        preferred_new_edges (int): Minimum number of uncolored edges a</span>
+<span class="sd">            target K5 should still have to be preferred as the next</span>
+<span class="sd">            completion target.</span>
+<span class="sd">        risk_epsilon (float): Maximum absolute risk difference from the</span>
+<span class="sd">            minimum for a candidate pattern to be treated as tied for</span>
+<span class="sd">            best.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
@@ -192,6 +263,18 @@
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate ``rng``, ``minimum_pressure_edges``,</span>
+<span class="sd">        ``preferred_new_edges``, and ``risk_epsilon``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``rng`` is not a NumPy ``Generator``, or if</span>
+<span class="sd">                ``minimum_pressure_edges`` or ``preferred_new_edges``</span>
+<span class="sd">                is not an integer.</span>
+<span class="sd">            ValueError: If ``minimum_pressure_edges`` or</span>
+<span class="sd">                ``preferred_new_edges`` is less than 1, or if</span>
+<span class="sd">                ``risk_epsilon`` is negative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;rng must be a NumPy Generator.&quot;</span><span class="p">)</span>
 
@@ -218,6 +301,10 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        str: Name encoding ``minimum_pressure_edges`` and</span>
+<span class="sd">        ``preferred_new_edges``, e.g. ``&quot;k5-risk-pressure-4-new-4&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="s2">&quot;k5-risk-&quot;</span>
             <span class="sa">f</span><span class="s2">&quot;pressure-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span><span class="si">}</span><span class="s2">-&quot;</span>
@@ -228,6 +315,10 @@
     <span class="k">def</span> <span class="nf">last_report</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RK5RiskConstructionReport</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        RK5RiskConstructionReport | None: Diagnostics from the most</span>
+<span class="sd">        recent call to :meth:`construct`, or ``None`` beforehand.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_report</span>
 
 <div class="viewcode-block" id="RK5RiskConstruction.construct">
@@ -236,6 +327,34 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Color ``graph`` by repeatedly completing constrained K5s.</span>
+
+<span class="sd">        Repeatedly selects a target K5 (see :meth:`_select_target_clique`),</span>
+<span class="sd">        enumerates candidate colorings for its remaining edges (see</span>
+<span class="sd">        :meth:`_candidate_patterns` and :meth:`_fallback_patterns`),</span>
+<span class="sd">        scores each candidate by summed expected risk over every</span>
+<span class="sd">        affected partial K5, and commits the lowest-risk candidate</span>
+<span class="sd">        (breaking ties toward color balance and then at random) until</span>
+<span class="sd">        every edge is colored.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph to color. Its problem must use</span>
+<span class="sd">                two symmetric colors and be scored by K5 cliques.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: The completed coloring. Also records diagnostics</span>
+<span class="sd">            retrievable via :attr:`last_report`.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``graph.problem`` is not a symmetric</span>
+<span class="sd">                two-color problem, if it is not scored by K5 cliques, or</span>
+<span class="sd">                if ``minimum_pressure_edges`` or ``preferred_new_edges``</span>
+<span class="sd">                exceeds the number of edges in a K5 (ten).</span>
+<span class="sd">            RuntimeError: If a selected target K5 has no uncolored</span>
+<span class="sd">                edges (an internal consistency check on the selection</span>
+<span class="sd">                logic, not expected to trigger under normal use).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">problem</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
 
         <span class="k">if</span> <span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">problem</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>
@@ -449,6 +568,26 @@
         <span class="n">assigned_counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
         <span class="n">edges_per_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Choose the next K5 to complete.</span>
+
+<span class="sd">        Prefers cliques with at least ``preferred_new_edges`` uncolored</span>
+<span class="sd">        edges, breaking ties toward the most already-assigned (most</span>
+<span class="sd">        constrained) such clique; when no clique meets that preference,</span>
+<span class="sd">        falls back to the most-assigned incomplete clique instead. Any</span>
+<span class="sd">        remaining tie is broken uniformly at random.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            assigned_counts (NDArray[np.uint8]): Number of colored edges</span>
+<span class="sd">                in every indexed clique, indexed by clique id.</span>
+<span class="sd">            edges_per_clique (int): Number of edges in each K5 (ten).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Index of the selected target clique.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If every clique is already fully colored.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">uncolored_counts</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">edges_per_clique</span>
             <span class="o">-</span> <span class="n">assigned_counts</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span>
@@ -484,6 +623,23 @@
     <span class="k">def</span> <span class="nf">_candidate_patterns</span><span class="p">(</span>
         <span class="n">target_colors</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return balanced C5/complement-C5 patterns compatible with</span>
+<span class="sd">        ``target_colors``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            target_colors (NDArray[np.int8]): Length-10 array of colors</span>
+<span class="sd">                already assigned to the target K5&#39;s edges, in the fixed</span>
+<span class="sd">                combination order; ``-1`` marks an uncolored edge.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.uint8]: The subset of</span>
+<span class="sd">            :data:`K5_BALANCED_CYCLE_PATTERNS` that agree with every</span>
+<span class="sd">            already-colored edge in ``target_colors``. Empty if no</span>
+<span class="sd">            balanced pattern is compatible; equal to</span>
+<span class="sd">            :data:`K5_BALANCED_CYCLE_PATTERNS` unchanged if no edge is</span>
+<span class="sd">            yet colored.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">colored</span> <span class="o">=</span> <span class="n">target_colors</span> <span class="o">&gt;=</span> <span class="mi">0</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">colored</span><span class="p">):</span>
@@ -501,6 +657,28 @@
     <span class="k">def</span> <span class="nf">_fallback_patterns</span><span class="p">(</span>
         <span class="n">target_colors</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Enumerate every nonmonochromatic completion of the target K5.</span>
+
+<span class="sd">        Used when no balanced C5/complement-C5 pattern is compatible</span>
+<span class="sd">        with the target&#39;s existing colors. Enumerates every 0/1</span>
+<span class="sd">        assignment of the remaining uncolored edges and keeps those that</span>
+<span class="sd">        do not leave the K5 entirely one color, so this construction</span>
+<span class="sd">        never deliberately creates a new monochromatic K5 when a</span>
+<span class="sd">        nonmonochromatic completion exists.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            target_colors (NDArray[np.int8]): Length-10 array of colors</span>
+<span class="sd">                already assigned to the target K5&#39;s edges, in the fixed</span>
+<span class="sd">                combination order; ``-1`` marks an uncolored edge.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.uint8]: Every completion of ``target_colors``</span>
+<span class="sd">            that avoids a monochromatic result, or, if every</span>
+<span class="sd">            completion would be monochromatic (the target is already</span>
+<span class="sd">            forced), every possible completion instead so the</span>
+<span class="sd">            construction can make progress.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">uncolored_positions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
             <span class="n">target_colors</span> <span class="o">&lt;</span> <span class="mi">0</span>
         <span class="p">)</span>
@@ -554,6 +732,24 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">edges_per_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Build the risk weight table indexed by same-color edge count.</span>
+
+<span class="sd">        Weight ``k`` (for ``k &gt;= minimum_pressure_edges``) is</span>
+<span class="sd">        ``2 ** -(edges_per_clique - k)``, the probability that a K5</span>
+<span class="sd">        already showing ``k`` edges of one color and none of the</span>
+<span class="sd">        opposite color would become monochromatic if its remaining</span>
+<span class="sd">        edges were colored uniformly at random. Weights below</span>
+<span class="sd">        ``minimum_pressure_edges`` are zero, so cliques under that</span>
+<span class="sd">        pressure threshold contribute no risk.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edges_per_clique (int): Number of edges in each K5 (ten).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.float64]: Array of length ``edges_per_clique +</span>
+<span class="sd">            1`` mapping a same-color edge count to its risk weight.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
             <span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
@@ -574,6 +770,27 @@
         <span class="n">blue_counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
         <span class="n">risk_weights</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sum expected monochromatic-completion risk over a set of cliques.</span>
+
+<span class="sd">        For each clique that is entirely red so far (``blue_counts ==</span>
+<span class="sd">        0``), looks up the risk weight for its red edge count; likewise</span>
+<span class="sd">        for cliques that are entirely blue so far. Cliques already</span>
+<span class="sd">        containing both colors contribute zero, since they can no</span>
+<span class="sd">        longer become monochromatic.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            red_counts (NDArray[np.uint8]): Red edge count in each</span>
+<span class="sd">                considered clique.</span>
+<span class="sd">            blue_counts (NDArray[np.uint8]): Blue edge count in each</span>
+<span class="sd">                considered clique, aligned by index with ``red_counts``.</span>
+<span class="sd">            risk_weights (NDArray[np.float64]): Risk weight table from</span>
+<span class="sd">                :meth:`_risk_weights`, indexed by same-color edge count.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: Total expected future monochromatic-clique risk</span>
+<span class="sd">            summed over every considered clique.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">red_only</span> <span class="o">=</span> <span class="n">blue_counts</span> <span class="o">==</span> <span class="mi">0</span>
         <span class="n">blue_only</span> <span class="o">=</span> <span class="n">red_counts</span> <span class="o">==</span> <span class="mi">0</span>
 

@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,17 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RMetric</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Structural measurements that distinguish equal-score Ramsey colorings.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Structural measurements that distinguish equal-score Ramsey colorings.</span>
+
+<span class="sd">Two colorings with the same exact score (monochromatic K5 count) can</span>
+<span class="sd">differ substantially in how their violations are distributed and how</span>
+<span class="sd">close they are to further violations. :data:`METRIC_VERSION` and</span>
+<span class="sd">:func:`calculate_metrics` together define a versioned schema of such</span>
+<span class="sd">structural measurements, captured in an :class:`RMetricSnapshot`. The</span>
+<span class="sd">version number is bumped whenever the schema of computed fields changes,</span>
+<span class="sd">so stored snapshots (see :mod:`ramsey.RMetricStore`) can be recognized as</span>
+<span class="sd">stale and recomputed rather than silently misinterpreted.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -91,7 +105,67 @@
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RMetric.RMetricSnapshot">[docs]</a>
 <span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">RMetricSnapshot</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A reusable structural fingerprint of one complete coloring.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A reusable structural fingerprint of one complete coloring.</span>
+
+<span class="sd">    All array-shaped fields are stored as plain tuples of Python ``int``</span>
+<span class="sd">    so instances are hashable, JSON-serializable (via :meth:`to_dict` /</span>
+<span class="sd">    :meth:`from_dict`), and safe to persist (see</span>
+<span class="sd">    :class:`ramsey.RMetricStore.RMetricStore`).</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        metric_version (int): Schema version this snapshot was computed</span>
+<span class="sd">            under; should equal :data:`METRIC_VERSION` for a</span>
+<span class="sd">            freshly-computed snapshot.</span>
+<span class="sd">        score (int): Exact monochromatic score of the coloring (total</span>
+<span class="sd">            count of monochromatic K5s).</span>
+<span class="sd">        red_violations (int): Number of K5s entirely color zero</span>
+<span class="sd">            (``histogram[0]``).</span>
+<span class="sd">        blue_violations (int): Number of K5s entirely color one</span>
+<span class="sd">            (``histogram[-1]``).</span>
+<span class="sd">        red_deficit_histogram (tuple[int, ...]): Index ``d`` holds the</span>
+<span class="sd">            number of K5s that would need exactly ``d`` edges recolored</span>
+<span class="sd">            to red to become monochromatic red (equivalently, the number</span>
+<span class="sd">            of K5s with exactly ``d`` color-one edges). This is the raw</span>
+<span class="sd">            color-one-count histogram.</span>
+<span class="sd">        blue_deficit_histogram (tuple[int, ...]): Index ``d`` holds the</span>
+<span class="sd">            number of K5s that would need exactly ``d`` edges recolored</span>
+<span class="sd">            to blue to become monochromatic blue. This is</span>
+<span class="sd">            ``red_deficit_histogram`` reversed.</span>
+<span class="sd">        red_vertex_degrees (tuple[int, ...]): Per-vertex count of</span>
+<span class="sd">            incident red (color zero) edges.</span>
+<span class="sd">        blue_vertex_degrees (tuple[int, ...]): Per-vertex count of</span>
+<span class="sd">            incident blue (color one) edges.</span>
+<span class="sd">        red_vertex_violation_load (tuple[int, ...]): Per-vertex count of</span>
+<span class="sd">            monochromatic-red K5s the vertex participates in.</span>
+<span class="sd">        blue_vertex_violation_load (tuple[int, ...]): Per-vertex count of</span>
+<span class="sd">            monochromatic-blue K5s the vertex participates in.</span>
+<span class="sd">        red_edge_violation_load (tuple[int, ...]): Per-edge count of</span>
+<span class="sd">            monochromatic-red K5s the edge participates in.</span>
+<span class="sd">        blue_edge_violation_load (tuple[int, ...]): Per-edge count of</span>
+<span class="sd">            monochromatic-blue K5s the edge participates in.</span>
+<span class="sd">        red_vertex_deficit_one_load (tuple[int, ...]): Per-vertex count</span>
+<span class="sd">            of participation in K5s with red deficit exactly one (K5s one</span>
+<span class="sd">            edge recoloring away from becoming monochromatic red).</span>
+<span class="sd">        blue_vertex_deficit_one_load (tuple[int, ...]): Per-vertex count</span>
+<span class="sd">            of participation in K5s with blue deficit exactly one.</span>
+<span class="sd">        red_edge_deficit_one_load (tuple[int, ...]): Per-edge count of</span>
+<span class="sd">            participation in K5s with red deficit exactly one.</span>
+<span class="sd">        blue_edge_deficit_one_load (tuple[int, ...]): Per-edge count of</span>
+<span class="sd">            participation in K5s with blue deficit exactly one.</span>
+<span class="sd">        red_red_overlap (tuple[int, ...]): Index ``t`` counts pairs of</span>
+<span class="sd">            distinct monochromatic-red K5s that share exactly ``t``</span>
+<span class="sd">            vertices. Distinct K5s can share at most four vertices.</span>
+<span class="sd">        blue_blue_overlap (tuple[int, ...]): Index ``t`` counts pairs of</span>
+<span class="sd">            distinct monochromatic-blue K5s that share exactly ``t``</span>
+<span class="sd">            vertices.</span>
+<span class="sd">        red_blue_overlap (tuple[int, ...]): Index ``t`` counts</span>
+<span class="sd">            (monochromatic-red, monochromatic-blue) K5 pairs that share</span>
+<span class="sd">            exactly ``t`` vertices.</span>
+<span class="sd">        single_flip_rewards (tuple[int, ...]): Exact score reduction that</span>
+<span class="sd">            would result from flipping each host-graph edge, indexed by</span>
+<span class="sd">            edge index (as computed by</span>
+<span class="sd">            :func:`ramsey.RAction.analyze_actions`).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">metric_version</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">score</span><span class="p">:</span> <span class="nb">int</span>
@@ -127,34 +201,42 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">red_deficit_one</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of K5s one edge recoloring away from monochromatic red.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_histogram</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">blue_deficit_one</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of K5s one edge recoloring away from monochromatic blue.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_histogram</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">best_single_flip_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Largest exact score reduction achievable by any single edge flip.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">worst_single_flip_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Largest exact score increase (worst outcome) any single edge flip could cause.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">improving_single_flips</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of host edges whose flip would strictly reduce the score.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">reward</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">reward</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">neutral_single_flips</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of host edges whose flip would leave the score unchanged.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">reward</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">reward</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">worsening_single_flips</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of host edges whose flip would strictly increase the score.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">reward</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">reward</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">maximum_vertex_violation_load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Largest combined red-plus-blue violation load at any single vertex.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
             <span class="n">red</span> <span class="o">+</span> <span class="n">blue</span>
             <span class="k">for</span> <span class="n">red</span><span class="p">,</span> <span class="n">blue</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
@@ -165,6 +247,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">maximum_edge_violation_load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Largest combined red-plus-blue violation load at any single edge.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
             <span class="n">red</span> <span class="o">+</span> <span class="n">blue</span>
             <span class="k">for</span> <span class="n">red</span><span class="p">,</span> <span class="n">blue</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
@@ -175,6 +258,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">same_color_shared_edge_violation_pairs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of same-color monochromatic K5 pairs that share a host edge.</span>
+
+<span class="sd">        Two K5s share at least one host edge exactly when they share at</span>
+<span class="sd">        least two vertices, so this sums ``red_red_overlap`` and</span>
+<span class="sd">        ``blue_blue_overlap`` from index 2 onward.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Two K5s share at least one host edge exactly when they share</span>
         <span class="c1"># at least two vertices.</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">red_red_overlap</span><span class="p">[</span><span class="mi">2</span><span class="p">:])</span> <span class="o">+</span> <span class="nb">sum</span><span class="p">(</span>
@@ -184,7 +273,17 @@
 <div class="viewcode-block" id="RMetricSnapshot.summary">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RMetric.RMetricSnapshot.summary">[docs]</a>
     <span class="k">def</span> <span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return compact scalar columns useful for tables and plots.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return compact scalar columns useful for tables and plots.</span>
+
+<span class="sd">        Reduces the snapshot&#39;s array-shaped fields to a handful of</span>
+<span class="sd">        headline scalars (score, violation counts, deficit-one counts,</span>
+<span class="sd">        maximum vertex/edge violation loads, shared-edge violation</span>
+<span class="sd">        pairs, and single-flip reward statistics), suitable for a</span>
+<span class="sd">        dataframe row or a summary print.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, int | float]: Mapping of column name to value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">rewards</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">,</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
@@ -213,7 +312,12 @@
 <div class="viewcode-block" id="RMetricSnapshot.to_dict">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RMetric.RMetricSnapshot.to_dict">[docs]</a>
     <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a JSON-compatible representation.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a JSON-compatible representation.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: Every field, keyed by name, with tuple fields</span>
+<span class="sd">            preserved as JSON-serializable lists via ``dataclasses.asdict``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">asdict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
 
 
@@ -224,7 +328,18 @@
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">values</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RMetricSnapshot&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore a snapshot from its JSON-compatible representation.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore a snapshot from its JSON-compatible representation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            values (dict[str, Any]): A mapping produced by :meth:`to_dict`</span>
+<span class="sd">                (or an equivalent JSON-decoded object), with array-shaped</span>
+<span class="sd">                fields as lists rather than tuples.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RMetricSnapshot: A snapshot equal in value to the one</span>
+<span class="sd">            originally serialized, with array-shaped fields restored to</span>
+<span class="sd">            tuples of ``int``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">normalized</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
 
         <span class="n">tuple_fields</span> <span class="o">=</span> <span class="p">(</span>
@@ -262,7 +377,28 @@
 <span class="k">def</span> <span class="nf">calculate_metrics</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RMetricSnapshot</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate the versioned structural fingerprint of one state.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate the versioned structural fingerprint of one state.</span>
+
+<span class="sd">    Computes every field of :class:`RMetricSnapshot` from the current</span>
+<span class="sd">    coloring: violation counts and deficit histograms directly from the</span>
+<span class="sd">    state&#39;s histogram, vertex/edge participation loads via</span>
+<span class="sd">    :func:`ramsey.REdgeFlipCausalAnalysis.monochromatic_participation` and</span>
+<span class="sd">    the deficit-one-specific helper below, exact pairwise K5 overlap</span>
+<span class="sd">    counts via inclusion-exclusion, and single-flip rewards via</span>
+<span class="sd">    :func:`ramsey.RAction.analyze_actions`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to compute metrics for. Must</span>
+<span class="sd">            use a symmetric two-color problem.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        RMetricSnapshot: The complete structural fingerprint, tagged with</span>
+<span class="sd">        :data:`METRIC_VERSION`.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the state&#39;s problem is not a symmetric two-color</span>
+<span class="sd">            problem.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
             <span class="s2">&quot;calculate_metrics currently requires a symmetric two-color problem.&quot;</span>
@@ -360,6 +496,17 @@
 <span class="k">def</span> <span class="nf">_vertex_color_degrees</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count each vertex&#39;s incident edges by color.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to inspect.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[NDArray[np.int32], NDArray[np.int32]]: ``(red, blue)``</span>
+<span class="sd">        arrays of shape ``(n_vertices,)``, where each entry is the</span>
+<span class="sd">        vertex&#39;s degree within the color-zero (red) or color-one (blue)</span>
+<span class="sd">        edge subgraph, respectively.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">number_of_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
     <span class="n">red</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">number_of_vertices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
     <span class="n">blue</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">number_of_vertices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
@@ -380,6 +527,30 @@
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="n">clique_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count vertex and edge participation across a selected subset of cliques.</span>
+
+<span class="sd">    Used to compute deficit-one participation loads: ``clique_mask``</span>
+<span class="sd">    selects the K5s with a given color-one count (e.g. exactly one, for</span>
+<span class="sd">    red deficit-one), and this returns how many of those selected K5s</span>
+<span class="sd">    each vertex and edge belongs to.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to inspect.</span>
+<span class="sd">        clique_mask (NDArray[np.bool_]): Boolean mask over all cliques</span>
+<span class="sd">            selecting the subset to count participation in.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[NDArray[np.int32], NDArray[np.int32]]: ``(vertex_load,</span>
+<span class="sd">        edge_load)``, shaped ``(n_vertices,)`` and ``(number_of_edges,)``</span>
+<span class="sd">        respectively, giving the count of selected cliques each vertex or</span>
+<span class="sd">        edge participates in. Both are all zero if ``clique_mask``</span>
+<span class="sd">        selects no cliques.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If accumulated vertex incidence does not divide</span>
+<span class="sd">            evenly by ``clique_size - 1``, which would indicate the</span>
+<span class="sd">            clique index is inconsistent.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">clique_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span><span class="n">clique_mask</span><span class="p">]</span>
 
     <span class="n">edge_load</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
@@ -427,7 +598,21 @@
 <span class="k">def</span> <span class="nf">_violation_overlap_histograms</span><span class="p">(</span>
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count exact red/red, blue/blue, and red/blue K5 intersections.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count exact red/red, blue/blue, and red/blue K5 intersections.</span>
+
+<span class="sd">    Uses inclusion-exclusion over vertex-subset incidence: for each pair</span>
+<span class="sd">    of same- or different-colored monochromatic K5s, the number of shared</span>
+<span class="sd">    vertices (0 to 4) is recovered exactly, rather than merely bounded.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to inspect.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]:</span>
+<span class="sd">        ``(red_exact, blue_exact, mixed_exact)``, the exact</span>
+<span class="sd">        shared-vertex-count histograms for red/red, blue/blue, and</span>
+<span class="sd">        red/blue monochromatic K5 pairs respectively.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span>
     <span class="n">edges_per_clique</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span>
 
@@ -474,6 +659,29 @@
     <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
     <span class="n">clique_indexes</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Counter</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count how many listed cliques contain each vertex subset.</span>
+
+<span class="sd">    For every subset size from 1 up to ``clique_size - 1``, builds a</span>
+<span class="sd">    counter mapping each vertex-subset tuple to the number of cliques in</span>
+<span class="sd">    ``clique_indexes`` whose vertex set contains that subset. These are</span>
+<span class="sd">    &quot;at least&quot; incidence counts, later inverted into exact intersection</span>
+<span class="sd">    sizes by :func:`_exact_intersections_from_subset_counts`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        state (RSearchState): Search state to inspect.</span>
+<span class="sd">        clique_indexes (NDArray[np.int64]): Indices of the monochromatic</span>
+<span class="sd">            cliques to accumulate subset counts over (e.g. all red or all</span>
+<span class="sd">            blue violating K5s).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[int, Counter[tuple[int, ...]]]: Mapping from subset size to</span>
+<span class="sd">        a ``Counter`` of vertex-subset tuple to incidence count.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If an indexed clique&#39;s edges do not span exactly</span>
+<span class="sd">            ``state.clique_size`` distinct vertices, indicating the</span>
+<span class="sd">            clique index is inconsistent.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
         <span class="n">size</span><span class="p">:</span> <span class="n">Counter</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">clique_size</span><span class="p">)</span>
@@ -506,6 +714,21 @@
 <span class="k">def</span> <span class="nf">_same_color_subset_pair_counts</span><span class="p">(</span>
     <span class="n">subset_counts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Counter</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count same-color clique pairs sharing at least each subset size.</span>
+
+<span class="sd">    For every subset size, sums ``comb(count, 2)`` over vertex subsets</span>
+<span class="sd">    that appear in two or more cliques, giving the number of clique pairs</span>
+<span class="sd">    that share at least that subset of vertices.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        subset_counts (dict[int, Counter[tuple[int, ...]]]): Per-subset-size</span>
+<span class="sd">            incidence counters, as produced by</span>
+<span class="sd">            :func:`_violation_subset_counts` for one color.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[int, int]: Mapping from subset size to the number of clique</span>
+<span class="sd">        pairs (of the same color) sharing at least that many vertices.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="p">{</span>
         <span class="n">size</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span>
             <span class="n">comb</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
@@ -520,6 +743,23 @@
     <span class="n">first</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Counter</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]],</span>
     <span class="n">second</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Counter</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count cross-color clique pairs sharing at least each subset size.</span>
+
+<span class="sd">    For every subset size, sums, over vertex subsets appearing in</span>
+<span class="sd">    ``first``, the product of that subset&#39;s count in ``first`` and its</span>
+<span class="sd">    count in ``second``, giving the number of (first-color, second-color)</span>
+<span class="sd">    clique pairs that share at least that subset of vertices.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        first (dict[int, Counter[tuple[int, ...]]]): Per-subset-size</span>
+<span class="sd">            incidence counters for one color (e.g. red).</span>
+<span class="sd">        second (dict[int, Counter[tuple[int, ...]]]): Per-subset-size</span>
+<span class="sd">            incidence counters for the other color (e.g. blue).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[int, int]: Mapping from subset size to the number of</span>
+<span class="sd">        cross-color clique pairs sharing at least that many vertices.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="n">first</span><span class="p">:</span>
@@ -538,7 +778,33 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">total_pairs</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Invert subset-incidence counts into exact intersection sizes.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Invert subset-incidence counts into exact intersection sizes.</span>
+
+<span class="sd">    Applies inclusion-exclusion from the largest subset size downward:</span>
+<span class="sd">    the &quot;at least ``shared``&quot; count includes every pair that actually</span>
+<span class="sd">    shares more than ``shared`` vertices, so those contributions</span>
+<span class="sd">    (weighted by ``comb(larger, shared)``, the number of ``shared``-sized</span>
+<span class="sd">    subsets of a ``larger``-sized intersection) are subtracted out to</span>
+<span class="sd">    leave the count of pairs sharing exactly ``shared`` vertices. The</span>
+<span class="sd">    zero-overlap count is the remainder after all positive counts are</span>
+<span class="sd">    accounted for against ``total_pairs``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        at_least (dict[int, int]): Mapping from subset size to the number</span>
+<span class="sd">            of clique pairs sharing at least that many vertices, as</span>
+<span class="sd">            produced by :func:`_same_color_subset_pair_counts` or</span>
+<span class="sd">            :func:`_mixed_subset_pair_counts`.</span>
+<span class="sd">        total_pairs (int): Total number of clique pairs being</span>
+<span class="sd">            categorized (e.g. ``comb(len(red_indexes), 2)``).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[int, ...]: Index ``t`` holds the number of clique pairs</span>
+<span class="sd">        sharing exactly ``t`` vertices.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If the inversion produces a negative count,</span>
+<span class="sd">            indicating an inconsistency in the input incidence counts.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">maximum_shared</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">at_least</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
     <span class="n">exact</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">maximum_shared</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
 
@@ -561,6 +827,15 @@
 <span class="k">def</span> <span class="nf">_integer_tuple</span><span class="p">(</span>
     <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an array to a plain tuple of Python ``int``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        values (NDArray): Source array of numeric values.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[int, ...]: The array&#39;s values as a tuple of ``int``,</span>
+<span class="sd">        suitable for a hashable, JSON-serializable dataclass field.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="p">)</span>
 </pre></div>
 

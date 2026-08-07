@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,16 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RPlot</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Visualization of colorings, searches, and experiment results.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Visualization of colorings, searches, and experiment results.</span>
+
+<span class="sd">Provides matplotlib-based plots for three kinds of data: the color-one</span>
+<span class="sd">edge-count histogram of one coloring&#39;s cliques (how close cliques are to</span>
+<span class="sd">monochromatic, and how many actually are), the score trajectory of one</span>
+<span class="sd">search run, and the initial/final/best score trajectory across the</span>
+<span class="sd">iterations of one experiment. Every plotting function returns the</span>
+<span class="sd">``(Figure, Axes)`` pair it drew on, and accepts an optional existing</span>
+<span class="sd">``Axes`` so plots can be composed into larger figures.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -100,9 +113,44 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Plot a binary clique histogram with exact count annotations.</span>
 
-<span class="sd">    Counts appear inside sufficiently tall bars. Counts belonging</span>
-<span class="sd">    to short or zero-height bars appear above the bar so they remain</span>
-<span class="sd">    visible.</span>
+<span class="sd">    Draws one bar per possible color-one edge count (0 through</span>
+<span class="sd">    ``edges_per_clique``), with bar height equal to the number of cliques</span>
+<span class="sd">    of ``clique_size`` vertices having that many color-one edges. Bars</span>
+<span class="sd">    are colored along a diverging colormap from one end of the axis to</span>
+<span class="sd">    the other, so the two monochromatic extremes (all edges color zero,</span>
+<span class="sd">    at the left, and all edges color one, at the right) sit visually</span>
+<span class="sd">    opposite each other; those two bars additionally get a thicker,</span>
+<span class="sd">    color-coded outline to call out the exact violation counts they</span>
+<span class="sd">    represent. Counts appear inside sufficiently tall bars. Counts</span>
+<span class="sd">    belonging to short or zero-height bars appear above the bar so they</span>
+<span class="sd">    remain visible.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        histogram (NDArray[np.integer]): Clique count by color-one edge</span>
+<span class="sd">            count, shape ``(comb(clique_size, 2) + 1,)``.</span>
+<span class="sd">        clique_size (int): Number of vertices per clique (e.g. 5 for K5),</span>
+<span class="sd">            used to compute the expected number of histogram bins and</span>
+<span class="sd">            axis labels.</span>
+<span class="sd">        ax (Axes | None): Existing axes to draw on. If ``None``, a new</span>
+<span class="sd">            figure and axes are created.</span>
+<span class="sd">        log_scale (bool): If ``True`` (the default), use a logarithmic</span>
+<span class="sd">            y-axis, with the lower limit set just below the smallest</span>
+<span class="sd">            positive count so zero-height bars remain distinguishable</span>
+<span class="sd">            from small ones.</span>
+<span class="sd">        title (str | None): Plot title. If ``None``, a title reporting</span>
+<span class="sd">            the total monochromatic count is generated.</span>
+<span class="sd">        minimum_inside_height_pixels (float): Minimum rendered bar height,</span>
+<span class="sd">            in pixels, for a count label to be placed inside the bar</span>
+<span class="sd">            rather than above it. Defaults to 18.0.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[plt.Figure, Axes]: The figure and axes the histogram was</span>
+<span class="sd">        drawn on.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``histogram`` does not have the shape implied by</span>
+<span class="sd">            ``clique_size``, if it contains negative counts, or if</span>
+<span class="sd">            ``minimum_inside_height_pixels`` is negative.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">edges_per_clique</span> <span class="o">=</span> <span class="n">comb</span><span class="p">(</span>
         <span class="n">clique_size</span><span class="p">,</span>
@@ -309,6 +357,24 @@
 <span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate and plot a symmetric binary coloring histogram.</span>
+
+<span class="sd">    Computes the color-one edge-count histogram for ``coloring`` via</span>
+<span class="sd">    :func:`ramsey.RScoring.binary_histogram` and renders it with</span>
+<span class="sd">    :func:`plot_clique_histogram`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        coloring (RColoring): Coloring to summarize. Its problem must use</span>
+<span class="sd">            exactly two colors and be symmetric.</span>
+<span class="sd">        **plot_options: Forwarded to :func:`plot_clique_histogram` (e.g.</span>
+<span class="sd">            ``ax``, ``log_scale``, ``title``).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[plt.Figure, Axes]: The figure and axes the histogram was</span>
+<span class="sd">        drawn on.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``coloring``&#39;s problem is not a symmetric</span>
+<span class="sd">            two-color problem.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">problem</span> <span class="o">=</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
 
@@ -338,6 +404,29 @@
 <span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Plot current and episode-best scores across a search.</span>
+
+<span class="sd">    Draws two lines against environment step number: the current</span>
+<span class="sd">    monochromatic score at each recorded step (which may rise and fall</span>
+<span class="sd">    as the policy explores), and the running best score seen so far</span>
+<span class="sd">    (monotonically non-increasing). Both series start from</span>
+<span class="sd">    ``result.initial_score`` at step 0.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        result (RSearchResult): Search result to plot. Must have been run</span>
+<span class="sd">            with ``record_steps=True`` if any steps were completed.</span>
+<span class="sd">        ax (Axes | None): Existing axes to draw on. If ``None``, a new</span>
+<span class="sd">            figure and axes are created.</span>
+<span class="sd">        title (str | None): Plot title. If ``None``, defaults to</span>
+<span class="sd">            ``f&quot;{result.policy_name} search&quot;``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[plt.Figure, Axes]: The figure and axes the scores were</span>
+<span class="sd">        drawn on.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``result.steps_completed`` is positive but</span>
+<span class="sd">            ``result.step_results`` is empty (the search was not run</span>
+<span class="sd">            with ``record_steps=True``).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">steps_completed</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">step_results</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -421,6 +510,23 @@
 <span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Plot initial, final, and best scores by experiment iteration.</span>
+
+<span class="sd">    Draws three lines against experiment iteration number: each</span>
+<span class="sd">    iteration&#39;s starting score, its ending score, and the best score</span>
+<span class="sd">    reached during that iteration&#39;s search. Useful for comparing outcomes</span>
+<span class="sd">    across the independent restarts or reconfigurations that make up one</span>
+<span class="sd">    experiment.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        result (RExperimentResult): Experiment result to plot.</span>
+<span class="sd">        ax (Axes | None): Existing axes to draw on. If ``None``, a new</span>
+<span class="sd">            figure and axes are created.</span>
+<span class="sd">        title (str | None): Plot title. If ``None``, defaults to</span>
+<span class="sd">            ``result.run_name``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[plt.Figure, Axes]: The figure and axes the scores were</span>
+<span class="sd">        drawn on.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">ax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">figure</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span>
@@ -500,6 +606,17 @@
 <span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Compatibility alias for the original histogram function name.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        histogram (NDArray[np.integer]): Clique count by color-one edge</span>
+<span class="sd">            count, forwarded to :func:`plot_clique_histogram`.</span>
+<span class="sd">        k_size (int): Number of vertices per clique, forwarded to</span>
+<span class="sd">            :func:`plot_clique_histogram` as ``clique_size``.</span>
+<span class="sd">        **plot_options: Forwarded to :func:`plot_clique_histogram`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[plt.Figure, Axes]: The figure and axes the histogram was</span>
+<span class="sd">        drawn on.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">plot_clique_histogram</span><span class="p">(</span>
         <span class="n">histogram</span><span class="p">,</span>

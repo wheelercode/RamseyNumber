@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -66,7 +70,15 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramsey.RState</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Mutable incremental state for one active search attempt.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Mutable incremental state for one active search attempt.</span>
+
+<span class="sd">This module defines :class:`RSearchState`, the single mutable object a</span>
+<span class="sd">search algorithm drives forward one edge flip at a time. Every mutation</span>
+<span class="sd">touches only the cliques incident to the flipped edge, so the coloring,</span>
+<span class="sd">per-clique color-one counts, global histogram, exact score, and (when in</span>
+<span class="sd">use) the action-profile cache are all updated incrementally rather than</span>
+<span class="sd">recomputed from scratch after each move.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -81,17 +93,45 @@
 <div class="viewcode-block" id="RSearchState">
 <a class="viewcode-back" href="../../ramsey.html#ramsey.RState.RSearchState">[docs]</a>
 <span class="k">class</span> <span class="nc">RSearchState</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Incrementally maintained state for symmetric two-color search.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Incrementally maintained state for symmetric two-color search.</span>
 
-<span class="sd">    RSearchState is the sole owner of mutable coloring, clique-count,</span>
-<span class="sd">    histogram, and score data.</span>
+<span class="sd">    ``RSearchState`` is the sole owner of mutable coloring, clique-count,</span>
+<span class="sd">    histogram, and score data for one search attempt. It currently</span>
+<span class="sd">    supports only symmetric two-color problems (both colors forbid the</span>
+<span class="sd">    same clique size), since the score is derived from a single</span>
+<span class="sd">    color-one-count histogram whose two ends (``histogram[0]`` and</span>
+<span class="sd">    ``histogram[-1]``) count the all-color-zero and all-color-one</span>
+<span class="sd">    cliques respectively.</span>
+
+<span class="sd">    Every exposed array property returns a read-only view that shares</span>
+<span class="sd">    memory with the state&#39;s internal buffers; callers must not attempt</span>
+<span class="sd">    to mutate them, and the view is only valid until the next mutating</span>
+<span class="sd">    call, after which it reflects the new data (or in the case of a</span>
+<span class="sd">    view into a *replaced* buffer, would no longer track it).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a search state initialized to a starting coloring.</span>
+
+<span class="sd">        Computes per-clique color-one counts, the color-one-count</span>
+<span class="sd">        histogram, and the exact score from ``coloring``. The</span>
+<span class="sd">        action-profile cache is left unbuilt (``None``) until first</span>
+<span class="sd">        requested, so search paths that never need it avoid its</span>
+<span class="sd">        construction cost.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            coloring (RColoring): Starting coloring to copy into the</span>
+<span class="sd">                new mutable state. The state takes an independent</span>
+<span class="sd">                mutable copy of the colors; ``coloring`` itself is</span>
+<span class="sd">                unaffected by later mutations.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``coloring.graph.problem`` is not a</span>
+<span class="sd">                symmetric two-color problem.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">problem</span> <span class="o">=</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
 
         <span class="k">if</span> <span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">problem</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>
@@ -130,50 +170,40 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RGraph</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the immutable graph topology.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RGraph: Immutable host-graph topology this state colors.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RSubgraphIndex</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the clique index maintained by this state.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;RSubgraphIndex: Precomputed clique-incidence index maintained by this state.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">clique_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the forbidden clique size maintained by this state.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Forbidden clique size maintained by this state.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_clique_size</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">edges_per_clique</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of edges in each maintained clique.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of edges in each maintained clique.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span><span class="o">.</span><span class="n">edges_per_clique</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">number_of_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of available edge-flip actions.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of available edge-flip actions (host-graph edges).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="o">.</span><span class="n">number_of_edges</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the current monochromatic-clique score.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Current exact monochromatic-clique score.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_score</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">version</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return the number of mutations applied to this state.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;int: Number of mutations applied to this state so far.</span>
+
+<span class="sd">        Used by cached analyses (e.g. :class:`ramsey.RAction.RActionAnalysis`)</span>
+<span class="sd">        to detect staleness after a state has been mutated.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_version</span>
 
@@ -181,8 +211,12 @@
     <span class="k">def</span> <span class="nf">colors</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return a read-only view of the current edge colors.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;NDArray[np.uint8]: Read-only view of the current edge colors.</span>
+
+<span class="sd">        Shape ``(number_of_edges,)``; entry ``e`` is the color (``0`` or</span>
+<span class="sd">        ``1``) currently assigned to host edge ``e``. The view shares</span>
+<span class="sd">        memory with this state&#39;s internal buffer and becomes stale after</span>
+<span class="sd">        the next mutation.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_only_view</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_colors</span><span class="p">)</span>
 
@@ -190,8 +224,10 @@
     <span class="k">def</span> <span class="nf">color_one_counts</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return a read-only view of per-clique color-one counts.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;NDArray[np.uint8]: Read-only view of per-clique color-one counts.</span>
+
+<span class="sd">        Shape ``(clique_count,)``; entry ``c`` is the number of</span>
+<span class="sd">        color-one edges currently in indexed clique ``c``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_only_view</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_color_one_counts</span><span class="p">)</span>
 
@@ -199,8 +235,11 @@
     <span class="k">def</span> <span class="nf">histogram</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return a read-only view of the current count histogram.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;NDArray[np.int64]: Read-only view of the current count histogram.</span>
+
+<span class="sd">        Shape ``(edges_per_clique + 1,)``; bin ``k`` is the number of</span>
+<span class="sd">        indexed cliques currently containing exactly ``k`` color-one</span>
+<span class="sd">        edges. ``score`` equals ``histogram[0] + histogram[-1]``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_only_view</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_histogram</span><span class="p">)</span>
 
@@ -208,15 +247,18 @@
     <span class="k">def</span> <span class="nf">action_profiles</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return incrementally maintained all-edge clique profiles.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;NDArray[np.uint16]: Incrementally maintained all-edge clique profiles.</span>
 
-<span class="sd">        profiles[e, k] is the number of indexed cliques containing</span>
-<span class="sd">        edge e that currently contain exactly k color-one edges.</span>
+<span class="sd">        ``profiles[e, k]`` is the number of indexed cliques containing</span>
+<span class="sd">        edge ``e`` that currently contain exactly ``k`` color-one edges.</span>
+<span class="sd">        Shape is ``(number_of_edges, edges_per_clique + 1)``.</span>
 
-<span class="sd">        The profiles are constructed only on first use.  Once they</span>
-<span class="sd">        exist, every edge flip updates only the profile contributions</span>
-<span class="sd">        of cliques affected by that flip.</span>
+<span class="sd">        The profiles are constructed only on first use (via</span>
+<span class="sd">        :meth:`_build_action_profiles`). Once built, every edge flip</span>
+<span class="sd">        updates only the profile contributions of cliques affected by</span>
+<span class="sd">        that flip (via :meth:`_update_action_profiles`), rather than</span>
+<span class="sd">        rebuilding the table. The returned array is a read-only view</span>
+<span class="sd">        that becomes stale after the next mutation.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_action_profiles</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_action_profiles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_action_profiles</span><span class="p">()</span>
@@ -228,8 +270,12 @@
     <span class="k">def</span> <span class="nf">coloring_snapshot</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return an immutable coloring containing the current state.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return an immutable coloring containing the current state.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RColoring: New immutable coloring holding a copy of the</span>
+<span class="sd">            current edge colors, decoupled from further mutations of</span>
+<span class="sd">            this state.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">RColoring</span><span class="p">(</span>
             <span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">,</span>
@@ -242,11 +288,16 @@
     <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RSearchState&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return an independent state with the same current coloring.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return an independent state with the same current coloring.</span>
 
 <span class="sd">        The copied state begins at version zero because it has its own</span>
-<span class="sd">        independent mutation history.</span>
+<span class="sd">        independent mutation history; it is not comparable via</span>
+<span class="sd">        :meth:`ramsey.RAction.RActionAnalysis.applies_to` to analyses</span>
+<span class="sd">        built from ``self``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RSearchState: New state, independently mutable, initialized</span>
+<span class="sd">            to a copy of this state&#39;s current coloring.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">RSearchState</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coloring_snapshot</span><span class="p">())</span></div>
 
@@ -257,11 +308,25 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Flip one edge and return the exact score reduction.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Flip one edge and return the exact score reduction.</span>
 
-<span class="sd">        A positive result means the score improved.</span>
-<span class="sd">        A negative result means the score became worse.</span>
+<span class="sd">        Recolors ``edge`` to the other color, then updates, for every</span>
+<span class="sd">        clique incident to ``edge``, the color-one count, the global</span>
+<span class="sd">        histogram, the exact score, and (if already built) the</span>
+<span class="sd">        action-profile cache — all incrementally, without touching any</span>
+<span class="sd">        clique not incident to ``edge``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge (int): Index of the host edge to flip.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Exact score reduction from this flip</span>
+<span class="sd">            (``old_score - new_score``). A positive result means the</span>
+<span class="sd">            score improved (fewer monochromatic K5s); a negative result</span>
+<span class="sd">            means it became worse.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If ``edge`` is out of range.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_edge</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
 
@@ -316,14 +381,13 @@
         <span class="n">edges</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
         <span class="n">colors</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Recolor several distinct edges and return exact score reduction.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Recolor several distinct edges and return exact score reduction.</span>
 
 <span class="sd">        Only edges whose requested color differs from the current color</span>
 <span class="sd">        are mutated.</span>
 
-<span class="sd">        Each changed edge goes through apply_edge_flip(), preserving all</span>
-<span class="sd">        incrementally maintained state:</span>
+<span class="sd">        Each changed edge goes through :meth:`apply_edge_flip`,</span>
+<span class="sd">        preserving all incrementally maintained state:</span>
 
 <span class="sd">        - edge colors</span>
 <span class="sd">        - K5 color counts</span>
@@ -331,6 +395,27 @@
 <span class="sd">        - monochromatic score</span>
 <span class="sd">        - action-profile cache</span>
 <span class="sd">        - state version</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edges (NDArray[np.integer]): One-dimensional array of</span>
+<span class="sd">                distinct host-edge indices to recolor.</span>
+<span class="sd">            colors (NDArray[np.integer]): One-dimensional array, the</span>
+<span class="sd">                same length as ``edges``, of requested colors (``0`` or</span>
+<span class="sd">                ``1``) for each edge.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Exact total score reduction from all resulting flips</span>
+<span class="sd">            (``old_score - new_score``).</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``edges`` or ``colors`` is not</span>
+<span class="sd">                one-dimensional, if their lengths differ, if ``edges``</span>
+<span class="sd">                contains duplicates, or if ``colors`` contains a value</span>
+<span class="sd">                other than ``0`` or ``1``.</span>
+<span class="sd">            TypeError: If ``edges`` or ``colors`` does not have an</span>
+<span class="sd">                integer dtype.</span>
+<span class="sd">            IndexError: If ``edges`` contains an out-of-range edge</span>
+<span class="sd">                index.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">edges</span><span class="p">)</span>
         <span class="n">colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">colors</span><span class="p">)</span>
@@ -409,12 +494,21 @@
     <span class="k">def</span> <span class="nf">_build_action_profiles</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Construct the complete action-profile cache from current state.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct the complete action-profile cache from current state.</span>
 
-<span class="sd">        This is the expensive full reconstruction.  It occurs at most</span>
-<span class="sd">        once per RSearchState; subsequent mutations use the incremental</span>
-<span class="sd">        update path.</span>
+<span class="sd">        This is the expensive full reconstruction: for every edge it</span>
+<span class="sd">        counts, across all cliques incident to that edge, how many fall</span>
+<span class="sd">        into each color-one-count bin. It occurs at most once per</span>
+<span class="sd">        ``RSearchState`` instance; subsequent mutations use the</span>
+<span class="sd">        incremental update path in :meth:`_update_action_profiles`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray[np.uint16]: Owned array of shape</span>
+<span class="sd">            ``(number_of_edges, edges_per_clique + 1)``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the number of cliques per edge exceeds the</span>
+<span class="sd">                ``uint16`` capacity of the action-profile cache.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span><span class="o">.</span><span class="n">cliques_per_edge</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">iinfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -451,14 +545,27 @@
         <span class="n">old_counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
         <span class="n">new_counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Update cached profiles after one edge flip.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update cached action profiles in place after one edge flip.</span>
 
 <span class="sd">        Each affected clique moves from one histogram bin to an</span>
-<span class="sd">        adjacent bin.  That move changes the action profile of every</span>
-<span class="sd">        edge contained in the clique.  Flattening (edge, bin) to one</span>
-<span class="sd">        integer lets two small bincount operations accumulate all</span>
-<span class="sd">        repeated updates efficiently in compiled NumPy code.</span>
+<span class="sd">        adjacent bin. That move changes the action profile of every</span>
+<span class="sd">        edge contained in the clique. Flattening ``(edge, bin)`` to one</span>
+<span class="sd">        integer lets two small ``bincount`` operations accumulate all</span>
+<span class="sd">        repeated updates efficiently in compiled NumPy code, avoiding a</span>
+<span class="sd">        Python-level loop over affected cliques.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            affected_cliques (NDArray[np.uint32]): Indices of the</span>
+<span class="sd">                cliques whose color-one count changed.</span>
+<span class="sd">            old_counts (NDArray[np.uint8]): Color-one count of each</span>
+<span class="sd">                affected clique before the flip.</span>
+<span class="sd">            new_counts (NDArray[np.uint8]): Color-one count of each</span>
+<span class="sd">                affected clique after the flip.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the updated profile values would fall</span>
+<span class="sd">                outside the valid ``uint16`` range, indicating a</span>
+<span class="sd">                corrupted incremental-update invariant.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_action_profiles</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
@@ -525,8 +632,14 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Validate an encoded edge index.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate an encoded edge index.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            edge (int): Edge index to validate.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If ``edge`` is negative or not less than</span>
+<span class="sd">                ``number_of_edges``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">edge</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">edge</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid edge index: </span><span class="si">{</span><span class="n">edge</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -535,8 +648,14 @@
     <span class="k">def</span> <span class="nf">_read_only_view</span><span class="p">(</span>
         <span class="n">array</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return a non-writeable view without copying array data.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a non-writeable view without copying array data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            array (NDArray): Owned array to expose read-only.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NDArray: View sharing memory with ``array``, with</span>
+<span class="sd">            ``flags.writeable`` set to ``False``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">view</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">view</span><span class="p">()</span>
         <span class="n">view</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>

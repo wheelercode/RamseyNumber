@@ -1,4 +1,16 @@
-"""Immutable host-graph topology and precomputed incidence indexes."""
+"""Immutable host-graph topology and precomputed incidence indexes.
+
+Defines :class:`RGraph`, the complete-graph host topology for one
+:class:`ramsey.RProblem.RProblem`, together with the module-level
+functions that enumerate its edges and build, for each required
+forbidden clique size, the two lookup tables search and scoring code
+depend on: which host edges belong to each clique
+(:func:`enumerate_clique_edges`), and which cliques contain each host
+edge (:func:`build_edge_to_cliques`). These tables are the incidence
+structure that lets :class:`ramsey.RState.RSearchState` update clique
+counts incrementally after a single-edge flip instead of rescanning
+every clique.
+"""
 
 from __future__ import annotations
 
@@ -21,8 +33,22 @@ EdgeToCliqueTable = NDArray[np.uint32]
 def enumerate_edges(
     n_vertices: int,
 ) -> EdgeTable:
-    """
-    Enumerate every unordered edge of the complete graph K_n.
+    """Enumerate every unordered edge of the complete graph K_n.
+
+    Args:
+        n_vertices (int): Number of vertices in the host graph; must be
+            at least two and at most 256 (the ``uint8`` vertex-index
+            limit).
+
+    Returns:
+        EdgeTable: ``uint8`` array of shape ``(comb(n_vertices, 2), 2)``
+        listing every unordered vertex pair ``(i, j)`` with ``i < j``,
+        in combinatorial (lexicographic) order. This order defines the
+        canonical host-edge index used throughout the package.
+
+    Raises:
+        ValueError: If ``n_vertices`` is less than two, or greater than
+            256.
     """
     if n_vertices < 2:
         raise ValueError("n_vertices must be at least two.")
@@ -46,8 +72,29 @@ def enumerate_clique_edges(
     n_vertices: int,
     clique_size: int,
 ) -> CliqueTable:
-    """
-    Enumerate host-edge indexes belonging to every requested clique.
+    """Enumerate host-edge indexes belonging to every requested clique.
+
+    Iterates every vertex subset of size ``clique_size`` in
+    combinatorial order and, for each, looks up the host-edge index of
+    every internal pair via a dictionary built from ``edges``.
+
+    Args:
+        edges (EdgeTable): Canonical host-edge table, as returned by
+            :func:`enumerate_edges`.
+        n_vertices (int): Number of vertices in the host graph.
+        clique_size (int): Size of the vertex subsets to enumerate;
+            must be between two and ``n_vertices``.
+
+    Returns:
+        CliqueTable: ``uint16`` array of shape
+        ``(comb(n_vertices, clique_size), comb(clique_size, 2))``. Row
+        ``c`` lists the host-edge indices of every edge within clique
+        ``c``, in combinatorial vertex-pair order.
+
+    Raises:
+        ValueError: If ``edges`` does not have the shape implied by
+            ``n_vertices``, if ``clique_size`` is out of range, or if
+            the host graph has too many edges to index with ``uint16``.
     """
     expected_edges = comb(
         n_vertices,
@@ -124,8 +171,33 @@ def build_edge_to_cliques(
     number_of_edges: int,
     clique_size: int,
 ) -> EdgeToCliqueTable:
-    """
-    List every requested clique containing each host-graph edge.
+    """List every requested clique containing each host-graph edge.
+
+    Inverts ``clique_edges`` (clique to edges) into a per-edge table
+    (edge to cliques). It flattens ``clique_edges`` and its parallel
+    clique-index array, stable-sorts by edge index to group clique
+    indices by the edge they belong to, then reshapes into a uniform
+    ``(number_of_edges, cliques_per_edge)`` table. This relies on every
+    host edge belonging to exactly the same number of indexed cliques,
+    which holds because the host graph is complete.
+
+    Args:
+        clique_edges (CliqueTable): Clique-to-edges table, as returned
+            by :func:`enumerate_clique_edges`.
+        n_vertices (int): Number of vertices in the host graph.
+        number_of_edges (int): Number of host-graph edges (rows of the
+            result).
+        clique_size (int): Size of the indexed cliques.
+
+    Returns:
+        EdgeToCliqueTable: ``uint32`` array of shape
+        ``(number_of_edges, comb(n_vertices - 2, clique_size - 2))``.
+        Row ``e`` lists the indices (into ``clique_edges``) of every
+        clique containing host edge ``e``.
+
+    Raises:
+        ValueError: If ``clique_edges`` does not have the shape implied
+            by ``n_vertices`` and ``clique_size``.
     """
     (
         number_of_cliques,
@@ -183,8 +255,17 @@ def build_edge_to_cliques(
 def _read_only(
     array: np.ndarray,
 ) -> np.ndarray:
-    """
-    Mark an owned NumPy array as immutable and return it.
+    """Mark an owned NumPy array as immutable and return it.
+
+    Unlike similar helpers in other modules, this does not copy: the
+    caller must already own ``array`` exclusively before calling this.
+
+    Args:
+        array (np.ndarray): Array to freeze in place.
+
+    Returns:
+        np.ndarray: The same array object, with ``flags.writeable`` set
+        to ``False``.
     """
     array.flags.writeable = False
     return array
@@ -192,8 +273,16 @@ def _read_only(
 
 @dataclass(frozen=True, slots=True)
 class RSubgraphIndex:
-    """
-    Precomputed occurrence tables for one forbidden clique size.
+    """Precomputed occurrence tables for one forbidden clique size.
+
+    Attributes:
+        clique_size (int): Vertex-subset size these tables index.
+        clique_edges (CliqueTable): ``uint16`` array of shape
+            ``(clique_count, edges_per_clique)``; row ``c`` lists the
+            host-edge indices belonging to clique ``c``.
+        edge_to_cliques (EdgeToCliqueTable): ``uint32`` array of shape
+            ``(number_of_edges, cliques_per_edge)``; row ``e`` lists
+            the indices of every clique containing host edge ``e``.
     """
 
     clique_size: int
@@ -202,35 +291,39 @@ class RSubgraphIndex:
 
     @property
     def clique_count(self) -> int:
-        """
-        Return the number of indexed clique occurrences.
-        """
+        """int: Number of indexed clique occurrences."""
         return len(self.clique_edges)
 
     @property
     def edges_per_clique(self) -> int:
-        """
-        Return the number of edges in each indexed clique.
-        """
+        """int: Number of edges in each indexed clique."""
         return self.clique_edges.shape[1]
 
     @property
     def cliques_per_edge(self) -> int:
-        """
-        Return the number of indexed cliques containing each edge.
-        """
+        """int: Number of indexed cliques containing each edge."""
         return self.edge_to_cliques.shape[1]
 
 
 class RGraph:
-    """
-    Complete host-graph topology required by one Ramsey problem.
+    """Complete host-graph topology required by one Ramsey problem.
+
+    Builds and owns the canonical edge table and, for every distinct
+    clique size the problem requires (:attr:`RProblem.required_clique_sizes`),
+    the precomputed :class:`RSubgraphIndex` occurrence tables used to
+    maintain clique counts incrementally.
     """
 
     def __init__(
         self,
         problem: RProblem,
     ) -> None:
+        """Build the host-graph edge table and per-clique-size indexes.
+
+        Args:
+            problem (RProblem): Ramsey problem specifying the vertex
+                count and forbidden clique sizes to index.
+        """
         self._problem = problem
 
         edges = enumerate_edges(problem.n_vertices)
@@ -266,23 +359,17 @@ class RGraph:
 
     @property
     def problem(self) -> RProblem:
-        """
-        Return the mathematical problem represented by this graph.
-        """
+        """RProblem: Mathematical problem represented by this graph."""
         return self._problem
 
     @property
     def edges(self) -> EdgeTable:
-        """
-        Return the canonical host-edge table.
-        """
+        """EdgeTable: Canonical host-edge table (see :func:`enumerate_edges`)."""
         return self._edges
 
     @property
     def number_of_edges(self) -> int:
-        """
-        Return the number of colorable host edges.
-        """
+        """int: Number of colorable host edges."""
         return len(self._edges)
 
     @property
@@ -292,8 +379,11 @@ class RGraph:
         int,
         RSubgraphIndex,
     ]:
-        """
-        Return the indexed forbidden clique sizes.
+        """Mapping[int, RSubgraphIndex]: Indexed tables keyed by clique size.
+
+        Covers every distinct clique size in
+        ``problem.required_clique_sizes``. The mapping is read-only
+        (backed by :class:`types.MappingProxyType`).
         """
         return self._subgraph_indexes
 
@@ -301,8 +391,18 @@ class RGraph:
         self,
         clique_size: int,
     ) -> RSubgraphIndex:
-        """
-        Return precomputed tables for one required clique size.
+        """Return precomputed tables for one required clique size.
+
+        Args:
+            clique_size (int): Clique size to look up.
+
+        Returns:
+            RSubgraphIndex: Precomputed occurrence tables for
+            ``clique_size``.
+
+        Raises:
+            KeyError: If ``clique_size`` was not indexed for this
+                graph's problem.
         """
         try:
             return self._subgraph_indexes[clique_size]

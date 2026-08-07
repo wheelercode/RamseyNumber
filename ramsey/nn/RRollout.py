@@ -21,6 +21,19 @@ from .RRuntime import resolve_torch_device
 class RRolloutReward(str, Enum):
     """
     State-transition quantity used as the training reward.
+
+    Selects which per-step reward reported by
+    :meth:`~ramsey.REnvironment.REnvironment.step` is used, after
+    scaling by ``RRolloutConfig.reward_scale``, as the PPO training
+    reward for that step.
+
+    Attributes:
+        EXACT_SCORE: Use the environment's ``immediate_reward``, the
+            change in exact score (count of forbidden monochromatic
+            K5 cliques) caused by the action.
+        OBJECTIVE: Use the environment's ``objective_reward``, the
+            change in the (possibly smoother) search objective caused
+            by the action.
     """
 
     EXACT_SCORE = "exact-score"
@@ -31,6 +44,25 @@ class RRolloutReward(str, Enum):
 class RRolloutConfig:
     """
     Immutable settings for one policy rollout.
+
+    Attributes:
+        rollout_steps (int): Maximum number of environment steps to
+            collect before stopping, unless the episode terminates or
+            truncates first.
+        discount (float): Discount factor ``gamma`` used by
+            :func:`calculate_advantages` for both the temporal
+            difference error and the advantage's exponential decay.
+        gae_lambda (float): Generalized Advantage Estimation decay
+            parameter ``lambda`` controlling the bias/variance
+            trade-off in :func:`calculate_advantages`.
+        reward_scale (float): Positive divisor applied to every raw
+            per-step reward before it is stored, keeping reward
+            magnitudes in a range suitable for PPO training.
+        reward_source (RRolloutReward): Which environment reward
+            quantity is used as the (unscaled) per-step reward.
+        normalize_advantages (bool): When ``True``, advantages
+            computed for the rollout are standardized to zero mean
+            and unit variance before being stored.
     """
 
     rollout_steps: int = 256
@@ -45,6 +77,24 @@ class RRolloutConfig:
     normalize_advantages: bool = True
 
     def __post_init__(self) -> None:
+        """
+        Validate, coerce, and normalize every configuration field in place.
+
+        ``rollout_steps`` must be a positive integer; ``discount`` and
+        ``gae_lambda`` must be numeric values in ``[0, 1]``;
+        ``reward_scale`` must be a positive numeric value;
+        ``reward_source`` must be convertible to :class:`RRolloutReward`;
+        ``normalize_advantages`` must be a ``bool``. Fields are
+        rewritten with their coerced values via ``object.__setattr__``
+        because the dataclass is frozen.
+
+        Raises:
+            TypeError: If a field has the wrong type (including
+                ``bool`` where an integer or float is expected).
+            ValueError: If a field fails its range check, or if
+                ``reward_source`` is not a valid :class:`RRolloutReward`
+                value.
+        """
         if isinstance(self.rollout_steps, bool) or not isinstance(
             self.rollout_steps,
             Integral,
@@ -129,6 +179,61 @@ class RRolloutConfig:
 class RRolloutBatch:
     """
     CPU-resident experiences and summary data from one rollout.
+
+    Produced by :func:`collect_rollout` and consumed by
+    :func:`ramsey.nn.RPPO.ppo_update`, which copies the required
+    tensors to the training device per minibatch. Every tensor field
+    below has a leading dimension equal to
+    :attr:`number_of_steps`, one entry per collected environment
+    step, in the order the steps were taken.
+
+    Attributes:
+        pair_inputs (torch.Tensor): Float32 tensor of shape
+            ``(number_of_steps, n_vertices, n_vertices, input_size)``
+            holding the per-step, per-vertex-pair network input
+            features used by the policy/value network.
+        available_masks (torch.Tensor): Boolean tensor of shape
+            ``(number_of_steps, number_of_edges)`` marking which
+            edges/actions were available (unblocked by tabu memory or
+            already-colored edges) at each step.
+        actions (torch.Tensor): Long tensor of shape
+            ``(number_of_steps,)`` holding the sampled edge/action
+            index at each step.
+        old_log_probabilities (torch.Tensor): Float32 tensor of shape
+            ``(number_of_steps,)`` holding the log-probability the
+            behavior policy assigned to the sampled action, used as
+            the PPO reference policy for the probability ratio.
+        rewards (torch.Tensor): Float32 tensor of shape
+            ``(number_of_steps,)`` holding the scaled per-step reward
+            (see ``RRolloutConfig.reward_scale`` and
+            ``RRolloutConfig.reward_source``).
+        old_values (torch.Tensor): Float32 tensor of shape
+            ``(number_of_steps,)`` holding the value network's
+            state-value prediction at each step, before the update.
+        advantages (torch.Tensor): Float32 tensor of shape
+            ``(number_of_steps,)`` holding the generalized advantage
+            estimate for each step, as computed by
+            :func:`calculate_advantages` and optionally normalized.
+        returns (torch.Tensor): Float32 tensor of shape
+            ``(number_of_steps,)`` holding the value-function
+            regression target (``advantages + old_values``) for each
+            step.
+        initial_score (int): Exact score of the coloring the rollout
+            started from.
+        final_score (int): Exact score of the coloring at the end of
+            the rollout (after the last collected step).
+        best_score (int): Lowest exact score observed by the
+            environment during the rollout.
+        final_coloring (RColoring): Coloring snapshot at the end of
+            the rollout.
+        best_coloring (RColoring): Best (lowest-score) coloring
+            snapshot observed during the rollout.
+        terminated (bool): Whether the environment reached a true
+            terminal search state (for example, a score-zero
+            coloring) during the rollout.
+        truncated (bool): Whether the environment stopped the episode
+            due to a step or other time limit rather than a true
+            terminal state.
     """
 
     pair_inputs: torch.Tensor
@@ -154,6 +259,15 @@ class RRolloutBatch:
     truncated: bool
 
     def __post_init__(self) -> None:
+        """
+        Verify that every per-step tensor field has equal length.
+
+        Raises:
+            ValueError: If ``pair_inputs``, ``available_masks``,
+                ``old_log_probabilities``, ``rewards``, ``old_values``,
+                ``advantages``, or ``returns`` does not have the same
+                length as ``actions``.
+        """
         number_of_steps = len(self.actions)
 
         step_tensors = (
@@ -171,10 +285,12 @@ class RRolloutBatch:
 
     @property
     def number_of_steps(self) -> int:
+        """int: Number of environment steps collected in this rollout."""
         return len(self.actions)
 
     @property
     def total_scaled_reward(self) -> float:
+        """float: Sum of the scaled per-step rewards across the rollout."""
         return float(self.rewards.sum().item())
 
 
@@ -192,8 +308,53 @@ def calculate_advantages(
     """
     Calculate generalized advantages and value-return targets.
 
-    A true terminal transition prevents value bootstrapping.
-    A time-limit truncation does not.
+    Implements Generalized Advantage Estimation (GAE), computing the
+    advantage at each step by a backward recursion over the
+    one-step temporal difference errors::
+
+        delta[t] = reward[t] + discount * next_value[t] * can_continue[t]
+            - value[t]
+        advantage[t] = delta[t]
+            + discount * gae_lambda * can_continue[t] * advantage[t + 1]
+
+    where ``next_value[t]`` is ``values[t + 1]`` for all but the last
+    step, and ``last_value`` for the last step, and
+    ``can_continue[t]`` is ``0`` when ``terminated[t]`` is ``True``
+    and ``1`` otherwise. A true terminal transition therefore prevents
+    value bootstrapping past that step (``can_continue`` zeroes out
+    both the next-value term and the recursive advantage carry-over),
+    while a time-limit truncation -- represented by the corresponding
+    ``terminated`` entry being ``False`` -- does not, so bootstrapping
+    continues using ``last_value``. Value-regression targets
+    (``returns``) are then ``advantages + values``.
+
+    Args:
+        rewards (numpy.ndarray): One-dimensional array of per-step
+            rewards, coerced to ``float32``.
+        values (numpy.ndarray): One-dimensional array of per-step
+            value predictions, coerced to ``float32``, the same
+            length as ``rewards``.
+        terminated (numpy.ndarray): One-dimensional boolean array,
+            the same length as ``rewards``, marking which steps ended
+            in a true terminal state (as opposed to a truncation).
+        last_value (float): Bootstrap value used for the step after
+            the final collected step, i.e. the value network's
+            prediction for the state the rollout stopped at (``0.0``
+            when that state is a true terminal state).
+        discount (float): Discount factor ``gamma`` in ``[0, 1]``.
+        gae_lambda (float): GAE decay parameter ``lambda`` in
+            ``[0, 1]``.
+
+    Returns:
+        tuple[numpy.ndarray, numpy.ndarray]: A ``(advantages, returns)``
+        pair, each a ``float32`` array of the same length as
+        ``rewards``.
+
+    Raises:
+        ValueError: If ``rewards``, ``values``, or ``terminated`` is
+            not one-dimensional, if their lengths differ, or if
+            ``discount`` or ``gae_lambda`` is outside ``[0, 1]``.
+        TypeError: If ``terminated`` does not have boolean dtype.
     """
     rewards = np.asarray(
         rewards,
@@ -268,8 +429,52 @@ def collect_rollout(
     """
     Collect one rollout from an explicit seed coloring.
 
-    The returned tensors remain on the CPU. Minibatches are moved to
-    the training device later by PPO.
+    Resets ``environment`` to ``coloring`` and then repeatedly: builds
+    the network input and available-action mask for the current
+    search state, samples an action from the policy's categorical
+    action distribution (network in evaluation mode, no gradient
+    tracking), records the value prediction and action
+    log-probability, and applies the action to the environment. This
+    continues for up to ``config.rollout_steps`` steps, stopping early
+    if the environment terminates or truncates. The per-step reward
+    is taken from either the environment's exact-score reward or its
+    objective reward (selected by ``config.reward_source``), divided
+    by ``config.reward_scale``. After the loop, a bootstrap value is
+    obtained: ``0.0`` if the environment reached a true terminal
+    state, otherwise the value network's prediction for the final
+    (non-terminal) state reached. Generalized advantages and returns
+    are then computed with :func:`calculate_advantages`, and
+    advantages are optionally standardized to zero mean and unit
+    variance when ``config.normalize_advantages`` is set. All
+    resulting tensors are assembled, CPU-resident, into an
+    :class:`RRolloutBatch` alongside score and coloring summaries
+    from ``environment``.
+
+    Args:
+        network (RPairPolicyValueNetwork): Policy/value network used
+            to act in the environment and to estimate values. Must
+            already reside on ``device`` and must have vertex/edge
+            dimensions matching ``environment.graph``.
+        environment (REnvironment): Search environment being driven;
+            reset to ``coloring`` at the start of the call and mutated
+            by repeated calls to ``environment.step``.
+        coloring (RColoring): Seed coloring the rollout starts from.
+        device (torch.device | str): Device the network is expected
+            to reside on and that network inputs are built for.
+            Resolved via :func:`~ramsey.nn.RRuntime.resolve_torch_device`.
+        config (RRolloutConfig): Rollout settings controlling step
+            budget, discounting, reward scaling/source, and advantage
+            normalization.
+
+    Returns:
+        RRolloutBatch: CPU-resident experiences and summary data from
+        this rollout.
+
+    Raises:
+        RuntimeError: If ``network``'s actual device does not match
+            the resolved ``device``.
+        ValueError: If ``environment.graph``'s vertex/edge dimensions
+            do not match ``network``'s.
     """
     device = resolve_torch_device(device)
 
@@ -483,6 +688,19 @@ def _require_compatible_environment(
     network: RPairPolicyValueNetwork,
     environment: REnvironment,
 ) -> None:
+    """
+    Verify that ``environment``'s host graph matches ``network``'s dimensions.
+
+    Args:
+        network (RPairPolicyValueNetwork): Policy/value network whose
+            expected vertex and edge counts are checked against.
+        environment (REnvironment): Environment supplying the host
+            graph to validate.
+
+    Raises:
+        ValueError: If the environment's number of vertices or number
+            of edges does not match the network's.
+    """
     graph = environment.graph
 
     if (
@@ -496,6 +714,22 @@ def _require_network_device(
     network: RPairPolicyValueNetwork,
     device: torch.device,
 ) -> None:
+    """
+    Verify that ``network``'s parameters already reside on ``device``.
+
+    Falls back to inspecting the ``edge_vertices`` buffer when
+    ``network`` has no parameters (``next(network.parameters())``
+    raises ``StopIteration``).
+
+    Args:
+        network (RPairPolicyValueNetwork): Network whose device
+            placement is checked.
+        device (torch.device): Expected device.
+
+    Raises:
+        RuntimeError: If ``network``'s actual device differs from
+            ``device``.
+    """
     try:
         actual_device = next(network.parameters()).device
     except StopIteration:

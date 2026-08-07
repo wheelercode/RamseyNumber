@@ -39,8 +39,12 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">ramsey</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.html">ramsey package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ramsey.nn.html">ramsey.nn package</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -91,6 +95,20 @@
 <span class="k">class</span> <span class="nc">RExperimentConfig</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Immutable settings for a sequence of search attempts.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        run_name (str): Nonempty label identifying this experiment run,</span>
+<span class="sd">            recorded with any archived colorings.</span>
+<span class="sd">        iterations (int): Number of search attempts to run, starting</span>
+<span class="sd">            at ``start_iteration``.</span>
+<span class="sd">        start_iteration (int): Iteration number of the first attempt.</span>
+<span class="sd">            Useful for resuming a run&#39;s numbering. Defaults to 0.</span>
+<span class="sd">        record_steps (bool): Whether each attempt&#39;s :class:`RSearch`</span>
+<span class="sd">            run keeps every intermediate ``RStepResult``. Defaults to</span>
+<span class="sd">            False.</span>
+<span class="sd">        stop_on_solution (bool): Whether to stop issuing further</span>
+<span class="sd">            iterations as soon as one attempt reaches an exact score</span>
+<span class="sd">            of zero. Defaults to True.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
@@ -101,6 +119,16 @@
     <span class="n">stop_on_solution</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate the configured field values.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``run_name`` is empty or whitespace-only,</span>
+<span class="sd">                ``iterations`` is not positive, or ``start_iteration``</span>
+<span class="sd">                is negative.</span>
+<span class="sd">            TypeError: If ``iterations`` or ``start_iteration`` is not</span>
+<span class="sd">                an integer, or if ``record_steps`` or</span>
+<span class="sd">                ``stop_on_solution`` is not a ``bool``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;run_name must be a nonempty string.&quot;</span><span class="p">)</span>
 
@@ -142,6 +170,18 @@
 <span class="k">class</span> <span class="nc">RExperimentIteration</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Outcome and archive metadata for one search attempt.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        iteration (int): Iteration number of this attempt.</span>
+<span class="sd">        construction_name (str): Name of the construction that</span>
+<span class="sd">            produced the seed coloring.</span>
+<span class="sd">        search_result (RSearchResult): Complete outcome of the search</span>
+<span class="sd">            attempt.</span>
+<span class="sd">        archive_record (RArchiveRecord | None): Record describing</span>
+<span class="sd">            where/how the best coloring was archived, or ``None`` if</span>
+<span class="sd">            the experiment has no archive.</span>
+<span class="sd">        new_archive_best (bool): True if ``archive_record`` improved</span>
+<span class="sd">            on the archive&#39;s previous best score for this graph.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span>
@@ -160,6 +200,14 @@
 <span class="k">class</span> <span class="nc">RExperimentResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Immutable outcome of a complete experiment run.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        run_name (str): Label identifying the experiment run.</span>
+<span class="sd">        requested_iterations (int): Number of iterations that were</span>
+<span class="sd">            requested via :class:`RExperimentConfig`; may exceed</span>
+<span class="sd">            ``completed_iterations`` if the run stopped early.</span>
+<span class="sd">        iteration_results (tuple[RExperimentIteration, ...]): Outcome</span>
+<span class="sd">            of each attempt actually completed, in order.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
@@ -171,6 +219,9 @@
     <span class="k">def</span> <span class="nf">completed_iterations</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the number of attempts actually completed.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Length of ``iteration_results``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">)</span>
 
@@ -180,6 +231,13 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RExperimentIteration</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the iteration having the lowest best score.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RExperimentIteration: The iteration result whose</span>
+<span class="sd">            ``search_result.best_score`` is lowest.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no iterations completed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Experiment contains no iteration results.&quot;</span><span class="p">)</span>
@@ -193,6 +251,12 @@
     <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the lowest exact score found.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: ``best_iteration.search_result.best_score``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no iterations completed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_iteration</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
 
@@ -200,11 +264,18 @@
     <span class="k">def</span> <span class="nf">solved</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return whether any iteration reached score zero.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if ``best_score`` is zero.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no iterations completed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span> <span class="o">==</span> <span class="mi">0</span></div>
 
 
 
+<span class="c1">#: Callback invoked with each :class:`RExperimentIteration` as it completes.</span>
 <span class="n">RExperimentObserver</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span>
     <span class="p">[</span><span class="n">RExperimentIteration</span><span class="p">],</span>
     <span class="kc">None</span><span class="p">,</span>
@@ -229,6 +300,23 @@
         <span class="n">search</span><span class="p">:</span> <span class="n">RSearch</span><span class="p">,</span>
         <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Bind an experiment to a graph, construction, search, and archive.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            graph (RGraph): Host graph attempts are run against; must</span>
+<span class="sd">                describe the same problem as ``search.environment.graph``.</span>
+<span class="sd">            construction (RConstruction): Seed-coloring generator used</span>
+<span class="sd">                once per iteration.</span>
+<span class="sd">            search (RSearch): Search coordinator run against each seed</span>
+<span class="sd">                coloring.</span>
+<span class="sd">            archive (RArchive | None): Optional store for best</span>
+<span class="sd">                colorings found by each iteration. When omitted, no</span>
+<span class="sd">                archiving occurs.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``search.environment.graph.problem`` does</span>
+<span class="sd">                not match ``graph.problem``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">search</span><span class="o">.</span><span class="n">environment</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Search environment problem does not &quot;</span> <span class="s2">&quot;match experiment graph.&quot;</span>
@@ -241,22 +329,34 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RGraph</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the host graph attempts are run against.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">construction</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RConstruction</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the seed-coloring construction used each iteration.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RSearch</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the search coordinator run against each seed coloring.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_search</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">archive</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchive</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the archive best colorings are saved to, if any.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span>
 
 <div class="viewcode-block" id="RExperiment.run">
@@ -270,9 +370,28 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the configured sequence of search attempts.</span>
 
-<span class="sd">        The observer, when supplied, is called after each completed</span>
-<span class="sd">        iteration. It can print progress, update a notebook, write</span>
-<span class="sd">        additional logs, or perform other external reporting.</span>
+<span class="sd">        For each iteration this constructs a seed coloring, runs it</span>
+<span class="sd">        through the search coordinator to termination or truncation,</span>
+<span class="sd">        optionally saves the best coloring to the archive, and reports</span>
+<span class="sd">        the outcome to ``observer``. The observer, when supplied, is</span>
+<span class="sd">        called after each completed iteration. It can print progress,</span>
+<span class="sd">        update a notebook, write additional logs, or perform other</span>
+<span class="sd">        external reporting. If ``config.stop_on_solution`` is true and</span>
+<span class="sd">        an iteration reaches an exact score of zero, no further</span>
+<span class="sd">        iterations are attempted.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config (RExperimentConfig): Settings governing how many</span>
+<span class="sd">                iterations to run and how to run them.</span>
+<span class="sd">            observer (RExperimentObserver | None): Optional callback</span>
+<span class="sd">                invoked with each completed iteration&#39;s result.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RExperimentResult: Immutable summary of every completed</span>
+<span class="sd">            iteration.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ``observer`` is supplied and is not callable.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">observer</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;observer must be callable.&quot;</span><span class="p">)</span>
