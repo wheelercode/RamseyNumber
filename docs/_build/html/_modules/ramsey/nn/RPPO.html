@@ -1,0 +1,440 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.nn.RPPO &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.nn.RPPO</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.nn.RPPO</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Proximal Policy Optimization configuration and parameter updates.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span><span class="p">,</span> <span class="n">Real</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">Categorical</span>
+
+<span class="kn">from</span> <span class="nn">.RModel</span> <span class="kn">import</span> <span class="n">RPairPolicyValueNetwork</span>
+<span class="kn">from</span> <span class="nn">.RRollout</span> <span class="kn">import</span> <span class="n">RRolloutBatch</span>
+
+
+<div class="viewcode-block" id="RPPOConfig">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RPPO.RPPOConfig">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RPPOConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Immutable hyperparameters for PPO parameter updates.&quot;&quot;&quot;</span>
+
+    <span class="n">update_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">minibatch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span>
+    <span class="n">clip_ratio</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.20</span>
+    <span class="n">value_loss_weight</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">entropy_weight</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">maximum_gradient_norm</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.50</span>
+    <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0e-4</span>
+    <span class="n">target_kl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;update_epochs&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;minibatch_size&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be an integer.&quot;</span><span class="p">)</span>
+
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be positive.&quot;</span><span class="p">)</span>
+
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+                <span class="n">value</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">numeric_fields</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;clip_ratio&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;value_loss_weight&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;entropy_weight&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;maximum_gradient_norm&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;learning_rate&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">numeric_fields</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Real</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be numeric.&quot;</span><span class="p">)</span>
+
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> cannot be negative.&quot;</span><span class="p">)</span>
+
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+                <span class="n">value</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">clip_ratio</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;clip_ratio must be positive.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">maximum_gradient_norm</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;maximum_gradient_norm must be positive.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;learning_rate must be positive.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_kl</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_kl</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">target_kl</span><span class="p">,</span>
+                <span class="n">Real</span><span class="p">,</span>
+            <span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;target_kl must be numeric or None.&quot;</span><span class="p">)</span>
+
+            <span class="n">target_kl</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_kl</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">target_kl</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;target_kl must be positive.&quot;</span><span class="p">)</span>
+
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="s2">&quot;target_kl&quot;</span><span class="p">,</span>
+                <span class="n">target_kl</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RPPOMetrics">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RPPO.RPPOMetrics">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RPPOMetrics</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Aggregated diagnostics from one PPO update.&quot;&quot;&quot;</span>
+
+    <span class="n">policy_loss</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">value_loss</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">entropy</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">approximate_kl</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">clipped_fraction</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">gradient_norm</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">minibatch_updates</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">epochs_completed</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">early_stopped</span><span class="p">:</span> <span class="nb">bool</span>
+
+<div class="viewcode-block" id="RPPOMetrics.as_dict">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RPPO.RPPOMetrics.as_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">as_dict</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bool</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return metrics in a logging-friendly dictionary.&quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;policy_loss&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">policy_loss</span><span class="p">,</span>
+            <span class="s2">&quot;value_loss&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_loss</span><span class="p">,</span>
+            <span class="s2">&quot;entropy&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">entropy</span><span class="p">,</span>
+            <span class="s2">&quot;approximate_kl&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">approximate_kl</span><span class="p">,</span>
+            <span class="s2">&quot;clipped_fraction&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">clipped_fraction</span><span class="p">,</span>
+            <span class="s2">&quot;gradient_norm&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">gradient_norm</span><span class="p">,</span>
+            <span class="s2">&quot;minibatch_updates&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">minibatch_updates</span><span class="p">,</span>
+            <span class="s2">&quot;epochs_completed&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">epochs_completed</span><span class="p">,</span>
+            <span class="s2">&quot;early_stopped&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">early_stopped</span><span class="p">,</span>
+        <span class="p">}</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="create_optimizer">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RPPO.create_optimizer">[docs]</a>
+<span class="k">def</span> <span class="nf">create_optimizer</span><span class="p">(</span>
+    <span class="n">network</span><span class="p">:</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">RPPOConfig</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create the standard Adam optimizer used by PPO.&quot;&quot;&quot;</span>
+
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span>
+        <span class="n">network</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span>
+        <span class="n">lr</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ppo_update">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RPPO.ppo_update">[docs]</a>
+<span class="k">def</span> <span class="nf">ppo_update</span><span class="p">(</span>
+    <span class="n">network</span><span class="p">:</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">,</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">,</span>
+    <span class="n">rollout</span><span class="p">:</span> <span class="n">RRolloutBatch</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">RPPOConfig</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RPPOMetrics</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Train the policy/value network using one collected rollout.</span>
+
+<span class="sd">    The rollout remains CPU-resident while the tensors required for</span>
+<span class="sd">    this update are copied to the requested training device.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">number_of_samples</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">number_of_steps</span>
+
+    <span class="k">if</span> <span class="n">number_of_samples</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot perform a PPO update &quot;</span> <span class="s2">&quot;with an empty rollout.&quot;</span><span class="p">)</span>
+
+    <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">pair_inputs</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">pair_inputs</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">available_masks</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">available_masks</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">actions</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">actions</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">old_log_probabilities</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">old_log_probabilities</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">advantages</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">advantages</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">returns</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">returns</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">policy_losses</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">value_losses</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">entropies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">approximate_kls</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">clipped_fractions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">gradient_norms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">epochs_completed</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">early_stopped</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">network</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">update_epochs</span><span class="p">):</span>
+        <span class="n">epoch_approximate_kls</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">permutation</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randperm</span><span class="p">(</span>
+            <span class="n">number_of_samples</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span>
+            <span class="mi">0</span><span class="p">,</span>
+            <span class="n">number_of_samples</span><span class="p">,</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">minibatch_size</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">permutation</span><span class="p">[</span><span class="n">start</span> <span class="p">:</span> <span class="n">start</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">minibatch_size</span><span class="p">]</span>
+
+            <span class="n">logits</span><span class="p">,</span> <span class="n">predicted_values</span> <span class="o">=</span> <span class="n">network</span><span class="p">(</span>
+                <span class="n">pair_inputs</span><span class="p">[</span><span class="n">indices</span><span class="p">],</span>
+                <span class="n">available_masks</span><span class="p">[</span><span class="n">indices</span><span class="p">],</span>
+            <span class="p">)</span>
+
+            <span class="n">distribution</span> <span class="o">=</span> <span class="n">Categorical</span><span class="p">(</span>
+                <span class="n">logits</span><span class="o">=</span><span class="n">logits</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">new_log_probabilities</span> <span class="o">=</span> <span class="n">distribution</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">actions</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span>
+
+            <span class="n">entropy</span> <span class="o">=</span> <span class="n">distribution</span><span class="o">.</span><span class="n">entropy</span><span class="p">()</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+            <span class="n">log_probability_ratio</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">new_log_probabilities</span> <span class="o">-</span> <span class="n">old_log_probabilities</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
+            <span class="p">)</span>
+
+            <span class="n">probability_ratio</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_probability_ratio</span><span class="p">)</span>
+
+            <span class="n">unclipped_objective</span> <span class="o">=</span> <span class="n">probability_ratio</span> <span class="o">*</span> <span class="n">advantages</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
+
+            <span class="n">clipped_ratio</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span>
+                <span class="n">probability_ratio</span><span class="p">,</span>
+                <span class="mf">1.0</span> <span class="o">-</span> <span class="n">config</span><span class="o">.</span><span class="n">clip_ratio</span><span class="p">,</span>
+                <span class="mf">1.0</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">clip_ratio</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">clipped_objective</span> <span class="o">=</span> <span class="n">clipped_ratio</span> <span class="o">*</span> <span class="n">advantages</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
+
+            <span class="n">policy_loss</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span>
+                <span class="n">unclipped_objective</span><span class="p">,</span>
+                <span class="n">clipped_objective</span><span class="p">,</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+            <span class="n">value_loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">predicted_values</span> <span class="o">-</span> <span class="n">returns</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+
+            <span class="n">total_loss</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">policy_loss</span>
+                <span class="o">+</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">value_loss_weight</span> <span class="o">*</span> <span class="n">value_loss</span><span class="p">)</span>
+                <span class="o">-</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">entropy_weight</span> <span class="o">*</span> <span class="n">entropy</span><span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">(</span>
+                <span class="n">set_to_none</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">total_loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+
+            <span class="n">gradient_norm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">clip_grad_norm_</span><span class="p">(</span>
+                <span class="n">network</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">maximum_gradient_norm</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+
+            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                <span class="c1"># This is a nonnegative approximation of</span>
+                <span class="c1"># KL(old_policy || new_policy):</span>
+                <span class="c1">#</span>
+                <span class="c1">#     ratio - 1 - log(ratio)</span>
+                <span class="c1">#</span>
+                <span class="c1"># Unlike mean(old_log_prob - new_log_prob),</span>
+                <span class="c1"># this estimator is nonnegative for each sample.</span>
+                <span class="n">approximate_kl</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">probability_ratio</span> <span class="o">-</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">log_probability_ratio</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+                <span class="n">clipped_fraction</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">probability_ratio</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">config</span><span class="o">.</span><span class="n">clip_ratio</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">float</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="p">)</span>
+
+            <span class="n">policy_loss_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">policy_loss</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+            <span class="n">value_loss_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value_loss</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+            <span class="n">entropy_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">entropy</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+            <span class="n">approximate_kl_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">approximate_kl</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+            <span class="n">clipped_fraction_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">clipped_fraction</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+            <span class="n">gradient_norm_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">gradient_norm</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+            <span class="n">policy_losses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">policy_loss_value</span><span class="p">)</span>
+
+            <span class="n">value_losses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value_loss_value</span><span class="p">)</span>
+
+            <span class="n">entropies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entropy_value</span><span class="p">)</span>
+
+            <span class="n">approximate_kls</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">approximate_kl_value</span><span class="p">)</span>
+
+            <span class="n">epoch_approximate_kls</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">approximate_kl_value</span><span class="p">)</span>
+
+            <span class="n">clipped_fractions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">clipped_fraction_value</span><span class="p">)</span>
+
+            <span class="n">gradient_norms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gradient_norm_value</span><span class="p">)</span>
+
+        <span class="n">epochs_completed</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">target_kl</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">epoch_approximate_kls</span>
+            <span class="ow">and</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">epoch_approximate_kls</span><span class="p">))</span> <span class="o">&gt;</span> <span class="n">config</span><span class="o">.</span><span class="n">target_kl</span>
+        <span class="p">):</span>
+            <span class="n">early_stopped</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">break</span>
+
+    <span class="k">return</span> <span class="n">RPPOMetrics</span><span class="p">(</span>
+        <span class="n">policy_loss</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">policy_losses</span><span class="p">)),</span>
+        <span class="n">value_loss</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">value_losses</span><span class="p">)),</span>
+        <span class="n">entropy</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">entropies</span><span class="p">)),</span>
+        <span class="n">approximate_kl</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">approximate_kls</span><span class="p">)),</span>
+        <span class="n">clipped_fraction</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">clipped_fractions</span><span class="p">)),</span>
+        <span class="n">gradient_norm</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">gradient_norms</span><span class="p">)),</span>
+        <span class="n">minibatch_updates</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">policy_losses</span><span class="p">),</span>
+        <span class="n">epochs_completed</span><span class="o">=</span><span class="n">epochs_completed</span><span class="p">,</span>
+        <span class="n">early_stopped</span><span class="o">=</span><span class="n">early_stopped</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

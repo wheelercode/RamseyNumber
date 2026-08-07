@@ -1,0 +1,312 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RFlexibilityPolicy &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RFlexibilityPolicy</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RFlexibilityPolicy</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Adaptive edge policy that treats flexibility as search capital.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span><span class="p">,</span> <span class="n">Real</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">.RActionFlexibility</span> <span class="kn">import</span> <span class="n">calculate_action_flexibility_landscape</span>
+<span class="kn">from</span> <span class="nn">.REnvironment</span> <span class="kn">import</span> <span class="n">REnvironment</span>
+<span class="kn">from</span> <span class="nn">.RFlexibility</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DEFAULT_FLEXIBILITY_BUDGETS</span><span class="p">,</span>
+    <span class="n">calculate_flexibility</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RPolicy</span> <span class="kn">import</span> <span class="n">RPolicy</span>
+
+
+<div class="viewcode-block" id="RFlexibilityPolicyConfig">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.RFlexibilityPolicyConfig">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RFlexibilityPolicyConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configure when and how the policy buys back flexibility.&quot;&quot;&quot;</span>
+
+    <span class="n">budgets</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_FLEXIBILITY_BUDGETS</span>
+
+    <span class="c1"># F(b) monitored as the maneuverability reserve.</span>
+    <span class="n">monitor_budget</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span>
+
+    <span class="c1"># Above this floor the policy follows ordinary exact greedy score.</span>
+    <span class="n">flexibility_floor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.10</span>
+
+    <span class="c1"># When below the floor, allow score-neutral actions and temporary</span>
+    <span class="c1"># worsening up to this amount, then maximize future F(b). Positive</span>
+    <span class="c1"># actions remain candidates; they simply stop receiving automatic</span>
+    <span class="c1"># priority over structurally more flexible alternatives.</span>
+    <span class="n">maximum_temporary_damage</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Reuse the canonical budget validation.</span>
+        <span class="n">probe</span> <span class="o">=</span> <span class="n">calculate_flexibility</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">budgets</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">monitor_budget</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">monitor_budget</span><span class="p">,</span>
+            <span class="n">Integral</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;monitor_budget must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="n">monitor_budget</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">monitor_budget</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">monitor_budget</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">probe</span><span class="o">.</span><span class="n">budgets</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;monitor_budget must be present in budgets.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">flexibility_floor</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">flexibility_floor</span><span class="p">,</span>
+            <span class="n">Real</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;flexibility_floor must be numeric.&quot;</span><span class="p">)</span>
+
+        <span class="n">flexibility_floor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">flexibility_floor</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;=</span> <span class="n">flexibility_floor</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;flexibility_floor must lie between zero and one.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">maximum_temporary_damage</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">maximum_temporary_damage</span><span class="p">,</span>
+            <span class="n">Integral</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;maximum_temporary_damage must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="n">maximum_temporary_damage</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">maximum_temporary_damage</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">maximum_temporary_damage</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;maximum_temporary_damage cannot be negative.&quot;</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;monitor_budget&quot;</span><span class="p">,</span> <span class="n">monitor_budget</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;flexibility_floor&quot;</span><span class="p">,</span> <span class="n">flexibility_floor</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;maximum_temporary_damage&quot;</span><span class="p">,</span>
+            <span class="n">maximum_temporary_damage</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RFlexibilityPolicyDecision">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.RFlexibilityPolicyDecision">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RFlexibilityPolicyDecision</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Explain one adaptive policy choice for experiment reporting.&quot;&quot;&quot;</span>
+
+    <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">immediate_reward</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">current_flexibility</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">resulting_flexibility</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">candidate_count</span><span class="p">:</span> <span class="nb">int</span></div>
+
+
+
+<div class="viewcode-block" id="select_flexibility_action">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.select_flexibility_action">[docs]</a>
+<span class="k">def</span> <span class="nf">select_flexibility_action</span><span class="p">(</span>
+    <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
+    <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">RFlexibilityPolicyConfig</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RFlexibilityPolicyDecision</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Select one edge while preserving a configurable flexibility reserve.&quot;&quot;&quot;</span>
+    <span class="n">environment_analysis</span> <span class="o">=</span> <span class="n">environment</span><span class="o">.</span><span class="n">analyze_actions</span><span class="p">()</span>
+    <span class="n">action_analysis</span> <span class="o">=</span> <span class="n">environment_analysis</span><span class="o">.</span><span class="n">action_analysis</span>
+    <span class="n">rewards</span> <span class="o">=</span> <span class="n">action_analysis</span><span class="o">.</span><span class="n">immediate_rewards</span>
+    <span class="n">available</span> <span class="o">=</span> <span class="n">environment_analysis</span><span class="o">.</span><span class="n">available_mask</span>
+
+    <span class="n">current</span> <span class="o">=</span> <span class="n">calculate_flexibility</span><span class="p">(</span>
+        <span class="n">rewards</span><span class="p">,</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">budgets</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">current_flexibility</span> <span class="o">=</span> <span class="n">current</span><span class="o">.</span><span class="n">fraction_at</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">monitor_budget</span><span class="p">)</span>
+
+    <span class="n">available_rewards</span> <span class="o">=</span> <span class="n">rewards</span><span class="p">[</span><span class="n">available</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">available_rewards</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;No actions are available.&quot;</span><span class="p">)</span>
+
+    <span class="n">best_reward</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">available_rewards</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">current_flexibility</span> <span class="o">&gt;=</span> <span class="n">config</span><span class="o">.</span><span class="n">flexibility_floor</span><span class="p">:</span>
+        <span class="n">candidates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+            <span class="n">available</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">rewards</span> <span class="o">==</span> <span class="n">best_reward</span><span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="n">edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">candidates</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">RFlexibilityPolicyDecision</span><span class="p">(</span>
+            <span class="n">edge</span><span class="o">=</span><span class="n">edge</span><span class="p">,</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;score&quot;</span><span class="p">,</span>
+            <span class="n">immediate_reward</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">rewards</span><span class="p">[</span><span class="n">edge</span><span class="p">]),</span>
+            <span class="n">current_flexibility</span><span class="o">=</span><span class="n">current_flexibility</span><span class="p">,</span>
+            <span class="n">resulting_flexibility</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">candidate_count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">candidates</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="n">minimum_reward</span> <span class="o">=</span> <span class="o">-</span><span class="n">config</span><span class="o">.</span><span class="n">maximum_temporary_damage</span>
+    <span class="n">candidate_mask</span> <span class="o">=</span> <span class="n">available</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">rewards</span> <span class="o">&gt;=</span> <span class="n">minimum_reward</span><span class="p">)</span>
+
+    <span class="c1"># A sufficiently rigid state can have no action inside the configured</span>
+    <span class="c1"># damage budget. Fall back to the least-damaging available actions so</span>
+    <span class="c1"># the policy remains total rather than deadlocking.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">candidate_mask</span><span class="p">):</span>
+        <span class="n">candidate_mask</span> <span class="o">=</span> <span class="n">available</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">rewards</span> <span class="o">==</span> <span class="n">best_reward</span><span class="p">)</span>
+
+    <span class="n">landscape</span> <span class="o">=</span> <span class="n">calculate_action_flexibility_landscape</span><span class="p">(</span>
+        <span class="n">environment</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+        <span class="n">analysis</span><span class="o">=</span><span class="n">action_analysis</span><span class="p">,</span>
+        <span class="n">budgets</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">budgets</span><span class="p">,</span>
+        <span class="n">candidate_mask</span><span class="o">=</span><span class="n">candidate_mask</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">budget_index</span> <span class="o">=</span> <span class="n">landscape</span><span class="o">.</span><span class="n">budget_index</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">monitor_budget</span><span class="p">)</span>
+    <span class="n">future_values</span> <span class="o">=</span> <span class="n">landscape</span><span class="o">.</span><span class="n">resulting_fractions</span><span class="p">[:,</span> <span class="n">budget_index</span><span class="p">]</span>
+    <span class="n">best_future</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">future_values</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+
+    <span class="n">best_flexibility_rows</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">future_values</span><span class="p">,</span> <span class="n">best_future</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Once future flexibility ties, spend as little score as possible.</span>
+    <span class="n">tied_rewards</span> <span class="o">=</span> <span class="n">landscape</span><span class="o">.</span><span class="n">score_rewards</span><span class="p">[</span><span class="n">best_flexibility_rows</span><span class="p">]</span>
+    <span class="n">best_tied_reward</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">tied_rewards</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+    <span class="n">final_rows</span> <span class="o">=</span> <span class="n">best_flexibility_rows</span><span class="p">[</span>
+        <span class="n">tied_rewards</span> <span class="o">==</span> <span class="n">best_tied_reward</span>
+    <span class="p">]</span>
+    <span class="n">row</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">final_rows</span><span class="p">))</span>
+    <span class="n">edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">landscape</span><span class="o">.</span><span class="n">candidate_edges</span><span class="p">[</span><span class="n">row</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">RFlexibilityPolicyDecision</span><span class="p">(</span>
+        <span class="n">edge</span><span class="o">=</span><span class="n">edge</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;flexibility&quot;</span><span class="p">,</span>
+        <span class="n">immediate_reward</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">landscape</span><span class="o">.</span><span class="n">score_rewards</span><span class="p">[</span><span class="n">row</span><span class="p">]),</span>
+        <span class="n">current_flexibility</span><span class="o">=</span><span class="n">current_flexibility</span><span class="p">,</span>
+        <span class="n">resulting_flexibility</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">future_values</span><span class="p">[</span><span class="n">row</span><span class="p">]),</span>
+        <span class="n">candidate_count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">landscape</span><span class="o">.</span><span class="n">candidate_edges</span><span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RFlexibilityPolicy">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.RFlexibilityPolicy">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RFlexibilityPolicy</span><span class="p">(</span><span class="n">RPolicy</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;RPolicy adapter for adaptive score/flexibility selection.&quot;&quot;&quot;</span>
+
+    <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">RFlexibilityPolicyConfig</span> <span class="o">=</span> <span class="n">RFlexibilityPolicyConfig</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;adaptive-flexibility&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">requires_full_analysis</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="RFlexibilityPolicy.select_action">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RFlexibilityPolicy.RFlexibilityPolicy.select_action">[docs]</a>
+    <span class="k">def</span> <span class="nf">select_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">select_flexibility_action</span><span class="p">(</span>
+            <span class="n">environment</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">edge</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

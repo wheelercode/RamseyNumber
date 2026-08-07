@@ -1,0 +1,364 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RExperiment &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RExperiment</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RExperiment</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Reproducible assembly and execution of search experiments.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+
+<span class="kn">from</span> <span class="nn">.RArchive</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RArchive</span><span class="p">,</span>
+    <span class="n">RArchiveRecord</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RConstruction</span> <span class="kn">import</span> <span class="n">RConstruction</span>
+<span class="kn">from</span> <span class="nn">.RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+<span class="kn">from</span> <span class="nn">.RSearch</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RSearch</span><span class="p">,</span>
+    <span class="n">RSearchResult</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="RExperimentConfig">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RExperiment.RExperimentConfig">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RExperimentConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Immutable settings for a sequence of search attempts.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">iterations</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">start_iteration</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">record_steps</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">stop_on_solution</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;run_name must be a nonempty string.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iterations</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">iterations</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;iterations must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">iterations</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;iterations must be positive.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start_iteration</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">start_iteration</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;start_iteration must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_iteration</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;start_iteration cannot be negative.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">record_steps</span><span class="p">,</span>
+            <span class="nb">bool</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;record_steps must be boolean.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stop_on_solution</span><span class="p">,</span>
+            <span class="nb">bool</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;stop_on_solution must be boolean.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RExperimentIteration">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RExperiment.RExperimentIteration">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RExperimentIteration</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Outcome and archive metadata for one search attempt.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">construction_name</span><span class="p">:</span> <span class="nb">str</span>
+
+    <span class="n">search_result</span><span class="p">:</span> <span class="n">RSearchResult</span>
+    <span class="n">archive_record</span><span class="p">:</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span>
+
+    <span class="n">new_archive_best</span><span class="p">:</span> <span class="nb">bool</span></div>
+
+
+
+<div class="viewcode-block" id="RExperimentResult">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RExperiment.RExperimentResult">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RExperimentResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Immutable outcome of a complete experiment run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">requested_iterations</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">iteration_results</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RExperimentIteration</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">completed_iterations</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the number of attempts actually completed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_iteration</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RExperimentIteration</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the iteration having the lowest best score.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Experiment contains no iteration results.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">,</span>
+            <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">result</span><span class="p">:</span> <span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the lowest exact score found.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_iteration</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solved</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return whether any iteration reached score zero.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span> <span class="o">==</span> <span class="mi">0</span></div>
+
+
+
+<span class="n">RExperimentObserver</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span>
+    <span class="p">[</span><span class="n">RExperimentIteration</span><span class="p">],</span>
+    <span class="kc">None</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="RExperiment">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RExperiment.RExperiment">[docs]</a>
+<span class="k">class</span> <span class="nc">RExperiment</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Coordinate construction, search, archival, and reporting.</span>
+
+<span class="sd">    RExperiment is deliberately thin. It does not implement any</span>
+<span class="sd">    construction, policy, environment behavior, scoring, plotting,</span>
+<span class="sd">    or database storage itself.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+        <span class="n">construction</span><span class="p">:</span> <span class="n">RConstruction</span><span class="p">,</span>
+        <span class="n">search</span><span class="p">:</span> <span class="n">RSearch</span><span class="p">,</span>
+        <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">search</span><span class="o">.</span><span class="n">environment</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Search environment problem does not &quot;</span> <span class="s2">&quot;match experiment graph.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span> <span class="o">=</span> <span class="n">graph</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span> <span class="o">=</span> <span class="n">construction</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_search</span> <span class="o">=</span> <span class="n">search</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span> <span class="o">=</span> <span class="n">archive</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RGraph</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">construction</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RConstruction</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RSearch</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_search</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">archive</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchive</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span>
+
+<div class="viewcode-block" id="RExperiment.run">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RExperiment.RExperiment.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">RExperimentConfig</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">observer</span><span class="p">:</span> <span class="n">RExperimentObserver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RExperimentResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run the configured sequence of search attempts.</span>
+
+<span class="sd">        The observer, when supplied, is called after each completed</span>
+<span class="sd">        iteration. It can print progress, update a notebook, write</span>
+<span class="sd">        additional logs, or perform other external reporting.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">observer</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;observer must be callable.&quot;</span><span class="p">)</span>
+
+        <span class="n">iteration_results</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RExperimentIteration</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">ending_iteration</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">start_iteration</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">iterations</span>
+
+        <span class="k">for</span> <span class="n">iteration</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">start_iteration</span><span class="p">,</span>
+            <span class="n">ending_iteration</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">seed_coloring</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">)</span>
+
+            <span class="n">search_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_search</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="n">seed_coloring</span><span class="p">,</span>
+                <span class="n">record_steps</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">record_steps</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">archive_record</span><span class="p">:</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="n">new_archive_best</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">previous_best</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="o">.</span><span class="n">best_score</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">)</span>
+
+                <span class="n">archive_record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="o">.</span><span class="n">save_coloring</span><span class="p">(</span>
+                    <span class="n">search_result</span><span class="o">.</span><span class="n">best_coloring</span><span class="p">,</span>
+                    <span class="n">run_name</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span>
+                    <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="n">new_archive_best</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">previous_best</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">archive_record</span><span class="o">.</span><span class="n">score</span> <span class="o">&lt;</span> <span class="n">previous_best</span>
+                <span class="p">)</span>
+
+            <span class="n">iteration_result</span> <span class="o">=</span> <span class="n">RExperimentIteration</span><span class="p">(</span>
+                <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+                <span class="n">construction_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_construction</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">search_result</span><span class="o">=</span><span class="n">search_result</span><span class="p">,</span>
+                <span class="n">archive_record</span><span class="o">=</span><span class="n">archive_record</span><span class="p">,</span>
+                <span class="n">new_archive_best</span><span class="o">=</span><span class="n">new_archive_best</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">iteration_results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iteration_result</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">observer</span><span class="p">(</span><span class="n">iteration_result</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">stop_on_solution</span> <span class="ow">and</span> <span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">break</span>
+
+        <span class="k">return</span> <span class="n">RExperimentResult</span><span class="p">(</span>
+            <span class="n">run_name</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span>
+            <span class="n">requested_iterations</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">iterations</span><span class="p">,</span>
+            <span class="n">iteration_results</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">iteration_results</span><span class="p">),</span>
+        <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

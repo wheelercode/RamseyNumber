@@ -1,0 +1,645 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.nn.RTraining &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.nn.RTraining</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.nn.RTraining</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;End-to-end orchestration of PPO training experiments.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">..RArchive</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RArchive</span><span class="p">,</span>
+    <span class="n">RArchiveRecord</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">..RConstruction</span> <span class="kn">import</span> <span class="n">RConstruction</span>
+<span class="kn">from</span> <span class="nn">..RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">..REnvironment</span> <span class="kn">import</span> <span class="n">REnvironment</span>
+<span class="kn">from</span> <span class="nn">..RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+<span class="kn">from</span> <span class="nn">.RCheckpoint</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">save_training_checkpoint</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RModel</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RPairPolicyValueNetwork</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RPPO</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RPPOConfig</span><span class="p">,</span>
+    <span class="n">RPPOMetrics</span><span class="p">,</span>
+    <span class="n">ppo_update</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RRollout</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RRolloutBatch</span><span class="p">,</span>
+    <span class="n">RRolloutConfig</span><span class="p">,</span>
+    <span class="n">collect_rollout</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="RTrainingConfig">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RTrainingConfig">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RTrainingConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for a sequence of PPO training iterations.&quot;&quot;&quot;</span>
+
+    <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">iterations</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">start_iteration</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">stop_on_solution</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span>
+                <span class="nb">str</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;run_name must be a nonempty string.&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;iterations&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;start_iteration&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+                <span class="n">value</span><span class="p">,</span>
+                <span class="n">Integral</span><span class="p">,</span>
+            <span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be an integer.&quot;</span><span class="p">)</span>
+
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="n">minimum</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;iterations&quot;</span> <span class="k">else</span> <span class="mi">0</span>
+
+            <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="n">minimum</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be at least </span><span class="si">{</span><span class="n">minimum</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+                <span class="n">value</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stop_on_solution</span><span class="p">,</span>
+            <span class="nb">bool</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;stop_on_solution must be boolean.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RCheckpointSchedule">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RCheckpointSchedule">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RCheckpointSchedule</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Optional periodic and final checkpoint schedule.&quot;&quot;&quot;</span>
+
+    <span class="n">directory</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span>
+    <span class="n">save_final</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">directory</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;directory&quot;</span><span class="p">,</span>
+            <span class="n">directory</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">,</span>
+            <span class="nb">bool</span><span class="p">,</span>
+        <span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">,</span>
+            <span class="n">Integral</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;interval must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="n">interval</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">interval</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;interval must be positive.&quot;</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;interval&quot;</span><span class="p">,</span>
+            <span class="n">interval</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save_final</span><span class="p">,</span>
+            <span class="nb">bool</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;save_final must be boolean.&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RCheckpointSchedule.path_for">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RCheckpointSchedule.path_for">[docs]</a>
+    <span class="k">def</span> <span class="nf">path_for</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the checkpoint path for one iteration.&quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">directory</span> <span class="o">/</span> <span class="p">(</span><span class="s2">&quot;ramsey_policy_iteration_&quot;</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">iteration</span><span class="si">:</span><span class="s2">06d</span><span class="si">}</span><span class="s2">.pt&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="RTrainingIteration">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RTrainingIteration">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RTrainingIteration</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compact outcome and persistence data for one iteration.&quot;&quot;&quot;</span>
+
+    <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">construction_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">construction_source</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">initial_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">final_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">best_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">steps_completed</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">total_scaled_reward</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">final_coloring</span><span class="p">:</span> <span class="n">RColoring</span>
+    <span class="n">best_coloring</span><span class="p">:</span> <span class="n">RColoring</span>
+    <span class="n">terminated</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">truncated</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">metrics</span><span class="p">:</span> <span class="n">RPPOMetrics</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">archive_record</span><span class="p">:</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">new_archive_best</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">parameter_update_performed</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this iteration trained the network.&quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="RTrainingResult">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RTrainingResult">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RTrainingResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of a complete PPO training run.&quot;&quot;&quot;</span>
+
+    <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">requested_iterations</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">iteration_results</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RTrainingIteration</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">completed_iterations</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of completed training iterations.&quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_iteration</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RTrainingIteration</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the iteration with the lowest score.&quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Training contains no iteration results.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">iteration_results</span><span class="p">,</span>
+            <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">result</span><span class="p">:</span> <span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">best_score</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the lowest score found during training.&quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_iteration</span><span class="o">.</span><span class="n">best_score</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solved</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether training found a score-zero coloring.&quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span> <span class="o">==</span> <span class="mi">0</span></div>
+
+
+
+<span class="n">RTrainingObserver</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span>
+    <span class="p">[</span><span class="n">RTrainingIteration</span><span class="p">],</span>
+    <span class="kc">None</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="RPPOTrainer">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RPPOTrainer">[docs]</a>
+<span class="k">class</span> <span class="nc">RPPOTrainer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Coordinate seed construction, rollouts, PPO updates, and persistence.</span>
+
+<span class="sd">    The trainer does not implement graph construction, environment</span>
+<span class="sd">    behavior, scoring, neural encoding, PPO mathematics, archiving,</span>
+<span class="sd">    or checkpoint serialization. It only coordinates those objects.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+        <span class="n">construction</span><span class="p">:</span> <span class="n">RConstruction</span><span class="p">,</span>
+        <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
+        <span class="n">network</span><span class="p">:</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">,</span>
+        <span class="n">rollout_config</span><span class="p">:</span> <span class="n">RRolloutConfig</span><span class="p">,</span>
+        <span class="n">ppo_config</span><span class="p">:</span> <span class="n">RPPOConfig</span><span class="p">,</span>
+        <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">environment</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Environment problem does not match &quot;</span> <span class="s2">&quot;training graph.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">network</span><span class="o">.</span><span class="n">n_vertices</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+            <span class="ow">or</span> <span class="n">network</span><span class="o">.</span><span class="n">number_of_edges</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Network dimensions do not match &quot;</span> <span class="s2">&quot;training graph.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">rng</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;rng must be a NumPy Generator.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span> <span class="o">=</span> <span class="n">graph</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span> <span class="o">=</span> <span class="n">construction</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span> <span class="o">=</span> <span class="n">environment</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_network</span> <span class="o">=</span> <span class="n">network</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span> <span class="o">=</span> <span class="n">optimizer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_rng</span> <span class="o">=</span> <span class="n">rng</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_rollout_config</span> <span class="o">=</span> <span class="n">rollout_config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ppo_config</span> <span class="o">=</span> <span class="n">ppo_config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span> <span class="o">=</span> <span class="n">archive</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">graph</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RGraph</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">construction</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RConstruction</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">environment</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REnvironment</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">network</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RPairPolicyValueNetwork</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_network</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">optimizer</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">device</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">rng</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rng</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">rollout_config</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RRolloutConfig</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rollout_config</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">ppo_config</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RPPOConfig</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ppo_config</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">archive</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchive</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span>
+
+<div class="viewcode-block" id="RPPOTrainer.run">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.RTraining.RPPOTrainer.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">RTrainingConfig</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">checkpoint_schedule</span><span class="p">:</span> <span class="n">RCheckpointSchedule</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">observer</span><span class="p">:</span> <span class="n">RTrainingObserver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RTrainingResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run sequential PPO iterations.</span>
+
+<span class="sd">        A new seed coloring is constructed for every iteration.</span>
+<span class="sd">        Each nonempty rollout is immediately used for one PPO update.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">observer</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;observer must be callable.&quot;</span><span class="p">)</span>
+
+        <span class="n">results</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RTrainingIteration</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">ending_iteration</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">start_iteration</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">iterations</span>
+
+        <span class="k">for</span> <span class="n">iteration</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">start_iteration</span><span class="p">,</span>
+            <span class="n">ending_iteration</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">seed_coloring</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">)</span>
+
+            <span class="n">construction_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span><span class="o">.</span><span class="n">name</span>
+            <span class="n">construction_source</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span><span class="o">.</span><span class="n">last_source_name</span>
+
+            <span class="n">rollout</span> <span class="o">=</span> <span class="n">collect_rollout</span><span class="p">(</span>
+                <span class="n">network</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="p">,</span>
+                <span class="n">environment</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="p">,</span>
+                <span class="n">coloring</span><span class="o">=</span><span class="n">seed_coloring</span><span class="p">,</span>
+                <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
+                <span class="n">config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_rollout_config</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">metrics</span><span class="p">:</span> <span class="n">RPPOMetrics</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="c1"># A terminal seed produces an empty rollout. There is</span>
+            <span class="c1"># nothing to train from, but it can still be archived</span>
+            <span class="c1"># and reported as a solution.</span>
+            <span class="k">if</span> <span class="n">rollout</span><span class="o">.</span><span class="n">number_of_steps</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">metrics</span> <span class="o">=</span> <span class="n">ppo_update</span><span class="p">(</span>
+                    <span class="n">network</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="p">,</span>
+                    <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span><span class="p">,</span>
+                    <span class="n">rollout</span><span class="o">=</span><span class="n">rollout</span><span class="p">,</span>
+                    <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
+                    <span class="n">config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_ppo_config</span><span class="p">,</span>
+                <span class="p">)</span>
+
+            <span class="p">(</span>
+                <span class="n">archive_record</span><span class="p">,</span>
+                <span class="n">new_archive_best</span><span class="p">,</span>
+            <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive_rollout</span><span class="p">(</span>
+                <span class="n">rollout</span><span class="p">,</span>
+                <span class="n">run_name</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span>
+                <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">solved</span> <span class="o">=</span> <span class="n">rollout</span><span class="o">.</span><span class="n">best_score</span> <span class="o">==</span> <span class="mi">0</span>
+
+            <span class="n">final_requested_iteration</span> <span class="o">=</span> <span class="n">iteration</span> <span class="o">==</span> <span class="n">ending_iteration</span> <span class="o">-</span> <span class="mi">1</span>
+
+            <span class="n">checkpoint_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_checkpoint_if_due</span><span class="p">(</span>
+                <span class="n">checkpoint_schedule</span><span class="p">,</span>
+                <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+                <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+                <span class="n">final_requested_iteration</span><span class="o">=</span><span class="n">final_requested_iteration</span><span class="p">,</span>
+                <span class="n">solved</span><span class="o">=</span><span class="n">solved</span><span class="p">,</span>
+                <span class="n">archive_record</span><span class="o">=</span><span class="n">archive_record</span><span class="p">,</span>
+                <span class="n">construction_source</span><span class="o">=</span><span class="n">construction_source</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">iteration_result</span> <span class="o">=</span> <span class="n">RTrainingIteration</span><span class="p">(</span>
+                <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+                <span class="n">construction_name</span><span class="o">=</span><span class="n">construction_name</span><span class="p">,</span>
+                <span class="n">construction_source</span><span class="o">=</span><span class="n">construction_source</span><span class="p">,</span>
+                <span class="n">initial_score</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">initial_score</span><span class="p">,</span>
+                <span class="n">final_score</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">final_score</span><span class="p">,</span>
+                <span class="n">best_score</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">best_score</span><span class="p">,</span>
+                <span class="n">steps_completed</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">number_of_steps</span><span class="p">,</span>
+                <span class="n">total_scaled_reward</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">total_scaled_reward</span><span class="p">,</span>
+                <span class="n">final_coloring</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">final_coloring</span><span class="p">,</span>
+                <span class="n">best_coloring</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">best_coloring</span><span class="p">,</span>
+                <span class="n">terminated</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">terminated</span><span class="p">,</span>
+                <span class="n">truncated</span><span class="o">=</span><span class="n">rollout</span><span class="o">.</span><span class="n">truncated</span><span class="p">,</span>
+                <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">,</span>
+                <span class="n">archive_record</span><span class="o">=</span><span class="n">archive_record</span><span class="p">,</span>
+                <span class="n">new_archive_best</span><span class="o">=</span><span class="n">new_archive_best</span><span class="p">,</span>
+                <span class="n">checkpoint_path</span><span class="o">=</span><span class="n">checkpoint_path</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iteration_result</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">observer</span><span class="p">(</span><span class="n">iteration_result</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">stop_on_solution</span> <span class="ow">and</span> <span class="n">solved</span><span class="p">:</span>
+                <span class="k">break</span>
+
+        <span class="k">return</span> <span class="n">RTrainingResult</span><span class="p">(</span>
+            <span class="n">run_name</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span>
+            <span class="n">requested_iterations</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">iterations</span><span class="p">,</span>
+            <span class="n">iteration_results</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">results</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_archive_rollout</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">rollout</span><span class="p">:</span> <span class="n">RRolloutBatch</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span>
+        <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Archive the best coloring found during one rollout.&quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span>
+
+        <span class="n">previous_best</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="o">.</span><span class="n">best_score</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">)</span>
+
+        <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="o">.</span><span class="n">save_coloring</span><span class="p">(</span>
+            <span class="n">rollout</span><span class="o">.</span><span class="n">best_coloring</span><span class="p">,</span>
+            <span class="n">run_name</span><span class="o">=</span><span class="n">run_name</span><span class="p">,</span>
+            <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">new_archive_best</span> <span class="o">=</span> <span class="n">previous_best</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">record</span><span class="o">.</span><span class="n">score</span> <span class="o">&lt;</span> <span class="n">previous_best</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">record</span><span class="p">,</span>
+            <span class="n">new_archive_best</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_checkpoint_if_due</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">schedule</span><span class="p">:</span> <span class="n">RCheckpointSchedule</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">RTrainingConfig</span><span class="p">,</span>
+        <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">final_requested_iteration</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">solved</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">archive_record</span><span class="p">:</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">construction_source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save and return a checkpoint path when scheduled.&quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">schedule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">iterations_completed</span> <span class="o">=</span> <span class="n">iteration</span> <span class="o">-</span> <span class="n">config</span><span class="o">.</span><span class="n">start_iteration</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">periodic</span> <span class="o">=</span> <span class="n">iterations_completed</span> <span class="o">%</span> <span class="n">schedule</span><span class="o">.</span><span class="n">interval</span> <span class="o">==</span> <span class="mi">0</span>
+
+        <span class="n">final</span> <span class="o">=</span> <span class="n">schedule</span><span class="o">.</span><span class="n">save_final</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">final_requested_iteration</span> <span class="ow">or</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">stop_on_solution</span> <span class="ow">and</span> <span class="n">solved</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">periodic</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">final</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span>
+            <span class="nb">str</span><span class="p">,</span>
+            <span class="nb">object</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;run_name&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">run_name</span><span class="p">),</span>
+            <span class="s2">&quot;construction_name&quot;</span><span class="p">:</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_construction</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+            <span class="s2">&quot;construction_source&quot;</span><span class="p">:</span> <span class="n">construction_source</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="n">archive_record</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;coloring_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">archive_record</span><span class="o">.</span><span class="n">coloring_id</span>
+
+            <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;best_score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">archive_record</span><span class="o">.</span><span class="n">score</span>
+
+        <span class="k">return</span> <span class="n">save_training_checkpoint</span><span class="p">(</span>
+            <span class="n">schedule</span><span class="o">.</span><span class="n">path_for</span><span class="p">(</span><span class="n">iteration</span><span class="p">),</span>
+            <span class="n">network</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_network</span><span class="p">,</span>
+            <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span><span class="p">,</span>
+            <span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">,</span>
+            <span class="n">rollout_config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_rollout_config</span><span class="p">,</span>
+            <span class="n">ppo_config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_ppo_config</span><span class="p">,</span>
+            <span class="n">completed_iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+            <span class="n">rng</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_rng</span><span class="p">,</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

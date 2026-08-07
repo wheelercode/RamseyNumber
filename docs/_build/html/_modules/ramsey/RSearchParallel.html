@@ -1,0 +1,429 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RSearchParallel &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RSearchParallel</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RSearchParallel</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Process-parallel execution of independent exact-greedy searches.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">ProcessPoolExecutor</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">perf_counter</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterable</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">.REnvironment</span> <span class="kn">import</span> <span class="n">REnvironment</span>
+<span class="kn">from</span> <span class="nn">.REnvironmentConfig</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">REnvironmentConfig</span><span class="p">,</span>
+    <span class="n">RTabuMemoryConfig</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.REnvironmentMemory</span> <span class="kn">import</span> <span class="n">RTabuMemory</span>
+<span class="kn">from</span> <span class="nn">.RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+<span class="kn">from</span> <span class="nn">.RObjective</span> <span class="kn">import</span> <span class="n">RMonochromaticObjective</span>
+<span class="kn">from</span> <span class="nn">.RPolicy</span> <span class="kn">import</span> <span class="n">RGreedyPolicy</span>
+<span class="kn">from</span> <span class="nn">.RProblem</span> <span class="kn">import</span> <span class="n">RProblem</span>
+<span class="kn">from</span> <span class="nn">.RSearch</span> <span class="kn">import</span> <span class="n">RSearch</span>
+
+
+<div class="viewcode-block" id="RExactGreedyProcessConfig">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearchParallel.RExactGreedyProcessConfig">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RExactGreedyProcessConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Immutable configuration shared by exact-greedy workers.&quot;&quot;&quot;</span>
+
+    <span class="n">problem</span><span class="p">:</span> <span class="n">RProblem</span>
+    <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironmentConfig</span>
+    <span class="n">memory</span><span class="p">:</span> <span class="n">RTabuMemoryConfig</span></div>
+
+
+
+<div class="viewcode-block" id="RParallelSearchTask">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearchParallel.RParallelSearchTask">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RParallelSearchTask</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One coloring and deterministic policy seed sent to a worker.&quot;&quot;&quot;</span>
+
+    <span class="n">task_id</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">colors</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]</span>
+    <span class="n">action_seed</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">task_id</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">task_id</span><span class="p">,</span>
+            <span class="n">Integral</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;task_id must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action_seed</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">action_seed</span><span class="p">,</span>
+            <span class="n">Integral</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;action_seed must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="n">task_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">task_id</span><span class="p">)</span>
+        <span class="n">action_seed</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action_seed</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">task_id</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;task_id cannot be negative.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">action_seed</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;action_seed cannot be negative.&quot;</span><span class="p">)</span>
+
+        <span class="n">colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">colors</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">colors</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;colors must be one-dimensional.&quot;</span><span class="p">)</span>
+
+        <span class="n">colors</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;task_id&quot;</span><span class="p">,</span>
+            <span class="n">task_id</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;action_seed&quot;</span><span class="p">,</span>
+            <span class="n">action_seed</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;colors&quot;</span><span class="p">,</span>
+            <span class="n">colors</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RParallelSearchResult">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearchParallel.RParallelSearchResult">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RParallelSearchResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compact worker result returned to the parent process.&quot;&quot;&quot;</span>
+
+    <span class="n">task_id</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">initial_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">final_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">best_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">best_colors</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]</span>
+    <span class="n">elapsed_seconds</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">best_colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">best_colors</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="n">best_colors</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;best_colors&quot;</span><span class="p">,</span>
+            <span class="n">best_colors</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<span class="n">_WORKER_CONFIG</span><span class="p">:</span> <span class="n">RExactGreedyProcessConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_WORKER_GRAPH</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<span class="k">def</span> <span class="nf">_initialize_exact_greedy_worker</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">RExactGreedyProcessConfig</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build immutable graph indexing once inside a worker process.&quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_WORKER_CONFIG</span>
+    <span class="k">global</span> <span class="n">_WORKER_GRAPH</span>
+
+    <span class="n">_WORKER_CONFIG</span> <span class="o">=</span> <span class="n">config</span>
+    <span class="n">_WORKER_GRAPH</span> <span class="o">=</span> <span class="n">RGraph</span><span class="p">(</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">problem</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_run_exact_greedy_task</span><span class="p">(</span>
+    <span class="n">task</span><span class="p">:</span> <span class="n">RParallelSearchTask</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RParallelSearchResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute one independent exact-greedy search in a worker.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">_WORKER_CONFIG</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">_WORKER_GRAPH</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Parallel search worker was not initialized.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">_WORKER_GRAPH</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">_WORKER_CONFIG</span>
+
+    <span class="k">if</span> <span class="n">task</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Task coloring edge count does not match &quot;</span>
+            <span class="s2">&quot;the worker graph.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">environment</span> <span class="o">=</span> <span class="n">REnvironment</span><span class="p">(</span>
+        <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">,</span>
+        <span class="n">objective</span><span class="o">=</span><span class="n">RMonochromaticObjective</span><span class="p">(),</span>
+        <span class="n">memory</span><span class="o">=</span><span class="n">RTabuMemory</span><span class="p">(</span>
+            <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">memory</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">environment</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">policy</span> <span class="o">=</span> <span class="n">RGreedyPolicy</span><span class="p">(</span>
+        <span class="n">rng</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span>
+            <span class="n">task</span><span class="o">.</span><span class="n">action_seed</span>
+        <span class="p">),</span>
+        <span class="n">use_objective_reward</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">search</span> <span class="o">=</span> <span class="n">RSearch</span><span class="p">(</span>
+        <span class="n">environment</span><span class="o">=</span><span class="n">environment</span><span class="p">,</span>
+        <span class="n">policy</span><span class="o">=</span><span class="n">policy</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">coloring</span> <span class="o">=</span> <span class="n">RColoring</span><span class="p">(</span>
+        <span class="n">graph</span><span class="p">,</span>
+        <span class="n">task</span><span class="o">.</span><span class="n">colors</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">start</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">search</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">coloring</span><span class="p">,</span>
+        <span class="n">record_steps</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">elapsed</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+    <span class="k">return</span> <span class="n">RParallelSearchResult</span><span class="p">(</span>
+        <span class="n">task_id</span><span class="o">=</span><span class="n">task</span><span class="o">.</span><span class="n">task_id</span><span class="p">,</span>
+        <span class="n">initial_score</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">initial_score</span><span class="p">,</span>
+        <span class="n">final_score</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">final_score</span><span class="p">,</span>
+        <span class="n">best_score</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">best_score</span><span class="p">,</span>
+        <span class="n">best_colors</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">best_coloring</span><span class="o">.</span><span class="n">colors</span><span class="p">,</span>
+        <span class="n">elapsed_seconds</span><span class="o">=</span><span class="n">elapsed</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="RExactGreedyProcessPool">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearchParallel.RExactGreedyProcessPool">[docs]</a>
+<span class="k">class</span> <span class="nc">RExactGreedyProcessPool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reusable process pool for independent exact-greedy searches.</span>
+
+<span class="sd">    The expensive graph/K5 indexing is constructed once per worker.</span>
+<span class="sd">    A pool may then execute multiple generations of tasks before it is</span>
+<span class="sd">    closed.  The pool never reads from or writes to an archive.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">RExactGreedyProcessConfig</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">max_workers</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">max_workers</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">max_workers</span><span class="p">,</span>
+            <span class="n">Integral</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;max_workers must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="n">max_workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_workers</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">max_workers</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;max_workers must be positive.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_max_workers</span> <span class="o">=</span> <span class="n">max_workers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span><span class="p">:</span> <span class="n">ProcessPoolExecutor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">max_workers</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_max_workers</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">running</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="RExactGreedyProcessPool.start">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearchParallel.RExactGreedyProcessPool.start">[docs]</a>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Start worker processes if the pool is not already running.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span> <span class="o">=</span> <span class="n">ProcessPoolExecutor</span><span class="p">(</span>
+            <span class="n">max_workers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_max_workers</span><span class="p">,</span>
+            <span class="n">initializer</span><span class="o">=</span><span class="n">_initialize_exact_greedy_worker</span><span class="p">,</span>
+            <span class="n">initargs</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">,),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RExactGreedyProcessPool.run">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearchParallel.RExactGreedyProcessPool.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">tasks</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">RParallelSearchTask</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RParallelSearchResult</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Execute one batch of tasks and preserve input order.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Process pool failed to start.&quot;</span><span class="p">)</span>
+
+        <span class="n">task_tuple</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">tasks</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">task_tuple</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                <span class="n">_run_exact_greedy_task</span><span class="p">,</span>
+                <span class="n">task_tuple</span><span class="p">,</span>
+                <span class="n">chunksize</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RExactGreedyProcessPool.close">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearchParallel.RExactGreedyProcessPool.close">[docs]</a>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shut down all worker processes.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span>
+            <span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">cancel_futures</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_executor</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RExactGreedyProcessPool&quot;</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">exception_type</span><span class="p">,</span>
+        <span class="n">exception_value</span><span class="p">,</span>
+        <span class="n">traceback</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

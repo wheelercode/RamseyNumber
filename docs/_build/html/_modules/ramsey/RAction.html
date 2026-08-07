@@ -1,0 +1,436 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RAction &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RAction</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RAction</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Consequences and exact score changes for candidate search actions.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RState</span> <span class="kn">import</span> <span class="n">RSearchState</span>
+
+<span class="n">ActionProfiles</span> <span class="o">=</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
+<span class="n">HistogramDeltas</span> <span class="o">=</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">_owned_read_only</span><span class="p">(</span>
+    <span class="n">array</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Copy an array, mark the copy read-only, and return it.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">owned</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">owned</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="n">owned</span>
+
+
+<div class="viewcode-block" id="RActionAnalysis">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RAction.RActionAnalysis">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RActionAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Exact consequences of every single-edge flip in one state.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
+    <span class="n">state_version</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">profiles</span><span class="p">:</span> <span class="n">ActionProfiles</span>
+    <span class="n">histogram_deltas</span><span class="p">:</span> <span class="n">HistogramDeltas</span>
+
+    <span class="n">immediate_rewards</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">resulting_scores</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">number_of_actions</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">immediate_rewards</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiles</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">number_of_actions</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;profiles and immediate_rewards &quot;</span>
+                <span class="s2">&quot;must describe the same number &quot;</span>
+                <span class="s2">&quot;of actions.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">histogram_deltas</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">number_of_actions</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;histogram_deltas and &quot;</span>
+                <span class="s2">&quot;immediate_rewards must describe &quot;</span>
+                <span class="s2">&quot;the same number of actions.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">resulting_scores</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="n">number_of_actions</span><span class="p">,):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;resulting_scores has the &quot;</span> <span class="s2">&quot;wrong shape.&quot;</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;state_version&quot;</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state_version</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;profiles&quot;</span><span class="p">,</span>
+            <span class="n">_owned_read_only</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">profiles</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;histogram_deltas&quot;</span><span class="p">,</span>
+            <span class="n">_owned_read_only</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">histogram_deltas</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;immediate_rewards&quot;</span><span class="p">,</span>
+            <span class="n">_owned_read_only</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">immediate_rewards</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;resulting_scores&quot;</span><span class="p">,</span>
+            <span class="n">_owned_read_only</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resulting_scores</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">number_of_actions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the number of analyzed edge flips.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">immediate_rewards</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RActionAnalysis.applies_to">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RAction.RActionAnalysis.applies_to">[docs]</a>
+    <span class="k">def</span> <span class="nf">applies_to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return whether this analysis belongs to the current state.</span>
+
+<span class="sd">        Both object identity and state version are checked. Two</span>
+<span class="sd">        different states at version zero are not interchangeable.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="edge_clique_profiles">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RAction.edge_clique_profiles">[docs]</a>
+<span class="k">def</span> <span class="nf">edge_clique_profiles</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ActionProfiles</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Count affected cliques by current color-one edge count.</span>
+
+<span class="sd">    profiles[e, k] is the number of indexed cliques containing</span>
+<span class="sd">    edge e that currently have exactly k color-one edges.</span>
+
+<span class="sd">    RSearchState constructs this information lazily and maintains it</span>
+<span class="sd">    incrementally after each edge flip.  Return an owned copy so this</span>
+<span class="sd">    function retains its original value-returning behavior.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">state</span><span class="o">.</span><span class="n">action_profiles</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="all_histogram_deltas">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RAction.all_histogram_deltas">[docs]</a>
+<span class="k">def</span> <span class="nf">all_histogram_deltas</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">profiles</span><span class="p">:</span> <span class="n">ActionProfiles</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HistogramDeltas</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the global histogram delta for every edge flip.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">profiles</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Expected profile shape &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">expected_shape</span><span class="si">}</span><span class="s2">, received &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">profiles</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">deltas</span> <span class="o">=</span> <span class="o">-</span><span class="n">profiles</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="n">red_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span> <span class="o">==</span> <span class="mi">0</span>
+
+    <span class="n">blue_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span> <span class="o">==</span> <span class="mi">1</span>
+
+    <span class="c1"># Color zero to color one:</span>
+    <span class="c1"># histogram bin k moves to k + 1.</span>
+    <span class="n">deltas</span><span class="p">[</span>
+        <span class="n">red_edges</span><span class="p">,</span>
+        <span class="mi">1</span><span class="p">:,</span>
+    <span class="p">]</span> <span class="o">+=</span> <span class="n">profiles</span><span class="p">[</span>
+        <span class="n">red_edges</span><span class="p">,</span>
+        <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">]</span>
+
+    <span class="c1"># Color one to color zero:</span>
+    <span class="c1"># histogram bin k moves to k - 1.</span>
+    <span class="n">deltas</span><span class="p">[</span>
+        <span class="n">blue_edges</span><span class="p">,</span>
+        <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">+=</span> <span class="n">profiles</span><span class="p">[</span>
+        <span class="n">blue_edges</span><span class="p">,</span>
+        <span class="mi">1</span><span class="p">:,</span>
+    <span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">deltas</span></div>
+
+
+
+<div class="viewcode-block" id="all_immediate_rewards">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RAction.all_immediate_rewards">[docs]</a>
+<span class="k">def</span> <span class="nf">all_immediate_rewards</span><span class="p">(</span>
+    <span class="n">histogram_deltas</span><span class="p">:</span> <span class="n">HistogramDeltas</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the exact score reduction for every histogram delta.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">histogram_deltas</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;histogram_deltas must be &quot;</span> <span class="s2">&quot;two-dimensional.&quot;</span><span class="p">)</span>
+
+    <span class="n">score_changes</span> <span class="o">=</span> <span class="n">histogram_deltas</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">histogram_deltas</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="o">-</span><span class="n">score_changes</span></div>
+
+
+
+<div class="viewcode-block" id="immediate_rewards_for_edges">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RAction.immediate_rewards_for_edges">[docs]</a>
+<span class="k">def</span> <span class="nf">immediate_rewards_for_edges</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">edge_indices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate exact score reductions for selected edge flips.</span>
+
+<span class="sd">    This is the fast path. It avoids constructing complete profiles</span>
+<span class="sd">    and histogram deltas for every action.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">edge_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+        <span class="n">edge_indices</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">edge_indices</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;edge_indices must be &quot;</span> <span class="s2">&quot;one-dimensional.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">edge_indices</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+            <span class="mi">0</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">edge_indices</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">edge_indices</span> <span class="o">&gt;=</span> <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">&quot;edge_indices contains &quot;</span> <span class="s2">&quot;an invalid edge.&quot;</span><span class="p">)</span>
+
+    <span class="n">affected_counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span><span class="p">[</span><span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span><span class="n">edge_indices</span><span class="p">]]</span>
+
+    <span class="n">selected_colors</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span><span class="p">[</span><span class="n">edge_indices</span><span class="p">]</span>
+
+    <span class="n">rewards</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">edge_indices</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">red_edges</span> <span class="o">=</span> <span class="n">selected_colors</span> <span class="o">==</span> <span class="mi">0</span>
+
+    <span class="n">blue_edges</span> <span class="o">=</span> <span class="n">selected_colors</span> <span class="o">==</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">red_edges</span><span class="p">):</span>
+        <span class="n">red_counts</span> <span class="o">=</span> <span class="n">affected_counts</span><span class="p">[</span><span class="n">red_edges</span><span class="p">]</span>
+
+        <span class="n">destroyed_red_cliques</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span>
+            <span class="n">red_counts</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">created_blue_cliques</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span>
+            <span class="n">red_counts</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">rewards</span><span class="p">[</span><span class="n">red_edges</span><span class="p">]</span> <span class="o">=</span> <span class="n">destroyed_red_cliques</span> <span class="o">-</span> <span class="n">created_blue_cliques</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">blue_edges</span><span class="p">):</span>
+        <span class="n">blue_counts</span> <span class="o">=</span> <span class="n">affected_counts</span><span class="p">[</span><span class="n">blue_edges</span><span class="p">]</span>
+
+        <span class="n">destroyed_blue_cliques</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span>
+            <span class="n">blue_counts</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span><span class="p">,</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">created_red_cliques</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span>
+            <span class="n">blue_counts</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">rewards</span><span class="p">[</span><span class="n">blue_edges</span><span class="p">]</span> <span class="o">=</span> <span class="n">destroyed_blue_cliques</span> <span class="o">-</span> <span class="n">created_red_cliques</span>
+
+    <span class="k">return</span> <span class="n">rewards</span></div>
+
+
+
+<div class="viewcode-block" id="analyze_actions">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RAction.analyze_actions">[docs]</a>
+<span class="k">def</span> <span class="nf">analyze_actions</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RActionAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the exact consequences of every edge flip.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">profiles</span> <span class="o">=</span> <span class="n">edge_clique_profiles</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+    <span class="n">histogram_deltas</span> <span class="o">=</span> <span class="n">all_histogram_deltas</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+        <span class="n">profiles</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">immediate_rewards</span> <span class="o">=</span> <span class="n">all_immediate_rewards</span><span class="p">(</span><span class="n">histogram_deltas</span><span class="p">)</span>
+
+    <span class="n">resulting_scores</span> <span class="o">=</span> <span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">score</span> <span class="o">-</span> <span class="n">immediate_rewards</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">RActionAnalysis</span><span class="p">(</span>
+        <span class="n">source_state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
+        <span class="n">state_version</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+        <span class="n">profiles</span><span class="o">=</span><span class="n">profiles</span><span class="p">,</span>
+        <span class="n">histogram_deltas</span><span class="o">=</span><span class="n">histogram_deltas</span><span class="p">,</span>
+        <span class="n">immediate_rewards</span><span class="o">=</span><span class="n">immediate_rewards</span><span class="p">,</span>
+        <span class="n">resulting_scores</span><span class="o">=</span><span class="n">resulting_scores</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="resulting_histograms">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RAction.resulting_histograms">[docs]</a>
+<span class="k">def</span> <span class="nf">resulting_histograms</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">analysis</span><span class="p">:</span> <span class="n">RActionAnalysis</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the complete resulting histogram for every action.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis</span><span class="o">.</span><span class="n">applies_to</span><span class="p">(</span><span class="n">state</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Action analysis belongs to &quot;</span> <span class="s2">&quot;an earlier state version.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">histogram</span><span class="p">[</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span>
+            <span class="p">:,</span>
+        <span class="p">]</span>
+        <span class="o">+</span> <span class="n">analysis</span><span class="o">.</span><span class="n">histogram_deltas</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

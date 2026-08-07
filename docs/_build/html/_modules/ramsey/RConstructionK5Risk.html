@@ -1,0 +1,614 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RConstructionK5Risk &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RConstructionK5Risk</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RConstructionK5Risk</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Incremental K5 construction guided by overlapping partial-K5 risk.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">combinations</span><span class="p">,</span> <span class="n">permutations</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">.RConstruction</span> <span class="kn">import</span> <span class="n">RConstruction</span>
+<span class="kn">from</span> <span class="nn">.RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+
+
+<span class="k">def</span> <span class="nf">_balanced_k5_cycle_patterns</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the 12 labeled red/blue C5-complement-C5 patterns.</span>
+
+<span class="sd">    Color one is the five-cycle.  Color zero is its complement, which</span>
+<span class="sd">    is also a five-cycle.  Consequently neither color contains a</span>
+<span class="sd">    triangle and every pattern contains exactly five edges of each</span>
+<span class="sd">    color.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">local_edges</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+        <span class="n">combinations</span><span class="p">(</span>
+            <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">),</span>
+            <span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">edge_lookup</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">edge</span><span class="p">:</span> <span class="n">index</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">edge</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">local_edges</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="n">patterns</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="c1"># Fix vertex zero as the first cycle vertex. Rotations disappear;</span>
+    <span class="c1"># reversing a cycle produces the same undirected edge set and is</span>
+    <span class="c1"># removed automatically by the set.</span>
+    <span class="k">for</span> <span class="n">tail</span> <span class="ow">in</span> <span class="n">permutations</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">)):</span>
+        <span class="n">cycle</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">*</span><span class="n">tail</span><span class="p">)</span>
+        <span class="n">cycle_edges</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">((</span><span class="n">cycle</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">cycle</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="mi">5</span><span class="p">])))</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+        <span class="p">}</span>
+
+        <span class="n">pattern</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">local_edges</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">cycle_edges</span><span class="p">:</span>
+            <span class="n">pattern</span><span class="p">[</span><span class="n">edge_lookup</span><span class="p">[</span><span class="n">edge</span><span class="p">]]</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="n">patterns</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pattern</span><span class="p">))</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+        <span class="nb">sorted</span><span class="p">(</span><span class="n">patterns</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">10</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Expected exactly 12 labeled balanced K5 cycle patterns.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="n">K5_BALANCED_CYCLE_PATTERNS</span> <span class="o">=</span> <span class="n">_balanced_k5_cycle_patterns</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="RK5RiskConstructionReport">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionK5Risk.RK5RiskConstructionReport">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RK5RiskConstructionReport</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Diagnostics from one completed K5-risk construction.&quot;&quot;&quot;</span>
+
+    <span class="n">macro_steps</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">balanced_pattern_steps</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">fallback_pattern_steps</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">risk_ties</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">red_edges</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">blue_edges</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">total_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_edges</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_edges</span></div>
+
+
+
+<div class="viewcode-block" id="RK5RiskConstruction">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionK5Risk.RK5RiskConstruction">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RK5RiskConstruction</span><span class="p">(</span><span class="n">RConstruction</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Build a coloring by completing carefully selected K5s.</span>
+
+<span class="sd">    The constructor prefers incomplete K5s having at least</span>
+<span class="sd">    ``preferred_new_edges`` uncolored edges, while choosing the most</span>
+<span class="sd">    constrained member of that group.  With the default value four,</span>
+<span class="sd">    the construction naturally grows from one completed K5 into K5s</span>
+<span class="sd">    sharing four vertices with already colored structure.</span>
+
+<span class="sd">    Whenever the existing assignments are compatible with one of the</span>
+<span class="sd">    12 balanced C5/complement-C5 K5 colorings, only those patterns are</span>
+<span class="sd">    considered.  Otherwise all compatible nonmonochromatic assignments</span>
+<span class="sd">    of the target K5&#39;s remaining edges are considered.</span>
+
+<span class="sd">    Each candidate is scored jointly over every partial K5 containing</span>
+<span class="sd">    at least one newly colored edge.  Lower expected future</span>
+<span class="sd">    monochromatic risk wins.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
+    <span class="n">minimum_pressure_edges</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">preferred_new_edges</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">risk_epsilon</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0e-12</span>
+
+    <span class="n">_last_report</span><span class="p">:</span> <span class="n">RK5RiskConstructionReport</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;rng must be a NumPy Generator.&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;minimum_pressure_edges&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;preferred_new_edges&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be an integer.&quot;</span><span class="p">)</span>
+
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be positive.&quot;</span><span class="p">)</span>
+
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;risk_epsilon cannot be negative.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="s2">&quot;k5-risk-&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;pressure-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span><span class="si">}</span><span class="s2">-&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;new-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">preferred_new_edges</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">last_report</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RK5RiskConstructionReport</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_report</span>
+
+<div class="viewcode-block" id="RK5RiskConstruction.construct">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionK5Risk.RK5RiskConstruction.construct">[docs]</a>
+    <span class="k">def</span> <span class="nf">construct</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+        <span class="n">problem</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
+
+        <span class="k">if</span> <span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">problem</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;RK5RiskConstruction requires a symmetric two-color &quot;</span>
+                <span class="s2">&quot;Ramsey problem.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">problem</span><span class="o">.</span><span class="n">required_clique_sizes</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">5</span><span class="p">,):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;RK5RiskConstruction currently requires K5 scoring.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">index</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">subgraph_index</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+        <span class="n">edges_per_clique</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">edges_per_clique</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span> <span class="o">&gt;</span> <span class="n">edges_per_clique</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;minimum_pressure_edges cannot exceed ten.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">preferred_new_edges</span> <span class="o">&gt;</span> <span class="n">edges_per_clique</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;preferred_new_edges cannot exceed ten.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">risk_weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_risk_weights</span><span class="p">(</span><span class="n">edges_per_clique</span><span class="p">)</span>
+
+        <span class="c1"># -1 is uncolored; zero and one are the two final colors.</span>
+        <span class="n">colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+            <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+            <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">red_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="n">index</span><span class="o">.</span><span class="n">clique_count</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">blue_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">red_counts</span><span class="p">)</span>
+        <span class="n">assigned_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">red_counts</span><span class="p">)</span>
+
+        <span class="n">macro_steps</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">balanced_pattern_steps</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">fallback_pattern_steps</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">risk_ties</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">while</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">colors</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_select_target_clique</span><span class="p">(</span>
+                <span class="n">assigned_counts</span><span class="o">=</span><span class="n">assigned_counts</span><span class="p">,</span>
+                <span class="n">edges_per_clique</span><span class="o">=</span><span class="n">edges_per_clique</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">target_edges</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span><span class="n">target</span><span class="p">]</span>
+            <span class="n">target_colors</span> <span class="o">=</span> <span class="n">colors</span><span class="p">[</span><span class="n">target_edges</span><span class="p">]</span>
+            <span class="n">uncolored_positions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+                <span class="n">target_colors</span> <span class="o">&lt;</span> <span class="mi">0</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">uncolored_positions</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="s2">&quot;Selected target K5 contains no uncolored edges.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">candidate_patterns</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_candidate_patterns</span><span class="p">(</span>
+                <span class="n">target_colors</span>
+            <span class="p">)</span>
+
+            <span class="n">used_balanced_patterns</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">candidate_patterns</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">used_balanced_patterns</span><span class="p">:</span>
+                <span class="n">candidate_patterns</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fallback_patterns</span><span class="p">(</span>
+                    <span class="n">target_colors</span>
+                <span class="p">)</span>
+
+            <span class="n">new_edges</span> <span class="o">=</span> <span class="n">target_edges</span><span class="p">[</span><span class="n">uncolored_positions</span><span class="p">]</span>
+            <span class="n">affected_cliques</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span>
+                <span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span>
+                    <span class="n">new_edges</span>
+                <span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="n">local_positions</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span>
+                    <span class="n">affected_cliques</span><span class="p">,</span>
+                    <span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">edge</span><span class="p">)],</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">new_edges</span>
+            <span class="p">)</span>
+
+            <span class="n">risks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">candidate_patterns</span><span class="p">),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">base_red</span> <span class="o">=</span> <span class="n">red_counts</span><span class="p">[</span><span class="n">affected_cliques</span><span class="p">]</span>
+            <span class="n">base_blue</span> <span class="o">=</span> <span class="n">blue_counts</span><span class="p">[</span><span class="n">affected_cliques</span><span class="p">]</span>
+
+            <span class="k">for</span> <span class="n">candidate_index</span><span class="p">,</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+                <span class="n">candidate_patterns</span>
+            <span class="p">):</span>
+                <span class="n">candidate_red</span> <span class="o">=</span> <span class="n">base_red</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                <span class="n">candidate_blue</span> <span class="o">=</span> <span class="n">base_blue</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+                <span class="k">for</span> <span class="n">new_index</span><span class="p">,</span> <span class="n">local_position</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+                    <span class="n">uncolored_positions</span>
+                <span class="p">):</span>
+                    <span class="n">color</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">pattern</span><span class="p">[</span><span class="n">local_position</span><span class="p">])</span>
+                    <span class="n">affected_positions</span> <span class="o">=</span> <span class="n">local_positions</span><span class="p">[</span><span class="n">new_index</span><span class="p">]</span>
+
+                    <span class="k">if</span> <span class="n">color</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">candidate_red</span><span class="p">[</span><span class="n">affected_positions</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">candidate_blue</span><span class="p">[</span><span class="n">affected_positions</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="n">risks</span><span class="p">[</span><span class="n">candidate_index</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partial_risk</span><span class="p">(</span>
+                    <span class="n">candidate_red</span><span class="p">,</span>
+                    <span class="n">candidate_blue</span><span class="p">,</span>
+                    <span class="n">risk_weights</span><span class="p">,</span>
+                <span class="p">)</span>
+
+            <span class="n">minimum_risk</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">risks</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+            <span class="n">best_candidates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">risks</span> <span class="o">-</span> <span class="n">minimum_risk</span><span class="p">)</span>
+                <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">best_candidates</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">risk_ties</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="c1"># Among equal-risk patterns, prefer the assignment</span>
+                <span class="c1"># keeping total graph color density closest to 50/50.</span>
+                <span class="n">current_red</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">colors</span> <span class="o">==</span> <span class="mi">0</span><span class="p">))</span>
+                <span class="n">current_blue</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">colors</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))</span>
+
+                <span class="n">balance_costs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">best_candidates</span><span class="p">),</span>
+                    <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="k">for</span> <span class="n">index_in_best</span><span class="p">,</span> <span class="n">candidate_index</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+                    <span class="n">best_candidates</span>
+                <span class="p">):</span>
+                    <span class="n">pattern</span> <span class="o">=</span> <span class="n">candidate_patterns</span><span class="p">[</span><span class="n">candidate_index</span><span class="p">]</span>
+                    <span class="n">new_colors</span> <span class="o">=</span> <span class="n">pattern</span><span class="p">[</span><span class="n">uncolored_positions</span><span class="p">]</span>
+                    <span class="n">added_red</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">new_colors</span> <span class="o">==</span> <span class="mi">0</span><span class="p">))</span>
+                    <span class="n">added_blue</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_colors</span><span class="p">)</span> <span class="o">-</span> <span class="n">added_red</span>
+                    <span class="n">balance_costs</span><span class="p">[</span><span class="n">index_in_best</span><span class="p">]</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">current_red</span> <span class="o">+</span> <span class="n">added_red</span><span class="p">)</span>
+                        <span class="o">-</span> <span class="p">(</span><span class="n">current_blue</span> <span class="o">+</span> <span class="n">added_blue</span><span class="p">)</span>
+                    <span class="p">)</span>
+
+                <span class="n">minimum_balance_cost</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">balance_costs</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                <span class="n">balanced_best</span> <span class="o">=</span> <span class="n">best_candidates</span><span class="p">[</span>
+                    <span class="n">balance_costs</span> <span class="o">==</span> <span class="n">minimum_balance_cost</span>
+                <span class="p">]</span>
+                <span class="n">selected_candidate</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">balanced_best</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">selected_candidate</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">best_candidates</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+            <span class="n">selected_pattern</span> <span class="o">=</span> <span class="n">candidate_patterns</span><span class="p">[</span>
+                <span class="n">selected_candidate</span>
+            <span class="p">]</span>
+
+            <span class="k">for</span> <span class="n">local_position</span> <span class="ow">in</span> <span class="n">uncolored_positions</span><span class="p">:</span>
+                <span class="n">edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">target_edges</span><span class="p">[</span><span class="n">local_position</span><span class="p">])</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">selected_pattern</span><span class="p">[</span><span class="n">local_position</span><span class="p">])</span>
+                <span class="n">edge_cliques</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+
+                <span class="n">colors</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span> <span class="o">=</span> <span class="n">color</span>
+                <span class="n">assigned_counts</span><span class="p">[</span><span class="n">edge_cliques</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="k">if</span> <span class="n">color</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">red_counts</span><span class="p">[</span><span class="n">edge_cliques</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">blue_counts</span><span class="p">[</span><span class="n">edge_cliques</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="n">macro_steps</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="n">used_balanced_patterns</span><span class="p">:</span>
+                <span class="n">balanced_pattern_steps</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">fallback_pattern_steps</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="n">final_colors</span> <span class="o">=</span> <span class="n">colors</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="n">red_edges</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">final_colors</span> <span class="o">==</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">blue_edges</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span> <span class="o">-</span> <span class="n">red_edges</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_report</span> <span class="o">=</span> <span class="n">RK5RiskConstructionReport</span><span class="p">(</span>
+            <span class="n">macro_steps</span><span class="o">=</span><span class="n">macro_steps</span><span class="p">,</span>
+            <span class="n">balanced_pattern_steps</span><span class="o">=</span><span class="n">balanced_pattern_steps</span><span class="p">,</span>
+            <span class="n">fallback_pattern_steps</span><span class="o">=</span><span class="n">fallback_pattern_steps</span><span class="p">,</span>
+            <span class="n">risk_ties</span><span class="o">=</span><span class="n">risk_ties</span><span class="p">,</span>
+            <span class="n">red_edges</span><span class="o">=</span><span class="n">red_edges</span><span class="p">,</span>
+            <span class="n">blue_edges</span><span class="o">=</span><span class="n">blue_edges</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RColoring</span><span class="p">(</span>
+            <span class="n">graph</span><span class="p">,</span>
+            <span class="n">final_colors</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_select_target_clique</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">assigned_counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
+        <span class="n">edges_per_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">uncolored_counts</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">edges_per_clique</span>
+            <span class="o">-</span> <span class="n">assigned_counts</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">preferred</span> <span class="o">=</span> <span class="n">uncolored_counts</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">preferred_new_edges</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">preferred</span><span class="p">):</span>
+            <span class="n">maximum_assigned</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">assigned_counts</span><span class="p">[</span><span class="n">preferred</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+            <span class="p">)</span>
+            <span class="n">candidates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+                <span class="n">preferred</span>
+                <span class="o">&amp;</span> <span class="p">(</span><span class="n">assigned_counts</span> <span class="o">==</span> <span class="n">maximum_assigned</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">incomplete</span> <span class="o">=</span> <span class="n">uncolored_counts</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">incomplete</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;No incomplete K5 remains.&quot;</span><span class="p">)</span>
+
+            <span class="n">maximum_assigned</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">assigned_counts</span><span class="p">[</span><span class="n">incomplete</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+            <span class="p">)</span>
+            <span class="n">candidates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+                <span class="n">incomplete</span>
+                <span class="o">&amp;</span> <span class="p">(</span><span class="n">assigned_counts</span> <span class="o">==</span> <span class="n">maximum_assigned</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">candidates</span><span class="p">))</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_candidate_patterns</span><span class="p">(</span>
+        <span class="n">target_colors</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
+        <span class="n">colored</span> <span class="o">=</span> <span class="n">target_colors</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">colored</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">K5_BALANCED_CYCLE_PATTERNS</span>
+
+        <span class="n">compatible</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span>
+            <span class="n">K5_BALANCED_CYCLE_PATTERNS</span><span class="p">[:,</span> <span class="n">colored</span><span class="p">]</span>
+            <span class="o">==</span> <span class="n">target_colors</span><span class="p">[</span><span class="n">colored</span><span class="p">],</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">K5_BALANCED_CYCLE_PATTERNS</span><span class="p">[</span><span class="n">compatible</span><span class="p">]</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_fallback_patterns</span><span class="p">(</span>
+        <span class="n">target_colors</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
+        <span class="n">uncolored_positions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+            <span class="n">target_colors</span> <span class="o">&lt;</span> <span class="mi">0</span>
+        <span class="p">)</span>
+        <span class="n">number_of_unknown</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">uncolored_positions</span><span class="p">)</span>
+
+        <span class="n">patterns</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">pattern_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">number_of_unknown</span><span class="p">):</span>
+            <span class="n">pattern</span> <span class="o">=</span> <span class="n">target_colors</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+            <span class="k">for</span> <span class="n">bit</span><span class="p">,</span> <span class="n">local_position</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+                <span class="n">uncolored_positions</span>
+            <span class="p">):</span>
+                <span class="n">pattern</span><span class="p">[</span><span class="n">local_position</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">pattern_id</span> <span class="o">&gt;&gt;</span> <span class="n">bit</span>
+                <span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span>
+
+            <span class="c1"># Never deliberately complete the target as monochromatic</span>
+            <span class="c1"># when a nonmonochromatic completion is available.</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">pattern</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">pattern</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="n">patterns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">pattern</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">patterns</span><span class="p">:</span>
+            <span class="c1"># This can only occur if previous assignments have already</span>
+            <span class="c1"># forced the target K5 monochromatic.  Preserve progress and</span>
+            <span class="c1"># enumerate the remaining assignments rather than deadlock.</span>
+            <span class="k">for</span> <span class="n">pattern_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">number_of_unknown</span><span class="p">):</span>
+                <span class="n">pattern</span> <span class="o">=</span> <span class="n">target_colors</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+                <span class="k">for</span> <span class="n">bit</span><span class="p">,</span> <span class="n">local_position</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+                    <span class="n">uncolored_positions</span>
+                <span class="p">):</span>
+                    <span class="n">pattern</span><span class="p">[</span><span class="n">local_position</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">pattern_id</span> <span class="o">&gt;&gt;</span> <span class="n">bit</span>
+                    <span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span>
+
+                <span class="n">patterns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">pattern</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="n">patterns</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_risk_weights</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">edges_per_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]:</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">same_color</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span><span class="p">,</span>
+            <span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">uncolored</span> <span class="o">=</span> <span class="n">edges_per_clique</span> <span class="o">-</span> <span class="n">same_color</span>
+            <span class="n">weights</span><span class="p">[</span><span class="n">same_color</span><span class="p">]</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="n">uncolored</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">weights</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_partial_risk</span><span class="p">(</span>
+        <span class="n">red_counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
+        <span class="n">blue_counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
+        <span class="n">risk_weights</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="n">red_only</span> <span class="o">=</span> <span class="n">blue_counts</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="n">blue_only</span> <span class="o">=</span> <span class="n">red_counts</span> <span class="o">==</span> <span class="mi">0</span>
+
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
+            <span class="n">risk_weights</span><span class="p">[</span><span class="n">red_counts</span><span class="p">[</span><span class="n">red_only</span><span class="p">]]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="o">+</span> <span class="n">risk_weights</span><span class="p">[</span><span class="n">blue_counts</span><span class="p">[</span><span class="n">blue_only</span><span class="p">]]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

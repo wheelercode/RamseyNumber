@@ -1,0 +1,419 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RConstructionEdgeRisk &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RConstructionEdgeRisk</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RConstructionEdgeRisk</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Incremental edge construction guided by partial-K5 future risk.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">.RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">.RConstruction</span> <span class="kn">import</span> <span class="n">RConstruction</span>
+<span class="kn">from</span> <span class="nn">.RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+
+
+<div class="viewcode-block" id="REdgeRiskConstructionReport">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionEdgeRisk.REdgeRiskConstructionReport">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">REdgeRiskConstructionReport</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Diagnostics from one completed edge-risk construction.&quot;&quot;&quot;</span>
+
+    <span class="n">alternating_decisions</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">risk_decisions</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">risk_overrides</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">first_risk_step</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">red_edges</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">blue_edges</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">total_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_edges</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_edges</span></div>
+
+
+
+<div class="viewcode-block" id="REdgeRiskConstructionProgress">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionEdgeRisk.REdgeRiskConstructionProgress">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">REdgeRiskConstructionProgress</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One observable edge-assignment event during construction.&quot;&quot;&quot;</span>
+
+    <span class="n">step_number</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">total_edges</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">endpoints</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+    <span class="n">color</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">alternating_color</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">risk_red</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">risk_blue</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">red_completions</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">blue_completions</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">risk_driven</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">overrode_alternating</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">red_edges</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">blue_edges</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">alternating_decisions</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">risk_decisions</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">risk_overrides</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">completed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_number</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_edges</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">unavoidable</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether either color completes a monochromatic K5.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_completions</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_completions</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">created_monochromatic_k5s</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the K5s completed by the color actually chosen.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_completions</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_completions</span></div>
+
+
+
+<div class="viewcode-block" id="REdgeRiskConstruction">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionEdgeRisk.REdgeRiskConstruction">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">REdgeRiskConstruction</span><span class="p">(</span><span class="n">RConstruction</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Color K43 one edge at a time while minimizing partial-K5 risk.</span>
+
+<span class="sd">    Edges are processed in one random order.  Step parity proposes the</span>
+<span class="sd">    globally balanced red/blue alternating color.  If the partial K5s</span>
+<span class="sd">    containing the current edge give one candidate color strictly less</span>
+<span class="sd">    expected future monochromatic risk, that color overrides the</span>
+<span class="sd">    alternating proposal.</span>
+
+<span class="sd">    A partial K5 contributes risk only after at least</span>
+<span class="sd">    ``minimum_pressure_edges`` edges of one color have been assigned</span>
+<span class="sd">    while none of the opposite color have been assigned.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span>
+    <span class="n">minimum_pressure_edges</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">risk_epsilon</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0e-12</span>
+    <span class="n">observer</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">REdgeRiskConstructionProgress</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">_last_report</span><span class="p">:</span> <span class="n">REdgeRiskConstructionReport</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;rng must be a NumPy Generator.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span><span class="p">,</span> <span class="n">Integral</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;minimum_pressure_edges must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;minimum_pressure_edges must be positive.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;risk_epsilon cannot be negative.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">observer</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;observer must be callable or None.&quot;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="s2">&quot;edge-risk-&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;pressure-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">last_report</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REdgeRiskConstructionReport</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_report</span>
+
+<div class="viewcode-block" id="REdgeRiskConstruction.construct">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RConstructionEdgeRisk.REdgeRiskConstruction.construct">[docs]</a>
+    <span class="k">def</span> <span class="nf">construct</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+        <span class="n">problem</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
+
+        <span class="k">if</span> <span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">problem</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;REdgeRiskConstruction requires a symmetric &quot;</span>
+                <span class="s2">&quot;two-color Ramsey problem.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">clique_size</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">required_clique_sizes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">subgraph_index</span><span class="p">(</span><span class="n">clique_size</span><span class="p">)</span>
+        <span class="n">edges_per_clique</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">edges_per_clique</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span> <span class="o">&gt;</span> <span class="n">edges_per_clique</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;minimum_pressure_edges cannot exceed the number &quot;</span>
+                <span class="s2">&quot;of edges in the forbidden clique.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># weights[k] is the probability that a K5 containing k edges</span>
+        <span class="c1"># of one color and no opposite-colored edges becomes</span>
+        <span class="c1"># monochromatic if all remaining edges are random.</span>
+        <span class="n">risk_weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">assigned_same_color</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">minimum_pressure_edges</span><span class="p">,</span>
+            <span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">uncolored</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">edges_per_clique</span>
+                <span class="o">-</span> <span class="n">assigned_same_color</span>
+            <span class="p">)</span>
+            <span class="n">risk_weights</span><span class="p">[</span><span class="n">assigned_same_color</span><span class="p">]</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="n">uncolored</span><span class="p">)</span>
+
+        <span class="n">red_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="n">index</span><span class="o">.</span><span class="n">clique_count</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">blue_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">red_counts</span><span class="p">)</span>
+
+        <span class="n">colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+            <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">edge_order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rng</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span>
+            <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span>
+        <span class="p">)</span>
+
+        <span class="n">alternating_decisions</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">risk_decisions</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">risk_overrides</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">first_risk_step</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">red_edges</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">blue_edges</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">step</span><span class="p">,</span> <span class="n">edge_value</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">edge_order</span><span class="p">):</span>
+            <span class="n">edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">edge_value</span><span class="p">)</span>
+            <span class="n">affected</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+
+            <span class="n">affected_red</span> <span class="o">=</span> <span class="n">red_counts</span><span class="p">[</span><span class="n">affected</span><span class="p">]</span>
+            <span class="n">affected_blue</span> <span class="o">=</span> <span class="n">blue_counts</span><span class="p">[</span><span class="n">affected</span><span class="p">]</span>
+
+            <span class="n">red_completions</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span>
+                    <span class="p">(</span><span class="n">affected_red</span> <span class="o">==</span> <span class="n">edges_per_clique</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="o">&amp;</span> <span class="p">(</span><span class="n">affected_blue</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">blue_completions</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span>
+                    <span class="p">(</span><span class="n">affected_blue</span> <span class="o">==</span> <span class="n">edges_per_clique</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="o">&amp;</span> <span class="p">(</span><span class="n">affected_red</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="n">red_after</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">affected_red</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="p">)</span>
+            <span class="n">blue_after</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">affected_blue</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="p">)</span>
+
+            <span class="n">risk_red</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                <span class="n">risk_weights</span><span class="p">[</span><span class="n">red_after</span><span class="p">][</span>
+                    <span class="n">affected_blue</span> <span class="o">==</span> <span class="mi">0</span>
+                <span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="p">)</span>
+            <span class="n">risk_blue</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                <span class="n">risk_weights</span><span class="p">[</span><span class="n">blue_after</span><span class="p">][</span>
+                    <span class="n">affected_red</span> <span class="o">==</span> <span class="mi">0</span>
+                <span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="n">alternating_color</span> <span class="o">=</span> <span class="n">step</span> <span class="o">%</span> <span class="mi">2</span>
+            <span class="n">risk_difference</span> <span class="o">=</span> <span class="n">risk_red</span> <span class="o">-</span> <span class="n">risk_blue</span>
+
+            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">risk_difference</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span><span class="p">:</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="n">alternating_color</span>
+                <span class="n">alternating_decisions</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">risk_red</span> <span class="o">&lt;</span> <span class="n">risk_blue</span> <span class="k">else</span> <span class="mi">1</span>
+                <span class="n">risk_decisions</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="k">if</span> <span class="n">first_risk_step</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">first_risk_step</span> <span class="o">=</span> <span class="n">step</span>
+
+                <span class="k">if</span> <span class="n">color</span> <span class="o">!=</span> <span class="n">alternating_color</span><span class="p">:</span>
+                    <span class="n">risk_overrides</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="n">colors</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span> <span class="o">=</span> <span class="n">color</span>
+
+            <span class="k">if</span> <span class="n">color</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">red_counts</span><span class="p">[</span><span class="n">affected</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">red_edges</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">blue_counts</span><span class="p">[</span><span class="n">affected</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">blue_edges</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">endpoints</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">observer</span><span class="p">(</span>
+                    <span class="n">REdgeRiskConstructionProgress</span><span class="p">(</span>
+                        <span class="n">step_number</span><span class="o">=</span><span class="n">step</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                        <span class="n">total_edges</span><span class="o">=</span><span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+                        <span class="n">edge</span><span class="o">=</span><span class="n">edge</span><span class="p">,</span>
+                        <span class="n">endpoints</span><span class="o">=</span><span class="p">(</span>
+                            <span class="nb">int</span><span class="p">(</span><span class="n">endpoints</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                            <span class="nb">int</span><span class="p">(</span><span class="n">endpoints</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                        <span class="p">),</span>
+                        <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span>
+                        <span class="n">alternating_color</span><span class="o">=</span><span class="n">alternating_color</span><span class="p">,</span>
+                        <span class="n">risk_red</span><span class="o">=</span><span class="n">risk_red</span><span class="p">,</span>
+                        <span class="n">risk_blue</span><span class="o">=</span><span class="n">risk_blue</span><span class="p">,</span>
+                        <span class="n">red_completions</span><span class="o">=</span><span class="n">red_completions</span><span class="p">,</span>
+                        <span class="n">blue_completions</span><span class="o">=</span><span class="n">blue_completions</span><span class="p">,</span>
+                        <span class="n">risk_driven</span><span class="o">=</span><span class="p">(</span>
+                            <span class="nb">abs</span><span class="p">(</span><span class="n">risk_difference</span><span class="p">)</span>
+                            <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">risk_epsilon</span>
+                        <span class="p">),</span>
+                        <span class="n">overrode_alternating</span><span class="o">=</span><span class="p">(</span>
+                            <span class="n">color</span> <span class="o">!=</span> <span class="n">alternating_color</span>
+                        <span class="p">),</span>
+                        <span class="n">red_edges</span><span class="o">=</span><span class="n">red_edges</span><span class="p">,</span>
+                        <span class="n">blue_edges</span><span class="o">=</span><span class="n">blue_edges</span><span class="p">,</span>
+                        <span class="n">alternating_decisions</span><span class="o">=</span><span class="n">alternating_decisions</span><span class="p">,</span>
+                        <span class="n">risk_decisions</span><span class="o">=</span><span class="n">risk_decisions</span><span class="p">,</span>
+                        <span class="n">risk_overrides</span><span class="o">=</span><span class="n">risk_overrides</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_report</span> <span class="o">=</span> <span class="n">REdgeRiskConstructionReport</span><span class="p">(</span>
+            <span class="n">alternating_decisions</span><span class="o">=</span><span class="n">alternating_decisions</span><span class="p">,</span>
+            <span class="n">risk_decisions</span><span class="o">=</span><span class="n">risk_decisions</span><span class="p">,</span>
+            <span class="n">risk_overrides</span><span class="o">=</span><span class="n">risk_overrides</span><span class="p">,</span>
+            <span class="n">first_risk_step</span><span class="o">=</span><span class="n">first_risk_step</span><span class="p">,</span>
+            <span class="n">red_edges</span><span class="o">=</span><span class="n">red_edges</span><span class="p">,</span>
+            <span class="n">blue_edges</span><span class="o">=</span><span class="n">blue_edges</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RColoring</span><span class="p">(</span>
+            <span class="n">graph</span><span class="p">,</span>
+            <span class="n">colors</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

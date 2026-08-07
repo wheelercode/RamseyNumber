@@ -1,0 +1,366 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RActionLandscape &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RActionLandscape</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RActionLandscape</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Directional structure surrounding every single-edge flip.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RAction</span> <span class="kn">import</span> <span class="n">RActionAnalysis</span><span class="p">,</span> <span class="n">analyze_actions</span>
+<span class="kn">from</span> <span class="nn">.RState</span> <span class="kn">import</span> <span class="n">RSearchState</span>
+
+
+<span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span><span class="n">array</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="RActionLandscape">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RActionLandscape.RActionLandscape">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RActionLandscape</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Preserve the information hidden by a scalar edge-flip reward.</span>
+
+<span class="sd">    Rows correspond to host-graph edges.  Deficit columns run from</span>
+<span class="sd">    zero (already monochromatic) through ``edges_per_clique``.</span>
+
+<span class="sd">    ``red_profiles[e, d]`` counts K5s containing edge ``e`` that are</span>
+<span class="sd">    currently ``d`` edge recolorings away from all red.  The blue</span>
+<span class="sd">    profile has the same meaning in the opposite color direction.</span>
+
+<span class="sd">    The delta arrays describe the exact global change to those two</span>
+<span class="sd">    distributions if the corresponding edge is flipped.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
+    <span class="n">state_version</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">analysis</span><span class="p">:</span> <span class="n">RActionAnalysis</span>
+
+    <span class="n">red_profiles</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
+    <span class="n">blue_profiles</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
+    <span class="n">red_deficit_deltas</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">blue_deficit_deltas</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+
+    <span class="n">red_violations_destroyed</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">red_violations_created</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">blue_violations_destroyed</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">blue_violations_created</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">number_of_edges</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span><span class="o">.</span><span class="n">number_of_edges</span>
+        <span class="n">number_of_bins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span><span class="o">.</span><span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">matrix_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">number_of_edges</span><span class="p">,</span> <span class="n">number_of_bins</span><span class="p">)</span>
+        <span class="n">vector_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">number_of_edges</span><span class="p">,)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;red_profiles&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_profiles&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_deficit_deltas&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_deficit_deltas&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">matrix_shape</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must have shape </span><span class="si">{</span><span class="n">matrix_shape</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+                <span class="n">_read_only_copy</span><span class="p">(</span><span class="n">value</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;red_violations_destroyed&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_violations_created&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_violations_destroyed&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_violations_created&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">vector_shape</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must have shape </span><span class="si">{</span><span class="n">vector_shape</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+                <span class="n">_read_only_copy</span><span class="p">(</span><span class="n">value</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">analysis</span><span class="o">.</span><span class="n">applies_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">source_state</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Action analysis does not describe the source state.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span><span class="o">.</span><span class="n">version</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Action landscape state version is stale.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">exact_rewards</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the exact monochromatic-score reward of every flip.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">analysis</span><span class="o">.</span><span class="n">immediate_rewards</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">red_deficit_one_deltas</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return each flip&#39;s change in red deficit-one K5 count.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_deltas</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">blue_deficit_one_deltas</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return each flip&#39;s change in blue deficit-one K5 count.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_deltas</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">red_deficit_two_deltas</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return each flip&#39;s change in red deficit-two K5 count.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_deltas</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">blue_deficit_two_deltas</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return each flip&#39;s change in blue deficit-two K5 count.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_deltas</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span>
+
+<div class="viewcode-block" id="RActionLandscape.applies_to">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RActionLandscape.RActionLandscape.applies_to">[docs]</a>
+    <span class="k">def</span> <span class="nf">applies_to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this landscape still describes ``state``.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span>
+            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RActionLandscape.summary">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RActionLandscape.RActionLandscape.summary">[docs]</a>
+    <span class="k">def</span> <span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return objective-neutral scalar descriptors of the landscape.&quot;&quot;&quot;</span>
+        <span class="n">rewards</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">exact_rewards</span>
+        <span class="n">best_reward</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rewards</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+        <span class="n">best_mask</span> <span class="o">=</span> <span class="n">rewards</span> <span class="o">==</span> <span class="n">best_reward</span>
+        <span class="n">neutral_mask</span> <span class="o">=</span> <span class="n">rewards</span> <span class="o">==</span> <span class="mi">0</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;best_reward&quot;</span><span class="p">:</span> <span class="n">best_reward</span><span class="p">,</span>
+            <span class="s2">&quot;worst_reward&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">rewards</span><span class="o">.</span><span class="n">min</span><span class="p">()),</span>
+            <span class="s2">&quot;improving_actions&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">rewards</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)),</span>
+            <span class="s2">&quot;neutral_actions&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">neutral_mask</span><span class="p">)),</span>
+            <span class="s2">&quot;worsening_actions&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">rewards</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)),</span>
+            <span class="s2">&quot;mean_reward&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">rewards</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
+            <span class="s2">&quot;std_reward&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">rewards</span><span class="o">.</span><span class="n">std</span><span class="p">()),</span>
+            <span class="s2">&quot;best_red_deficit_1_delta_min&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_one_deltas</span><span class="p">[</span><span class="n">best_mask</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;best_red_deficit_1_delta_max&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_one_deltas</span><span class="p">[</span><span class="n">best_mask</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;best_blue_deficit_1_delta_min&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_one_deltas</span><span class="p">[</span><span class="n">best_mask</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;best_blue_deficit_1_delta_max&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_one_deltas</span><span class="p">[</span><span class="n">best_mask</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;neutral_red_deficit_1_delta_min&quot;</span><span class="p">:</span> <span class="n">_masked_min</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_one_deltas</span><span class="p">,</span>
+                <span class="n">neutral_mask</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;neutral_red_deficit_1_delta_max&quot;</span><span class="p">:</span> <span class="n">_masked_max</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_one_deltas</span><span class="p">,</span>
+                <span class="n">neutral_mask</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;neutral_blue_deficit_1_delta_min&quot;</span><span class="p">:</span> <span class="n">_masked_min</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_one_deltas</span><span class="p">,</span>
+                <span class="n">neutral_mask</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;neutral_blue_deficit_1_delta_max&quot;</span><span class="p">:</span> <span class="n">_masked_max</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_one_deltas</span><span class="p">,</span>
+                <span class="n">neutral_mask</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">}</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="calculate_action_landscape">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RActionLandscape.calculate_action_landscape">[docs]</a>
+<span class="k">def</span> <span class="nf">calculate_action_landscape</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">analysis</span><span class="p">:</span> <span class="n">RActionAnalysis</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RActionLandscape</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate the complete directional single-edge action landscape.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">analysis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">analysis</span> <span class="o">=</span> <span class="n">analyze_actions</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">analysis</span><span class="o">.</span><span class="n">applies_to</span><span class="p">(</span><span class="n">state</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Action analysis does not describe the supplied state.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># profiles[:, k] uses the number of blue edges as k.  That is</span>
+    <span class="c1"># exactly the red completion deficit.  Reversing the columns gives</span>
+    <span class="c1"># the number of red edges, which is the blue completion deficit.</span>
+    <span class="n">red_profiles</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">profiles</span>
+    <span class="n">blue_profiles</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">profiles</span><span class="p">[:,</span> <span class="p">::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">red_deficit_deltas</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">histogram_deltas</span>
+    <span class="n">blue_deficit_deltas</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">histogram_deltas</span><span class="p">[:,</span> <span class="p">::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">colors</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span>
+    <span class="n">red_edges</span> <span class="o">=</span> <span class="n">colors</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="n">blue_edges</span> <span class="o">=</span> <span class="n">colors</span> <span class="o">==</span> <span class="mi">1</span>
+
+    <span class="n">number_of_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span>
+    <span class="n">red_destroyed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">number_of_edges</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="n">red_created</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">number_of_edges</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="n">blue_destroyed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">number_of_edges</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="n">blue_created</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">number_of_edges</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="c1"># Red -&gt; blue destroys all-red K5s and can create all-blue K5s.</span>
+    <span class="n">red_destroyed</span><span class="p">[</span><span class="n">red_edges</span><span class="p">]</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">profiles</span><span class="p">[</span><span class="n">red_edges</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">blue_created</span><span class="p">[</span><span class="n">red_edges</span><span class="p">]</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">profiles</span><span class="p">[</span>
+        <span class="n">red_edges</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">]</span>
+
+    <span class="c1"># Blue -&gt; red is the color-reversed situation.</span>
+    <span class="n">blue_destroyed</span><span class="p">[</span><span class="n">blue_edges</span><span class="p">]</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">profiles</span><span class="p">[</span>
+        <span class="n">blue_edges</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="n">red_created</span><span class="p">[</span><span class="n">blue_edges</span><span class="p">]</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">profiles</span><span class="p">[</span><span class="n">blue_edges</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">RActionLandscape</span><span class="p">(</span>
+        <span class="n">source_state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
+        <span class="n">state_version</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+        <span class="n">analysis</span><span class="o">=</span><span class="n">analysis</span><span class="p">,</span>
+        <span class="n">red_profiles</span><span class="o">=</span><span class="n">red_profiles</span><span class="p">,</span>
+        <span class="n">blue_profiles</span><span class="o">=</span><span class="n">blue_profiles</span><span class="p">,</span>
+        <span class="n">red_deficit_deltas</span><span class="o">=</span><span class="n">red_deficit_deltas</span><span class="p">,</span>
+        <span class="n">blue_deficit_deltas</span><span class="o">=</span><span class="n">blue_deficit_deltas</span><span class="p">,</span>
+        <span class="n">red_violations_destroyed</span><span class="o">=</span><span class="n">red_destroyed</span><span class="p">,</span>
+        <span class="n">red_violations_created</span><span class="o">=</span><span class="n">red_created</span><span class="p">,</span>
+        <span class="n">blue_violations_destroyed</span><span class="o">=</span><span class="n">blue_destroyed</span><span class="p">,</span>
+        <span class="n">blue_violations_created</span><span class="o">=</span><span class="n">blue_created</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_masked_min</span><span class="p">(</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
+    <span class="n">mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="n">selected</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">selected</span><span class="o">.</span><span class="n">min</span><span class="p">())</span> <span class="k">if</span> <span class="n">selected</span><span class="o">.</span><span class="n">size</span> <span class="k">else</span> <span class="mi">0</span>
+
+
+<span class="k">def</span> <span class="nf">_masked_max</span><span class="p">(</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
+    <span class="n">mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="n">selected</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">selected</span><span class="o">.</span><span class="n">max</span><span class="p">())</span> <span class="k">if</span> <span class="n">selected</span><span class="o">.</span><span class="n">size</span> <span class="k">else</span> <span class="mi">0</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,367 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.nn.REncoding &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.nn.REncoding</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.nn.REncoding</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; &quot;Conversion of Ramsey search information into neural model inputs.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">..RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+<span class="kn">from</span> <span class="nn">..RState</span> <span class="kn">import</span> <span class="n">RSearchState</span>
+
+<span class="n">PAIR_INPUT_CHANNELS</span> <span class="o">=</span> <span class="mi">3</span>
+
+<span class="n">EDGE_COLOR_CHANNEL</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">DIAGONAL_CHANNEL</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">AVAILABILITY_CHANNEL</span> <span class="o">=</span> <span class="mi">2</span>
+
+
+<div class="viewcode-block" id="encode_pair_features">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REncoding.encode_pair_features">[docs]</a>
+<span class="k">def</span> <span class="nf">encode_pair_features</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">available_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Encode one state as a symmetric vertex-pair feature array.</span>
+
+<span class="sd">    Channels</span>
+<span class="sd">    --------</span>
+<span class="sd">    0:</span>
+<span class="sd">        Edge color represented as -1 for color zero and +1 for</span>
+<span class="sd">        color one.</span>
+
+<span class="sd">    1:</span>
+<span class="sd">        Diagonal indicator. This distinguishes diagonal positions</span>
+<span class="sd">        from real edge positions.</span>
+
+<span class="sd">    2:</span>
+<span class="sd">        Action availability represented as zero or one.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">available_mask</span> <span class="o">=</span> <span class="n">_validate_available_mask</span><span class="p">(</span>
+        <span class="n">available_mask</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span>
+    <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+
+    <span class="n">pair_features</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+        <span class="p">(</span>
+            <span class="n">n_vertices</span><span class="p">,</span>
+            <span class="n">n_vertices</span><span class="p">,</span>
+            <span class="n">PAIR_INPUT_CHANNELS</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">i</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+    <span class="n">j</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+    <span class="n">signed_colors</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">*</span> <span class="mf">2.0</span> <span class="o">-</span> <span class="mf">1.0</span>
+
+    <span class="n">pair_features</span><span class="p">[</span>
+        <span class="n">i</span><span class="p">,</span>
+        <span class="n">j</span><span class="p">,</span>
+        <span class="n">EDGE_COLOR_CHANNEL</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">signed_colors</span>
+
+    <span class="n">pair_features</span><span class="p">[</span>
+        <span class="n">j</span><span class="p">,</span>
+        <span class="n">i</span><span class="p">,</span>
+        <span class="n">EDGE_COLOR_CHANNEL</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">signed_colors</span>
+
+    <span class="n">diagonal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_vertices</span><span class="p">)</span>
+
+    <span class="n">pair_features</span><span class="p">[</span>
+        <span class="n">diagonal</span><span class="p">,</span>
+        <span class="n">diagonal</span><span class="p">,</span>
+        <span class="n">DIAGONAL_CHANNEL</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+    <span class="n">availability</span> <span class="o">=</span> <span class="n">available_mask</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+    <span class="n">pair_features</span><span class="p">[</span>
+        <span class="n">i</span><span class="p">,</span>
+        <span class="n">j</span><span class="p">,</span>
+        <span class="n">AVAILABILITY_CHANNEL</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">availability</span>
+
+    <span class="n">pair_features</span><span class="p">[</span>
+        <span class="n">j</span><span class="p">,</span>
+        <span class="n">i</span><span class="p">,</span>
+        <span class="n">AVAILABILITY_CHANNEL</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">availability</span>
+
+    <span class="k">return</span> <span class="n">pair_features</span></div>
+
+
+
+<div class="viewcode-block" id="build_network_input">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REncoding.build_network_input">[docs]</a>
+<span class="k">def</span> <span class="nf">build_network_input</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">available_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+<span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Build one batched pair-input tensor and action-mask tensor.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pair_tensor:</span>
+<span class="sd">        Shape:</span>
+
+<span class="sd">            (1, n_vertices, n_vertices, 3)</span>
+
+<span class="sd">    mask_tensor:</span>
+<span class="sd">        Shape:</span>
+
+<span class="sd">            (1, number_of_edges)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">normalized_mask</span> <span class="o">=</span> <span class="n">_validate_available_mask</span><span class="p">(</span>
+        <span class="n">available_mask</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">pair_features</span> <span class="o">=</span> <span class="n">encode_pair_features</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+        <span class="n">normalized_mask</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">pair_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
+        <span class="n">pair_features</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="n">mask_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+        <span class="n">normalized_mask</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bool</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">pair_tensor</span><span class="p">,</span>
+        <span class="n">mask_tensor</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="edge_permutation_indices">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REncoding.edge_permutation_indices">[docs]</a>
+<span class="k">def</span> <span class="nf">edge_permutation_indices</span><span class="p">(</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+    <span class="n">vertex_permutation</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Map old edge indexes to new indexes after vertex renaming.</span>
+
+<span class="sd">    If the returned array is named edge_mapping, then:</span>
+
+<span class="sd">        new_values[edge_mapping] = old_values</span>
+
+<span class="sd">    applies the vertex permutation to an edge-indexed array.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+
+    <span class="n">permutation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">vertex_permutation</span><span class="p">)</span>
+
+    <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_vertices</span><span class="p">,)</span>
+
+    <span class="k">if</span> <span class="n">permutation</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Expected permutation shape &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">expected_shape</span><span class="si">}</span><span class="s2">, received &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">permutation</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span>
+        <span class="n">permutation</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;vertex_permutation must &quot;</span> <span class="s2">&quot;contain integers.&quot;</span><span class="p">)</span>
+
+    <span class="n">permutation</span> <span class="o">=</span> <span class="n">permutation</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+        <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">permutation</span><span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_vertices</span><span class="p">),</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;vertex_permutation must contain &quot;</span> <span class="s2">&quot;every vertex exactly once.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">edge_lookup</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+        <span class="p">(</span>
+            <span class="n">n_vertices</span><span class="p">,</span>
+            <span class="n">n_vertices</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">edge_numbers</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">i</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+    <span class="n">j</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+    <span class="n">edge_lookup</span><span class="p">[</span>
+        <span class="n">i</span><span class="p">,</span>
+        <span class="n">j</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">edge_numbers</span>
+
+    <span class="n">edge_lookup</span><span class="p">[</span>
+        <span class="n">j</span><span class="p">,</span>
+        <span class="n">i</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">edge_numbers</span>
+
+    <span class="n">renamed_i</span> <span class="o">=</span> <span class="n">permutation</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+    <span class="n">renamed_j</span> <span class="o">=</span> <span class="n">permutation</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+
+    <span class="n">mapping</span> <span class="o">=</span> <span class="n">edge_lookup</span><span class="p">[</span>
+        <span class="n">renamed_i</span><span class="p">,</span>
+        <span class="n">renamed_j</span><span class="p">,</span>
+    <span class="p">]</span>
+
+    <span class="n">mapping</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="n">mapping</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_validate_available_mask</span><span class="p">(</span>
+    <span class="n">available_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
+    <span class="n">number_of_edges</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return a validated boolean action mask without copying it.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">available_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">available_mask</span><span class="p">)</span>
+
+    <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">number_of_edges</span><span class="p">,)</span>
+
+    <span class="k">if</span> <span class="n">available_mask</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Expected available-mask shape &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">expected_shape</span><span class="si">}</span><span class="s2">, received &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">available_mask</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">available_mask</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;available_mask must have boolean dtype.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">available_mask</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;At least one action must be available.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">available_mask</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,629 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.nn.REvaluation &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.nn.REvaluation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.nn.REvaluation</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Reproducible, no-training evaluation of neural checkpoints.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">statistics</span> <span class="kn">import</span> <span class="n">mean</span><span class="p">,</span> <span class="n">median</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterable</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">..RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">..RConstruction</span> <span class="kn">import</span> <span class="n">RConstruction</span>
+<span class="kn">from</span> <span class="nn">..REnvironment</span> <span class="kn">import</span> <span class="n">REnvironment</span>
+<span class="kn">from</span> <span class="nn">..RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+<span class="kn">from</span> <span class="nn">..RSearch</span> <span class="kn">import</span> <span class="n">RSearch</span>
+<span class="kn">from</span> <span class="nn">.RCheckpoint</span> <span class="kn">import</span> <span class="n">load_training_checkpoint</span>
+<span class="kn">from</span> <span class="nn">.RNeuralPolicy</span> <span class="kn">import</span> <span class="n">RNeuralPolicy</span>
+<span class="kn">from</span> <span class="nn">.RRuntime</span> <span class="kn">import</span> <span class="n">resolve_torch_device</span><span class="p">,</span> <span class="n">seed_torch</span>
+
+
+<div class="viewcode-block" id="REvaluationSeed">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.REvaluationSeed">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">REvaluationSeed</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One named coloring shared by every evaluated checkpoint.&quot;&quot;&quot;</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">source_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;source_name&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">field_name</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">field_name</span><span class="si">}</span><span class="s2"> must be a nonempty string.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coloring</span><span class="p">,</span> <span class="n">RColoring</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;coloring must be an RColoring.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RCheckpointEvaluationConfig">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluationConfig">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RCheckpointEvaluationConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings shared by every checkpoint comparison.&quot;&quot;&quot;</span>
+
+    <span class="n">repetitions_per_seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">action_seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000_000</span>
+    <span class="n">greedy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">score_thresholds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="mi">600</span><span class="p">,</span>
+        <span class="mi">550</span><span class="p">,</span>
+        <span class="mi">500</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">repetitions</span> <span class="o">=</span> <span class="n">_nonnegative_integer</span><span class="p">(</span>
+            <span class="s2">&quot;repetitions_per_seed&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">repetitions_per_seed</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">repetitions</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;repetitions_per_seed must be positive.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;repetitions_per_seed&quot;</span><span class="p">,</span>
+            <span class="n">repetitions</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;action_seed&quot;</span><span class="p">,</span>
+            <span class="n">_nonnegative_integer</span><span class="p">(</span>
+                <span class="s2">&quot;action_seed&quot;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">action_seed</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">greedy</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;greedy must be boolean.&quot;</span><span class="p">)</span>
+
+        <span class="n">thresholds</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="n">_nonnegative_integer</span><span class="p">(</span>
+                <span class="s2">&quot;score threshold&quot;</span><span class="p">,</span>
+                <span class="n">threshold</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">threshold</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_thresholds</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">thresholds</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">thresholds</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;score_thresholds must be unique.&quot;</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;score_thresholds&quot;</span><span class="p">,</span>
+            <span class="nb">tuple</span><span class="p">(</span>
+                <span class="nb">sorted</span><span class="p">(</span>
+                    <span class="n">thresholds</span><span class="p">,</span>
+                    <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RCheckpointEvaluationRun">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluationRun">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RCheckpointEvaluationRun</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of one checkpoint, seed, and repetition.&quot;&quot;&quot;</span>
+
+    <span class="n">seed_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">source_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">repetition</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">action_seed</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">initial_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">final_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">best_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">steps_completed</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">terminated</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">truncated</span><span class="p">:</span> <span class="nb">bool</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return improvement from initial to final score.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_score</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_score</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return improvement from initial to best score.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_score</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span></div>
+
+
+
+<div class="viewcode-block" id="RCheckpointEvaluation">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluation">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RCheckpointEvaluation</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Aggregate evaluation of one checkpoint.&quot;&quot;&quot;</span>
+
+    <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">completed_iteration</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span>
+    <span class="n">greedy</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">score_thresholds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">runs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RCheckpointEvaluationRun</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">number_of_runs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mean_final_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
+            <span class="n">mean</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">final_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">median_final_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
+            <span class="n">median</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">final_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mean_best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
+            <span class="n">mean</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">best_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">median_best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
+            <span class="n">median</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">best_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">minimum_best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">best_score</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mean_score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
+            <span class="n">mean</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">score_reduction</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mean_best_score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span>
+            <span class="n">mean</span><span class="p">(</span>
+                <span class="n">run</span><span class="o">.</span><span class="n">best_score_reduction</span>
+                <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">improved_final_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">run</span><span class="o">.</span><span class="n">score_reduction</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">improved_best_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">run</span><span class="o">.</span><span class="n">best_score_reduction</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">threshold_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="n">threshold</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span>
+                <span class="n">run</span><span class="o">.</span><span class="n">best_score</span> <span class="o">&lt;=</span> <span class="n">threshold</span>
+                <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">threshold</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_thresholds</span>
+        <span class="p">}</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">source_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="nb">sorted</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="n">run</span><span class="o">.</span><span class="n">source_name</span>
+                    <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="RCheckpointEvaluation.runs_for_source">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluation.runs_for_source">[docs]</a>
+    <span class="k">def</span> <span class="nf">runs_for_source</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">source_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RCheckpointEvaluationRun</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return only runs originating from one seed source.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="n">run</span>
+            <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">runs</span>
+            <span class="k">if</span> <span class="n">run</span><span class="o">.</span><span class="n">source_name</span> <span class="o">==</span> <span class="n">source_name</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="RCheckpointEvaluationResult">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluationResult">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RCheckpointEvaluationResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparable evaluations for a collection of checkpoints.&quot;&quot;&quot;</span>
+
+    <span class="n">seeds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">evaluations</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RCheckpointEvaluation</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">strongest_checkpoint</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RCheckpointEvaluation</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rank checkpoints by typical performance, then minimum.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">evaluations</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;No checkpoints were evaluated.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">evaluations</span><span class="p">,</span>
+            <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">evaluation</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">evaluation</span><span class="o">.</span><span class="n">mean_best_score</span><span class="p">,</span>
+                <span class="n">evaluation</span><span class="o">.</span><span class="n">median_best_score</span><span class="p">,</span>
+                <span class="n">evaluation</span><span class="o">.</span><span class="n">minimum_best_score</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RCheckpointEvaluator">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluator">[docs]</a>
+<span class="k">class</span> <span class="nc">RCheckpointEvaluator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate trained checkpoints without optimization or writes.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+        <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">environment</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Environment problem does not match graph.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span> <span class="o">=</span> <span class="n">graph</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span> <span class="o">=</span> <span class="n">environment</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">resolve_torch_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RCheckpointEvaluator.evaluate">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.RCheckpointEvaluator.evaluate">[docs]</a>
+    <span class="k">def</span> <span class="nf">evaluate</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">checkpoint_paths</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">],</span>
+        <span class="n">seeds</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">],</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">RCheckpointEvaluationConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RCheckpointEvaluationResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run every checkpoint under identical evaluation cases.&quot;&quot;&quot;</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">config</span>
+            <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">RCheckpointEvaluationConfig</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="n">paths</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">checkpoint_paths</span>
+        <span class="p">)</span>
+
+        <span class="n">evaluation_seeds</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">seeds</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;checkpoint_paths cannot be empty.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">paths</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">paths</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;checkpoint_paths must be unique.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">evaluation_seeds</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;seeds cannot be empty.&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">evaluation_seeds</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="n">REvaluationSeed</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="s2">&quot;Every seed must be an REvaluationSeed.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">seed</span><span class="o">.</span><span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Evaluation seed problem does not match graph.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">cpu_rng_state</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">get_rng_state</span><span class="p">()</span>
+        <span class="n">cuda_rng_states</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_rng_state_all</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span>
+            <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">evaluations</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_checkpoint</span><span class="p">(</span>
+                    <span class="n">path</span><span class="p">,</span>
+                    <span class="n">evaluation_seeds</span><span class="p">,</span>
+                    <span class="n">config</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span>
+            <span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">set_rng_state</span><span class="p">(</span><span class="n">cpu_rng_state</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">cuda_rng_states</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">set_rng_state_all</span><span class="p">(</span>
+                    <span class="n">cuda_rng_states</span>
+                <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RCheckpointEvaluationResult</span><span class="p">(</span>
+            <span class="n">seeds</span><span class="o">=</span><span class="n">evaluation_seeds</span><span class="p">,</span>
+            <span class="n">evaluations</span><span class="o">=</span><span class="n">evaluations</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_evaluate_checkpoint</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">seeds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">RCheckpointEvaluationConfig</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RCheckpointEvaluation</span><span class="p">:</span>
+        <span class="n">restored</span> <span class="o">=</span> <span class="n">load_training_checkpoint</span><span class="p">(</span>
+            <span class="n">checkpoint_path</span><span class="p">,</span>
+            <span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
+            <span class="n">rng</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="n">policy</span> <span class="o">=</span> <span class="n">RNeuralPolicy</span><span class="p">(</span>
+            <span class="n">restored</span><span class="o">.</span><span class="n">network</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
+            <span class="n">greedy</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">greedy</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">search</span> <span class="o">=</span> <span class="n">RSearch</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="p">,</span>
+            <span class="n">policy</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">runs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RCheckpointEvaluationRun</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">seed_index</span><span class="p">,</span> <span class="n">evaluation_seed</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">seeds</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">repetition</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">repetitions_per_seed</span>
+            <span class="p">):</span>
+                <span class="n">action_seed</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">config</span><span class="o">.</span><span class="n">action_seed</span>
+                    <span class="o">+</span> <span class="n">seed_index</span>
+                    <span class="o">*</span> <span class="n">config</span><span class="o">.</span><span class="n">repetitions_per_seed</span>
+                    <span class="o">+</span> <span class="n">repetition</span>
+                <span class="p">)</span>
+
+                <span class="n">seed_torch</span><span class="p">(</span><span class="n">action_seed</span><span class="p">)</span>
+
+                <span class="n">search_result</span> <span class="o">=</span> <span class="n">search</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                    <span class="n">evaluation_seed</span><span class="o">.</span><span class="n">coloring</span>
+                <span class="p">)</span>
+
+                <span class="n">runs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">RCheckpointEvaluationRun</span><span class="p">(</span>
+                        <span class="n">seed_name</span><span class="o">=</span><span class="n">evaluation_seed</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="n">source_name</span><span class="o">=</span><span class="p">(</span>
+                            <span class="n">evaluation_seed</span><span class="o">.</span><span class="n">source_name</span>
+                        <span class="p">),</span>
+                        <span class="n">repetition</span><span class="o">=</span><span class="n">repetition</span><span class="p">,</span>
+                        <span class="n">action_seed</span><span class="o">=</span><span class="n">action_seed</span><span class="p">,</span>
+                        <span class="n">initial_score</span><span class="o">=</span><span class="p">(</span>
+                            <span class="n">search_result</span><span class="o">.</span><span class="n">initial_score</span>
+                        <span class="p">),</span>
+                        <span class="n">final_score</span><span class="o">=</span><span class="p">(</span>
+                            <span class="n">search_result</span><span class="o">.</span><span class="n">final_score</span>
+                        <span class="p">),</span>
+                        <span class="n">best_score</span><span class="o">=</span><span class="p">(</span>
+                            <span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
+                        <span class="p">),</span>
+                        <span class="n">steps_completed</span><span class="o">=</span><span class="p">(</span>
+                            <span class="n">search_result</span><span class="o">.</span><span class="n">steps_completed</span>
+                        <span class="p">),</span>
+                        <span class="n">terminated</span><span class="o">=</span><span class="n">search_result</span><span class="o">.</span><span class="n">terminated</span><span class="p">,</span>
+                        <span class="n">truncated</span><span class="o">=</span><span class="n">search_result</span><span class="o">.</span><span class="n">truncated</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RCheckpointEvaluation</span><span class="p">(</span>
+            <span class="n">checkpoint_path</span><span class="o">=</span><span class="n">checkpoint_path</span><span class="p">,</span>
+            <span class="n">completed_iteration</span><span class="o">=</span><span class="p">(</span>
+                <span class="n">restored</span><span class="o">.</span><span class="n">completed_iteration</span>
+            <span class="p">),</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">restored</span><span class="o">.</span><span class="n">metadata</span><span class="p">),</span>
+            <span class="n">greedy</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">greedy</span><span class="p">,</span>
+            <span class="n">score_thresholds</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">score_thresholds</span><span class="p">,</span>
+            <span class="n">runs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">runs</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="build_evaluation_seeds">
+<a class="viewcode-back" href="../../../ramsey.nn.html#ramsey.nn.REvaluation.build_evaluation_seeds">[docs]</a>
+<span class="k">def</span> <span class="nf">build_evaluation_seeds</span><span class="p">(</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+    <span class="n">construction</span><span class="p">:</span> <span class="n">RConstruction</span><span class="p">,</span>
+    <span class="n">number_of_seeds</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">name_prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct and freeze a reusable checkpoint seed collection.&quot;&quot;&quot;</span>
+    <span class="n">number_of_seeds</span> <span class="o">=</span> <span class="n">_nonnegative_integer</span><span class="p">(</span>
+        <span class="s2">&quot;number_of_seeds&quot;</span><span class="p">,</span>
+        <span class="n">number_of_seeds</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">number_of_seeds</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;number_of_seeds must be positive.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">name_prefix</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span>
+        <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_prefix</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="n">name_prefix</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;name_prefix must be a nonempty string or None.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">seeds</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">REvaluationSeed</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">number_of_seeds</span><span class="p">):</span>
+        <span class="n">coloring</span> <span class="o">=</span> <span class="n">construction</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
+
+        <span class="n">source_name</span> <span class="o">=</span> <span class="n">construction</span><span class="o">.</span><span class="n">last_source_name</span>
+
+        <span class="n">prefix</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">name_prefix</span>
+            <span class="k">if</span> <span class="n">name_prefix</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">source_name</span>
+        <span class="p">)</span>
+
+        <span class="n">seeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">REvaluationSeed</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">index</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">source_name</span><span class="o">=</span><span class="n">source_name</span><span class="p">,</span>
+                <span class="n">coloring</span><span class="o">=</span><span class="n">coloring</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">seeds</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_nonnegative_integer</span><span class="p">(</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate and normalize one nonnegative integer.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="n">value</span><span class="p">,</span>
+        <span class="n">Integral</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be an integer.&quot;</span><span class="p">)</span>
+
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> cannot be negative.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">value</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

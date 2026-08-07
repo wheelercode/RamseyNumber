@@ -1,0 +1,594 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RMetric &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RMetric</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RMetric</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Structural measurements that distinguish equal-score Ramsey colorings.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">Counter</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">asdict</span><span class="p">,</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">combinations</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">comb</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RAction</span> <span class="kn">import</span> <span class="n">analyze_actions</span>
+<span class="kn">from</span> <span class="nn">.REdgeFlipCausalAnalysis</span> <span class="kn">import</span> <span class="n">monochromatic_participation</span>
+<span class="kn">from</span> <span class="nn">.RState</span> <span class="kn">import</span> <span class="n">RSearchState</span>
+
+
+<span class="n">METRIC_VERSION</span> <span class="o">=</span> <span class="mi">1</span>
+
+
+<div class="viewcode-block" id="RMetricSnapshot">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RMetric.RMetricSnapshot">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RMetricSnapshot</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A reusable structural fingerprint of one complete coloring.&quot;&quot;&quot;</span>
+
+    <span class="n">metric_version</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">red_violations</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">blue_violations</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="c1"># Index d contains the number of K5s requiring d edge recolorings</span>
+    <span class="c1"># to become monochromatic in the named color.</span>
+    <span class="n">red_deficit_histogram</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">blue_deficit_histogram</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="n">red_vertex_degrees</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">blue_vertex_degrees</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="n">red_vertex_violation_load</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">blue_vertex_violation_load</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">red_edge_violation_load</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">blue_edge_violation_load</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="n">red_vertex_deficit_one_load</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">blue_vertex_deficit_one_load</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">red_edge_deficit_one_load</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">blue_edge_deficit_one_load</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="c1"># Index t counts pairs of violating K5s sharing exactly t vertices.</span>
+    <span class="c1"># Distinct K5s can share at most four vertices.</span>
+    <span class="n">red_red_overlap</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">blue_blue_overlap</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">red_blue_overlap</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="c1"># Exact score reward for flipping each host-graph edge.</span>
+    <span class="n">single_flip_rewards</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">red_deficit_one</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_histogram</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">blue_deficit_one</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_histogram</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_single_flip_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">worst_single_flip_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">improving_single_flips</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">reward</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">reward</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">neutral_single_flips</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">reward</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">reward</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">worsening_single_flips</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">reward</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">reward</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">maximum_vertex_violation_load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="n">red</span> <span class="o">+</span> <span class="n">blue</span>
+            <span class="k">for</span> <span class="n">red</span><span class="p">,</span> <span class="n">blue</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">red_vertex_violation_load</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">blue_vertex_violation_load</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">maximum_edge_violation_load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="n">red</span> <span class="o">+</span> <span class="n">blue</span>
+            <span class="k">for</span> <span class="n">red</span><span class="p">,</span> <span class="n">blue</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">red_edge_violation_load</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">blue_edge_violation_load</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">same_color_shared_edge_violation_pairs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="c1"># Two K5s share at least one host edge exactly when they share</span>
+        <span class="c1"># at least two vertices.</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">red_red_overlap</span><span class="p">[</span><span class="mi">2</span><span class="p">:])</span> <span class="o">+</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">blue_blue_overlap</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="RMetricSnapshot.summary">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RMetric.RMetricSnapshot.summary">[docs]</a>
+    <span class="k">def</span> <span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return compact scalar columns useful for tables and plots.&quot;&quot;&quot;</span>
+        <span class="n">rewards</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">single_flip_rewards</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+            <span class="s2">&quot;red_violations&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_violations</span><span class="p">,</span>
+            <span class="s2">&quot;blue_violations&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_violations</span><span class="p">,</span>
+            <span class="s2">&quot;red_deficit_1&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">red_deficit_one</span><span class="p">,</span>
+            <span class="s2">&quot;blue_deficit_1&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">blue_deficit_one</span><span class="p">,</span>
+            <span class="s2">&quot;max_vertex_violation_load&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">maximum_vertex_violation_load</span><span class="p">,</span>
+            <span class="s2">&quot;max_edge_violation_load&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">maximum_edge_violation_load</span><span class="p">,</span>
+            <span class="s2">&quot;shared_edge_violation_pairs&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">same_color_shared_edge_violation_pairs</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;best_single_flip_reward&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_single_flip_reward</span><span class="p">,</span>
+            <span class="s2">&quot;improving_single_flips&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">improving_single_flips</span><span class="p">,</span>
+            <span class="s2">&quot;neutral_single_flips&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">neutral_single_flips</span><span class="p">,</span>
+            <span class="s2">&quot;worsening_single_flips&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">worsening_single_flips</span><span class="p">,</span>
+            <span class="s2">&quot;mean_single_flip_reward&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">rewards</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
+            <span class="s2">&quot;std_single_flip_reward&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">rewards</span><span class="o">.</span><span class="n">std</span><span class="p">()),</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="RMetricSnapshot.to_dict">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RMetric.RMetricSnapshot.to_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a JSON-compatible representation.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">asdict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RMetricSnapshot.from_dict">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RMetric.RMetricSnapshot.from_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_dict</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">values</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RMetricSnapshot&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore a snapshot from its JSON-compatible representation.&quot;&quot;&quot;</span>
+        <span class="n">normalized</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+        <span class="n">tuple_fields</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;red_deficit_histogram&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_deficit_histogram&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_vertex_degrees&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_vertex_degrees&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_vertex_violation_load&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_vertex_violation_load&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_edge_violation_load&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_edge_violation_load&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_vertex_deficit_one_load&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_vertex_deficit_one_load&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_edge_deficit_one_load&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_edge_deficit_one_load&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_red_overlap&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;blue_blue_overlap&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;red_blue_overlap&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;single_flip_rewards&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="n">tuple_fields</span><span class="p">:</span>
+            <span class="n">normalized</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">normalized</span><span class="p">[</span><span class="n">field_name</span><span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">normalized</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="calculate_metrics">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RMetric.calculate_metrics">[docs]</a>
+<span class="k">def</span> <span class="nf">calculate_metrics</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RMetricSnapshot</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate the versioned structural fingerprint of one state.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;calculate_metrics currently requires a symmetric two-color problem.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">edges_per_clique</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span>
+    <span class="n">histogram</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">histogram</span>
+
+    <span class="c1"># color_one_counts is literally the red completion deficit: every</span>
+    <span class="c1"># color-one/blue edge must become red.  The blue deficit is the</span>
+    <span class="c1"># complementary number of red edges and therefore uses the reversed</span>
+    <span class="c1"># histogram.  Keeping both names makes the two directions explicit.</span>
+    <span class="n">red_deficit_histogram</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">histogram</span>
+    <span class="p">)</span>
+    <span class="n">blue_deficit_histogram</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">histogram</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">participation</span> <span class="o">=</span> <span class="n">monochromatic_participation</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+    <span class="n">red_vertex_degrees</span><span class="p">,</span> <span class="n">blue_vertex_degrees</span> <span class="o">=</span> <span class="n">_vertex_color_degrees</span><span class="p">(</span>
+        <span class="n">state</span>
+    <span class="p">)</span>
+
+    <span class="p">(</span>
+        <span class="n">red_vertex_deficit_one</span><span class="p">,</span>
+        <span class="n">red_edge_deficit_one</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="n">_participation_for_clique_mask</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="p">(</span>
+        <span class="n">blue_vertex_deficit_one</span><span class="p">,</span>
+        <span class="n">blue_edge_deficit_one</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="n">_participation_for_clique_mask</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span> <span class="o">==</span> <span class="n">edges_per_clique</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="p">(</span>
+        <span class="n">red_red_overlap</span><span class="p">,</span>
+        <span class="n">blue_blue_overlap</span><span class="p">,</span>
+        <span class="n">red_blue_overlap</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="n">_violation_overlap_histograms</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+    <span class="n">action_rewards</span> <span class="o">=</span> <span class="n">analyze_actions</span><span class="p">(</span>
+        <span class="n">state</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">immediate_rewards</span>
+
+    <span class="k">return</span> <span class="n">RMetricSnapshot</span><span class="p">(</span>
+        <span class="n">metric_version</span><span class="o">=</span><span class="n">METRIC_VERSION</span><span class="p">,</span>
+        <span class="n">score</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+        <span class="n">red_violations</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">histogram</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+        <span class="n">blue_violations</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">histogram</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span>
+        <span class="n">red_deficit_histogram</span><span class="o">=</span><span class="n">red_deficit_histogram</span><span class="p">,</span>
+        <span class="n">blue_deficit_histogram</span><span class="o">=</span><span class="n">blue_deficit_histogram</span><span class="p">,</span>
+        <span class="n">red_vertex_degrees</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span><span class="n">red_vertex_degrees</span><span class="p">),</span>
+        <span class="n">blue_vertex_degrees</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span><span class="n">blue_vertex_degrees</span><span class="p">),</span>
+        <span class="n">red_vertex_violation_load</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span>
+            <span class="n">participation</span><span class="o">.</span><span class="n">red_vertices</span>
+        <span class="p">),</span>
+        <span class="n">blue_vertex_violation_load</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span>
+            <span class="n">participation</span><span class="o">.</span><span class="n">blue_vertices</span>
+        <span class="p">),</span>
+        <span class="n">red_edge_violation_load</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span>
+            <span class="n">participation</span><span class="o">.</span><span class="n">red_edges</span>
+        <span class="p">),</span>
+        <span class="n">blue_edge_violation_load</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span>
+            <span class="n">participation</span><span class="o">.</span><span class="n">blue_edges</span>
+        <span class="p">),</span>
+        <span class="n">red_vertex_deficit_one_load</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span>
+            <span class="n">red_vertex_deficit_one</span>
+        <span class="p">),</span>
+        <span class="n">blue_vertex_deficit_one_load</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span>
+            <span class="n">blue_vertex_deficit_one</span>
+        <span class="p">),</span>
+        <span class="n">red_edge_deficit_one_load</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span>
+            <span class="n">red_edge_deficit_one</span>
+        <span class="p">),</span>
+        <span class="n">blue_edge_deficit_one_load</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span>
+            <span class="n">blue_edge_deficit_one</span>
+        <span class="p">),</span>
+        <span class="n">red_red_overlap</span><span class="o">=</span><span class="n">red_red_overlap</span><span class="p">,</span>
+        <span class="n">blue_blue_overlap</span><span class="o">=</span><span class="n">blue_blue_overlap</span><span class="p">,</span>
+        <span class="n">red_blue_overlap</span><span class="o">=</span><span class="n">red_blue_overlap</span><span class="p">,</span>
+        <span class="n">single_flip_rewards</span><span class="o">=</span><span class="n">_integer_tuple</span><span class="p">(</span><span class="n">action_rewards</span><span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_vertex_color_degrees</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]]:</span>
+    <span class="n">number_of_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+    <span class="n">red</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">number_of_vertices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="n">blue</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">number_of_vertices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="n">endpoints</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span>
+    <span class="n">red_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="n">blue_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span> <span class="o">==</span> <span class="mi">1</span>
+
+    <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">red</span><span class="p">,</span> <span class="n">endpoints</span><span class="p">[</span><span class="n">red_edges</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">red</span><span class="p">,</span> <span class="n">endpoints</span><span class="p">[</span><span class="n">red_edges</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">blue</span><span class="p">,</span> <span class="n">endpoints</span><span class="p">[</span><span class="n">blue_edges</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">blue</span><span class="p">,</span> <span class="n">endpoints</span><span class="p">[</span><span class="n">blue_edges</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">red</span><span class="p">,</span> <span class="n">blue</span>
+
+
+<span class="k">def</span> <span class="nf">_participation_for_clique_mask</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">clique_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]]:</span>
+    <span class="n">clique_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span><span class="n">clique_mask</span><span class="p">]</span>
+
+    <span class="n">edge_load</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">vertex_load</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">clique_edges</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">vertex_load</span><span class="p">,</span> <span class="n">edge_load</span>
+
+    <span class="n">edge_load</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span>
+        <span class="n">clique_edges</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+        <span class="n">minlength</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Each clique contributes through clique_size - 1 incident edges at</span>
+    <span class="c1"># each of its vertices, just as in monochromatic_participation().</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span>
+        <span class="n">vertex_load</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="n">edge_load</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span>
+        <span class="n">vertex_load</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span>
+        <span class="n">edge_load</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">divisor</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">clique_size</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">vertex_load</span> <span class="o">%</span> <span class="n">divisor</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Clique participation incidence did not divide exactly.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">vertex_load</span> <span class="o">//=</span> <span class="n">divisor</span>
+
+    <span class="k">return</span> <span class="n">vertex_load</span><span class="p">,</span> <span class="n">edge_load</span>
+
+
+<span class="k">def</span> <span class="nf">_violation_overlap_histograms</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count exact red/red, blue/blue, and red/blue K5 intersections.&quot;&quot;&quot;</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span>
+    <span class="n">edges_per_clique</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span>
+
+    <span class="n">red_indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">counts</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">blue_indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">counts</span> <span class="o">==</span> <span class="n">edges_per_clique</span><span class="p">)</span>
+
+    <span class="n">red_subset_counts</span> <span class="o">=</span> <span class="n">_violation_subset_counts</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+        <span class="n">red_indexes</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">blue_subset_counts</span> <span class="o">=</span> <span class="n">_violation_subset_counts</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+        <span class="n">blue_indexes</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">red_at_least</span> <span class="o">=</span> <span class="n">_same_color_subset_pair_counts</span><span class="p">(</span>
+        <span class="n">red_subset_counts</span>
+    <span class="p">)</span>
+    <span class="n">blue_at_least</span> <span class="o">=</span> <span class="n">_same_color_subset_pair_counts</span><span class="p">(</span>
+        <span class="n">blue_subset_counts</span>
+    <span class="p">)</span>
+    <span class="n">mixed_at_least</span> <span class="o">=</span> <span class="n">_mixed_subset_pair_counts</span><span class="p">(</span>
+        <span class="n">red_subset_counts</span><span class="p">,</span>
+        <span class="n">blue_subset_counts</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">red_exact</span> <span class="o">=</span> <span class="n">_exact_intersections_from_subset_counts</span><span class="p">(</span>
+        <span class="n">red_at_least</span><span class="p">,</span>
+        <span class="n">total_pairs</span><span class="o">=</span><span class="n">comb</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">red_indexes</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">blue_exact</span> <span class="o">=</span> <span class="n">_exact_intersections_from_subset_counts</span><span class="p">(</span>
+        <span class="n">blue_at_least</span><span class="p">,</span>
+        <span class="n">total_pairs</span><span class="o">=</span><span class="n">comb</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">blue_indexes</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">mixed_exact</span> <span class="o">=</span> <span class="n">_exact_intersections_from_subset_counts</span><span class="p">(</span>
+        <span class="n">mixed_at_least</span><span class="p">,</span>
+        <span class="n">total_pairs</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">red_indexes</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">blue_indexes</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">red_exact</span><span class="p">,</span> <span class="n">blue_exact</span><span class="p">,</span> <span class="n">mixed_exact</span>
+
+
+<span class="k">def</span> <span class="nf">_violation_subset_counts</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">clique_indexes</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Counter</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">size</span><span class="p">:</span> <span class="n">Counter</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">clique_size</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="k">for</span> <span class="n">clique_index_value</span> <span class="ow">in</span> <span class="n">clique_indexes</span><span class="p">:</span>
+        <span class="n">clique_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">clique_index_value</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">vertex</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">vertex</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[</span><span class="n">clique_edges</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span> <span class="o">!=</span> <span class="n">state</span><span class="o">.</span><span class="n">clique_size</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Indexed clique did not contain the expected vertices.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">subset_size</span><span class="p">,</span> <span class="n">counter</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">counter</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="n">combinations</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">subset_size</span><span class="p">)</span>
+            <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span> <span class="nf">_same_color_subset_pair_counts</span><span class="p">(</span>
+    <span class="n">subset_counts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Counter</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">size</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">comb</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">counter</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">count</span> <span class="o">&gt;=</span> <span class="mi">2</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">size</span><span class="p">,</span> <span class="n">counter</span> <span class="ow">in</span> <span class="n">subset_counts</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span> <span class="nf">_mixed_subset_pair_counts</span><span class="p">(</span>
+    <span class="n">first</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Counter</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]],</span>
+    <span class="n">second</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Counter</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+    <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="n">first</span><span class="p">:</span>
+        <span class="n">first_counter</span> <span class="o">=</span> <span class="n">first</span><span class="p">[</span><span class="n">size</span><span class="p">]</span>
+        <span class="n">second_counter</span> <span class="o">=</span> <span class="n">second</span><span class="p">[</span><span class="n">size</span><span class="p">]</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">size</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">count</span> <span class="o">*</span> <span class="n">second_counter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">subset</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">subset</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">first_counter</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span> <span class="nf">_exact_intersections_from_subset_counts</span><span class="p">(</span>
+    <span class="n">at_least</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">total_pairs</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Invert subset-incidence counts into exact intersection sizes.&quot;&quot;&quot;</span>
+    <span class="n">maximum_shared</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">at_least</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">exact</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">maximum_shared</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">shared</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">maximum_shared</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">at_least</span><span class="p">[</span><span class="n">shared</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">larger</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">shared</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">maximum_shared</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">-=</span> <span class="n">comb</span><span class="p">(</span><span class="n">larger</span><span class="p">,</span> <span class="n">shared</span><span class="p">)</span> <span class="o">*</span> <span class="n">exact</span><span class="p">[</span><span class="n">larger</span><span class="p">]</span>
+
+        <span class="n">exact</span><span class="p">[</span><span class="n">shared</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="n">exact</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">total_pairs</span> <span class="o">-</span> <span class="nb">sum</span><span class="p">(</span><span class="n">exact</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">exact</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Violation overlap inversion became negative.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">exact</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_integer_tuple</span><span class="p">(</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

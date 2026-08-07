@@ -51,6 +51,15 @@ from .RGraph import (
     RGraph,
     RSubgraphIndex,
 )
+from .RMetric import (
+    METRIC_VERSION,
+    RMetricSnapshot,
+    calculate_metrics,
+)
+from .RMetricStore import (
+    RMetricStore,
+    RStoredMetric,
+)
 from .RObjective import (
     RDangerObjective,
     RMonochromaticObjective,
@@ -102,6 +111,8 @@ __all__ = [
     "RGreedyPolicy",
     "RMemory",
     "RMemoryStatus",
+    "RMetricSnapshot",
+    "RMetricStore",
     "RMixedConstruction",
     "RMonochromaticObjective",
     "RNullMemory",
@@ -116,8 +127,11 @@ __all__ = [
     "RSearchState",
     "RSQLiteArchive",
     "RStateVerification",
+    "RStoredMetric",
     "RStepResult",
     "RSubgraphIndex",
     "RTabuMemory",
     "RTabuMemoryConfig",
+    "METRIC_VERSION",
+    "calculate_metrics",
 ]

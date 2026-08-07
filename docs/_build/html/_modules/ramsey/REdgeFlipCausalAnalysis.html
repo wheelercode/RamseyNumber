@@ -1,0 +1,582 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.REdgeFlipCausalAnalysis &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.REdgeFlipCausalAnalysis</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.REdgeFlipCausalAnalysis</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Read-only causal instrumentation for one single-edge Ramsey flip.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RAction</span> <span class="kn">import</span> <span class="n">analyze_actions</span>
+<span class="kn">from</span> <span class="nn">.RState</span> <span class="kn">import</span> <span class="n">RSearchState</span>
+
+
+<span class="k">def</span> <span class="nf">_owned_read_only</span><span class="p">(</span>
+    <span class="n">array</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an owned immutable NumPy array.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+        <span class="n">array</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="RMonochromaticParticipation">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipCausalAnalysis.RMonochromaticParticipation">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RMonochromaticParticipation</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Monochromatic-clique participation by vertex and host edge.</span>
+
+<span class="sd">    The final axis is the edge color:</span>
+
+<span class="sd">        [..., 0] = color-zero / red K5 participation</span>
+<span class="sd">        [..., 1] = color-one / blue K5 participation</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">vertices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">edges</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">_owned_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="n">_owned_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">vertices</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;vertices must have shape (n_vertices, 2).&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">edges</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">edges</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;edges must have shape (n_edges, 2).&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">vertices</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">edges</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Participation counts cannot be negative.&quot;</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;vertices&quot;</span><span class="p">,</span> <span class="n">vertices</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;edges&quot;</span><span class="p">,</span> <span class="n">edges</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">red_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">blue_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">red_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">blue_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="RMonochromaticCliqueChange">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipCausalAnalysis.RMonochromaticCliqueChange">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RMonochromaticCliqueChange</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One monochromatic K5 created or destroyed by the edge flip.&quot;&quot;&quot;</span>
+
+    <span class="n">clique_index</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">color</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">delta</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">vertices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]</span>
+    <span class="n">edges</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;color must be zero or one.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;delta must be -1 or +1.&quot;</span><span class="p">)</span>
+
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">_owned_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="n">_owned_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">vertices</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;vertices must be one-dimensional.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">edges</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;edges must be one-dimensional.&quot;</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;clique_index&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">clique_index</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">color</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;delta&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">delta</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;vertices&quot;</span><span class="p">,</span> <span class="n">vertices</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;edges&quot;</span><span class="p">,</span> <span class="n">edges</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">created</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">==</span> <span class="mi">1</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">destroyed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span></div>
+
+
+
+<div class="viewcode-block" id="REdgeFlipCausalAnalysis">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipCausalAnalysis.REdgeFlipCausalAnalysis">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">REdgeFlipCausalAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete read-only causal footprint of one specified edge flip.&quot;&quot;&quot;</span>
+
+    <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">endpoints</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+    <span class="n">old_color</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">new_color</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">score_before</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">score_after</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">participation_before</span><span class="p">:</span> <span class="n">RMonochromaticParticipation</span>
+    <span class="n">participation_after</span><span class="p">:</span> <span class="n">RMonochromaticParticipation</span>
+    <span class="n">clique_changes</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RMonochromaticCliqueChange</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">greedy_rewards_before</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">greedy_rewards_after</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">before_rewards</span> <span class="o">=</span> <span class="n">_owned_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_before</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">after_rewards</span> <span class="o">=</span> <span class="n">_owned_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_after</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">before_rewards</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">after_rewards</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Before and after greedy reward arrays must have equal shape.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;edge&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edge</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;old_color&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">old_color</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;new_color&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">new_color</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;score_before&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">score_before</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;score_after&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">score_after</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;greedy_rewards_before&quot;</span><span class="p">,</span> <span class="n">before_rewards</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;greedy_rewards_after&quot;</span><span class="p">,</span> <span class="n">after_rewards</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">exact_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_before</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_after</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">vertex_participation_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">participation_after</span><span class="o">.</span><span class="n">vertices</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">vertices</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">edge_participation_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">participation_after</span><span class="o">.</span><span class="n">edges</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">edges</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">greedy_reward_delta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_after</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">greedy_rewards_before</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">changed_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="n">changed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">vertex_participation_delta</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">changed</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">changed_structure_edges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">clique_changes</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">change</span><span class="o">.</span><span class="n">edges</span> <span class="k">for</span> <span class="n">change</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">clique_changes</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">vertex_event_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">vertices</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">change</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">clique_changes</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">change</span><span class="o">.</span><span class="n">vertices</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">edge_event_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">participation_before</span><span class="o">.</span><span class="n">edges</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">change</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">clique_changes</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">change</span><span class="o">.</span><span class="n">edges</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="monochromatic_participation">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipCausalAnalysis.monochromatic_participation">[docs]</a>
+<span class="k">def</span> <span class="nf">monochromatic_participation</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RMonochromaticParticipation</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Count red and blue monochromatic K5 participation exactly.&quot;&quot;&quot;</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span>
+
+    <span class="n">red_cliques</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span>
+        <span class="n">counts</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="p">]</span>
+    <span class="n">blue_cliques</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span>
+        <span class="n">counts</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span>
+    <span class="p">]</span>
+
+    <span class="n">edge_participation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">red_cliques</span><span class="p">):</span>
+        <span class="n">edge_participation</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span>
+            <span class="n">red_cliques</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">minlength</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">blue_cliques</span><span class="p">):</span>
+        <span class="n">edge_participation</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span>
+            <span class="n">blue_cliques</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">minlength</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">vertex_participation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Every K5 containing a vertex contributes to exactly four of the</span>
+    <span class="c1"># host edges incident to that vertex.  Summing edge participation</span>
+    <span class="c1"># at each endpoint and dividing by four therefore recovers the</span>
+    <span class="c1"># exact number of monochromatic K5s containing the vertex.</span>
+    <span class="k">for</span> <span class="n">color</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">loads</span> <span class="o">=</span> <span class="n">edge_participation</span><span class="p">[:,</span> <span class="n">color</span><span class="p">]</span>
+
+        <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span>
+            <span class="n">vertex_participation</span><span class="p">[:,</span> <span class="n">color</span><span class="p">],</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+            <span class="n">loads</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span>
+            <span class="n">vertex_participation</span><span class="p">[:,</span> <span class="n">color</span><span class="p">],</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span>
+            <span class="n">loads</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">vertex_participation</span> <span class="o">%</span> <span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">clique_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Vertex participation incidence did not divide exactly.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">vertex_participation</span> <span class="o">//=</span> <span class="n">state</span><span class="o">.</span><span class="n">clique_size</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">RMonochromaticParticipation</span><span class="p">(</span>
+        <span class="n">vertices</span><span class="o">=</span><span class="n">vertex_participation</span><span class="p">,</span>
+        <span class="n">edges</span><span class="o">=</span><span class="n">edge_participation</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="analyze_edge_flip_causality">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REdgeFlipCausalAnalysis.analyze_edge_flip_causality">[docs]</a>
+<span class="k">def</span> <span class="nf">analyze_edge_flip_causality</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REdgeFlipCausalAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Analyze one edge flip without mutating the supplied search state.</span>
+
+<span class="sd">    The returned K5 changes form an exact event decomposition: replaying</span>
+<span class="sd">    their +/-1 color contributions reconstructs all vertex and edge</span>
+<span class="sd">    monochromatic-participation deltas.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;edge must be an integer.&quot;</span><span class="p">)</span>
+
+    <span class="n">edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">edge</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">edge</span> <span class="o">&gt;=</span> <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">&quot;edge is outside the host graph.&quot;</span><span class="p">)</span>
+
+    <span class="n">working_state</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="n">working_state</span><span class="o">.</span><span class="n">index</span>
+
+    <span class="n">old_color</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">working_state</span><span class="o">.</span><span class="n">colors</span><span class="p">[</span><span class="n">edge</span><span class="p">])</span>
+    <span class="n">new_color</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">old_color</span>
+    <span class="n">endpoints</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">vertex</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">vertex</span> <span class="ow">in</span> <span class="n">working_state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">score_before</span> <span class="o">=</span> <span class="n">working_state</span><span class="o">.</span><span class="n">score</span>
+    <span class="n">participation_before</span> <span class="o">=</span> <span class="n">monochromatic_participation</span><span class="p">(</span>
+        <span class="n">working_state</span>
+    <span class="p">)</span>
+    <span class="n">greedy_rewards_before</span> <span class="o">=</span> <span class="n">analyze_actions</span><span class="p">(</span>
+        <span class="n">working_state</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">immediate_rewards</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">affected_cliques</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+    <span class="n">counts_before</span> <span class="o">=</span> <span class="n">working_state</span><span class="o">.</span><span class="n">color_one_counts</span><span class="p">[</span>
+        <span class="n">affected_cliques</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">working_state</span><span class="o">.</span><span class="n">apply_edge_flip</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
+
+    <span class="n">counts_after</span> <span class="o">=</span> <span class="n">working_state</span><span class="o">.</span><span class="n">color_one_counts</span><span class="p">[</span>
+        <span class="n">affected_cliques</span>
+    <span class="p">]</span>
+
+    <span class="n">changes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RMonochromaticCliqueChange</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">local_index</span><span class="p">,</span> <span class="n">clique_index_value</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">affected_cliques</span><span class="p">):</span>
+        <span class="n">clique_index</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">clique_index_value</span><span class="p">)</span>
+        <span class="n">before_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">counts_before</span><span class="p">[</span><span class="n">local_index</span><span class="p">])</span>
+        <span class="n">after_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">counts_after</span><span class="p">[</span><span class="n">local_index</span><span class="p">])</span>
+
+        <span class="n">before_color</span> <span class="o">=</span> <span class="n">_monochromatic_color</span><span class="p">(</span>
+            <span class="n">before_count</span><span class="p">,</span>
+            <span class="n">working_state</span><span class="o">.</span><span class="n">edges_per_clique</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">after_color</span> <span class="o">=</span> <span class="n">_monochromatic_color</span><span class="p">(</span>
+            <span class="n">after_count</span><span class="p">,</span>
+            <span class="n">working_state</span><span class="o">.</span><span class="n">edges_per_clique</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">before_color</span> <span class="o">==</span> <span class="n">after_color</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">clique_edges</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span><span class="n">clique_index</span><span class="p">]</span>
+        <span class="n">clique_vertices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span>
+            <span class="n">working_state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[</span>
+                <span class="n">clique_edges</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">before_color</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">changes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">RMonochromaticCliqueChange</span><span class="p">(</span>
+                    <span class="n">clique_index</span><span class="o">=</span><span class="n">clique_index</span><span class="p">,</span>
+                    <span class="n">color</span><span class="o">=</span><span class="n">before_color</span><span class="p">,</span>
+                    <span class="n">delta</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+                    <span class="n">vertices</span><span class="o">=</span><span class="n">clique_vertices</span><span class="p">,</span>
+                    <span class="n">edges</span><span class="o">=</span><span class="n">clique_edges</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">after_color</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">changes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">RMonochromaticCliqueChange</span><span class="p">(</span>
+                    <span class="n">clique_index</span><span class="o">=</span><span class="n">clique_index</span><span class="p">,</span>
+                    <span class="n">color</span><span class="o">=</span><span class="n">after_color</span><span class="p">,</span>
+                    <span class="n">delta</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                    <span class="n">vertices</span><span class="o">=</span><span class="n">clique_vertices</span><span class="p">,</span>
+                    <span class="n">edges</span><span class="o">=</span><span class="n">clique_edges</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+    <span class="n">participation_after</span> <span class="o">=</span> <span class="n">monochromatic_participation</span><span class="p">(</span>
+        <span class="n">working_state</span>
+    <span class="p">)</span>
+    <span class="n">greedy_rewards_after</span> <span class="o">=</span> <span class="n">analyze_actions</span><span class="p">(</span>
+        <span class="n">working_state</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">immediate_rewards</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">REdgeFlipCausalAnalysis</span><span class="p">(</span>
+        <span class="n">edge</span><span class="o">=</span><span class="n">edge</span><span class="p">,</span>
+        <span class="n">endpoints</span><span class="o">=</span><span class="n">endpoints</span><span class="p">,</span>
+        <span class="n">old_color</span><span class="o">=</span><span class="n">old_color</span><span class="p">,</span>
+        <span class="n">new_color</span><span class="o">=</span><span class="n">new_color</span><span class="p">,</span>
+        <span class="n">score_before</span><span class="o">=</span><span class="n">score_before</span><span class="p">,</span>
+        <span class="n">score_after</span><span class="o">=</span><span class="n">working_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+        <span class="n">participation_before</span><span class="o">=</span><span class="n">participation_before</span><span class="p">,</span>
+        <span class="n">participation_after</span><span class="o">=</span><span class="n">participation_after</span><span class="p">,</span>
+        <span class="n">clique_changes</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">changes</span><span class="p">),</span>
+        <span class="n">greedy_rewards_before</span><span class="o">=</span><span class="n">greedy_rewards_before</span><span class="p">,</span>
+        <span class="n">greedy_rewards_after</span><span class="o">=</span><span class="n">greedy_rewards_after</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">_verify_event_decomposition</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_monochromatic_color</span><span class="p">(</span>
+    <span class="n">color_one_count</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">edges_per_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">color_one_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">color_one_count</span> <span class="o">==</span> <span class="n">edges_per_clique</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<span class="k">def</span> <span class="nf">_verify_event_decomposition</span><span class="p">(</span>
+    <span class="n">analysis</span><span class="p">:</span> <span class="n">REdgeFlipCausalAnalysis</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify that causal events exactly reconstruct both load deltas.&quot;&quot;&quot;</span>
+    <span class="n">vertex_delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span>
+        <span class="n">analysis</span><span class="o">.</span><span class="n">vertex_participation_delta</span>
+    <span class="p">)</span>
+    <span class="n">edge_delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span>
+        <span class="n">analysis</span><span class="o">.</span><span class="n">edge_participation_delta</span>
+    <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">change</span> <span class="ow">in</span> <span class="n">analysis</span><span class="o">.</span><span class="n">clique_changes</span><span class="p">:</span>
+        <span class="n">vertex_delta</span><span class="p">[</span>
+            <span class="n">change</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span>
+            <span class="n">change</span><span class="o">.</span><span class="n">color</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">+=</span> <span class="n">change</span><span class="o">.</span><span class="n">delta</span>
+        <span class="n">edge_delta</span><span class="p">[</span>
+            <span class="n">change</span><span class="o">.</span><span class="n">edges</span><span class="p">,</span>
+            <span class="n">change</span><span class="o">.</span><span class="n">color</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">+=</span> <span class="n">change</span><span class="o">.</span><span class="n">delta</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span>
+        <span class="n">vertex_delta</span><span class="p">,</span>
+        <span class="n">analysis</span><span class="o">.</span><span class="n">vertex_participation_delta</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Causal K5 events do not reconstruct the vertex delta.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span>
+        <span class="n">edge_delta</span><span class="p">,</span>
+        <span class="n">analysis</span><span class="o">.</span><span class="n">edge_participation_delta</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Causal K5 events do not reconstruct the edge delta.&quot;</span>
+        <span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

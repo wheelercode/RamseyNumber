@@ -1,0 +1,260 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RSearch &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RSearch</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RSearch</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Lifecycle and results for complete search attempts.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">from</span> <span class="nn">.RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">.REnvironment</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">REnvironment</span><span class="p">,</span>
+    <span class="n">RStepResult</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RPolicy</span> <span class="kn">import</span> <span class="n">RPolicy</span>
+
+
+<div class="viewcode-block" id="RSearchResult">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearch.RSearchResult">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RSearchResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Immutable outcome of one complete search attempt.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">policy_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">objective_name</span><span class="p">:</span> <span class="nb">str</span>
+
+    <span class="n">initial_coloring</span><span class="p">:</span> <span class="n">RColoring</span>
+    <span class="n">final_coloring</span><span class="p">:</span> <span class="n">RColoring</span>
+    <span class="n">best_coloring</span><span class="p">:</span> <span class="n">RColoring</span>
+
+    <span class="n">initial_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">final_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">best_score</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">steps_completed</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">terminated</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">truncated</span><span class="p">:</span> <span class="nb">bool</span>
+
+    <span class="n">step_results</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RStepResult</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the exact improvement from initial to final state.</span>
+
+<span class="sd">        This can be negative if the final state is worse than the</span>
+<span class="sd">        initial state.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_score</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_score</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_score_reduction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the exact improvement from initial to best state.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_score</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span></div>
+
+
+
+<div class="viewcode-block" id="RSearch">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearch.RSearch">[docs]</a>
+<span class="k">class</span> <span class="nc">RSearch</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Run an environment using one interchangeable policy.</span>
+
+<span class="sd">    RSearch coordinates an episode but does not:</span>
+
+<span class="sd">    - construct seed colorings;</span>
+<span class="sd">    - choose how action rewards are calculated;</span>
+<span class="sd">    - implement tabu memory;</span>
+<span class="sd">    - persist results;</span>
+<span class="sd">    - plot results; or</span>
+<span class="sd">    - train neural networks.</span>
+
+<span class="sd">    Those responsibilities belong to separate components.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">environment</span><span class="p">:</span> <span class="n">REnvironment</span><span class="p">,</span>
+        <span class="n">policy</span><span class="p">:</span> <span class="n">RPolicy</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span> <span class="o">=</span> <span class="n">environment</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_policy</span> <span class="o">=</span> <span class="n">policy</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">environment</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REnvironment</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the environment used for each search attempt.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">policy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RPolicy</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the action-selection policy.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_policy</span>
+
+<div class="viewcode-block" id="RSearch.run">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RSearch.RSearch.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">record_steps</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RSearchResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run from an explicit seed until termination or truncation.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        coloring:</span>
+<span class="sd">            Immutable seed coloring for the search attempt.</span>
+
+<span class="sd">        record_steps:</span>
+<span class="sd">            If true, preserve every RStepResult in the returned result.</span>
+
+<span class="sd">            If false, only summary information and important coloring</span>
+<span class="sd">            snapshots are retained.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">record_steps</span><span class="p">,</span>
+            <span class="nb">bool</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;record_steps must be boolean.&quot;</span><span class="p">)</span>
+
+        <span class="n">initial_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">coloring</span><span class="p">)</span>
+
+        <span class="n">initial_coloring</span> <span class="o">=</span> <span class="n">initial_state</span><span class="o">.</span><span class="n">coloring_snapshot</span><span class="p">()</span>
+
+        <span class="n">initial_score</span> <span class="o">=</span> <span class="n">initial_state</span><span class="o">.</span><span class="n">score</span>
+
+        <span class="n">recorded_steps</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RStepResult</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">while</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">terminated</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">truncated</span><span class="p">):</span>
+            <span class="n">edge</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_policy</span><span class="o">.</span><span class="n">select_action</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="p">)</span>
+
+            <span class="n">step_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">step</span><span class="p">(</span>
+                <span class="n">edge</span><span class="p">,</span>
+                <span class="n">full_analysis</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_policy</span><span class="o">.</span><span class="n">requires_full_analysis</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">record_steps</span><span class="p">:</span>
+                <span class="n">recorded_steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">step_result</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RSearchResult</span><span class="p">(</span>
+            <span class="n">policy_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_policy</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">objective_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">initial_coloring</span><span class="o">=</span><span class="n">initial_coloring</span><span class="p">,</span>
+            <span class="n">final_coloring</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">coloring_snapshot</span><span class="p">(),</span>
+            <span class="n">best_coloring</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">best_coloring</span><span class="p">,</span>
+            <span class="n">initial_score</span><span class="o">=</span><span class="n">initial_score</span><span class="p">,</span>
+            <span class="n">final_score</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+            <span class="n">best_score</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">best_score</span><span class="p">,</span>
+            <span class="n">steps_completed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">step_number</span><span class="p">,</span>
+            <span class="n">terminated</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">terminated</span><span class="p">,</span>
+            <span class="n">truncated</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_environment</span><span class="o">.</span><span class="n">truncated</span><span class="p">,</span>
+            <span class="n">step_results</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">recorded_steps</span><span class="p">),</span>
+        <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,504 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RK5Action &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RK5Action</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RK5Action</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Objective-neutral analysis and application of K5 recoloring actions.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RState</span> <span class="kn">import</span> <span class="n">RSearchState</span>
+
+
+<span class="n">K5_EDGE_COUNT</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">K5_PATTERN_COUNT</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">K5_EDGE_COUNT</span>
+
+<span class="c1"># Pattern IDs are ten-bit integers. Bit j is the requested color of</span>
+<span class="c1"># target edge j in the canonical clique-edge ordering. IDs zero and</span>
+<span class="c1"># 1023 are monochromatic and are intentionally excluded.</span>
+<span class="n">K5_ALLOWED_PATTERN_IDS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span>
+    <span class="mi">1</span><span class="p">,</span>
+    <span class="n">K5_PATTERN_COUNT</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">K5_PATTERN_COLORS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="p">(</span>
+        <span class="n">K5_ALLOWED_PATTERN_IDS</span><span class="p">[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>
+        <span class="o">&gt;&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">K5_EDGE_COUNT</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="o">&amp;</span> <span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+
+<span class="n">K5_POPCOUNT</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">pattern</span><span class="o">.</span><span class="n">bit_count</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">K5_PATTERN_COUNT</span><span class="p">)</span>
+    <span class="p">],</span>
+    <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">K5_ALLOWED_PATTERN_IDS</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">K5_PATTERN_COLORS</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">K5_POPCOUNT</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+
+
+<span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="RK5PatternAnalysis">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RK5Action.RK5PatternAnalysis">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RK5PatternAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exact consequences of all 1,022 allowed patterns for one bad K5.&quot;&quot;&quot;</span>
+
+    <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
+    <span class="n">state_version</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">target_clique</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">target_edges</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
+    <span class="n">old_pattern_id</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">pattern_ids</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
+    <span class="n">histogram_deltas</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">exact_rewards</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">resulting_scores</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">changed_edge_counts</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]</span>
+
+    <span class="n">affected_clique_count</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pattern_ids</span> <span class="o">=</span> <span class="n">_read_only_copy</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pattern_ids</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">exact_rewards</span> <span class="o">=</span> <span class="n">_read_only_copy</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">exact_rewards</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">histogram_deltas</span> <span class="o">=</span> <span class="n">_read_only_copy</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">histogram_deltas</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">resulting_scores</span> <span class="o">=</span> <span class="n">_read_only_copy</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resulting_scores</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">changed_edge_counts</span> <span class="o">=</span> <span class="n">_read_only_copy</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">changed_edge_counts</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">action_shape</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pattern_ids</span><span class="p">),)</span>
+
+        <span class="n">expected_delta_shape</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">pattern_ids</span><span class="p">),</span>
+            <span class="n">K5_EDGE_COUNT</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">histogram_deltas</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_delta_shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;histogram_deltas has the wrong shape.&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s2">&quot;exact_rewards&quot;</span><span class="p">,</span> <span class="n">exact_rewards</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;resulting_scores&quot;</span><span class="p">,</span> <span class="n">resulting_scores</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;changed_edge_counts&quot;</span><span class="p">,</span> <span class="n">changed_edge_counts</span><span class="p">),</span>
+        <span class="p">):</span>
+            <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">action_shape</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> has the wrong shape.&quot;</span><span class="p">)</span>
+
+        <span class="n">target_edges</span> <span class="o">=</span> <span class="n">_read_only_copy</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_edges</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">target_edges</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="n">K5_EDGE_COUNT</span><span class="p">,):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;target_edges must contain ten edges.&quot;</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;state_version&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state_version</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;target_clique&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_clique</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;target_edges&quot;</span><span class="p">,</span> <span class="n">target_edges</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;old_pattern_id&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">old_pattern_id</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;pattern_ids&quot;</span><span class="p">,</span> <span class="n">pattern_ids</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;histogram_deltas&quot;</span><span class="p">,</span> <span class="n">histogram_deltas</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;exact_rewards&quot;</span><span class="p">,</span> <span class="n">exact_rewards</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;resulting_scores&quot;</span><span class="p">,</span> <span class="n">resulting_scores</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;changed_edge_counts&quot;</span><span class="p">,</span> <span class="n">changed_edge_counts</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;affected_clique_count&quot;</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">affected_clique_count</span><span class="p">),</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="RK5PatternAnalysis.applies_to">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RK5Action.RK5PatternAnalysis.applies_to">[docs]</a>
+    <span class="k">def</span> <span class="nf">applies_to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span></div>
+</div>
+
+
+
+<span class="k">def</span> <span class="nf">_require_k5_state</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">clique_size</span> <span class="o">!=</span> <span class="mi">5</span> <span class="ow">or</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span> <span class="o">!=</span> <span class="n">K5_EDGE_COUNT</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;K5 pattern actions require a K5 search state.&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="pattern_colors">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RK5Action.pattern_colors">[docs]</a>
+<span class="k">def</span> <span class="nf">pattern_colors</span><span class="p">(</span>
+    <span class="n">pattern_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the ten edge colors encoded by one nonmonochromatic pattern.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pattern_id</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="n">pattern_id</span><span class="p">,</span>
+        <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;pattern_id must be an integer.&quot;</span><span class="p">)</span>
+
+    <span class="n">pattern_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">pattern_id</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">pattern_id</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">pattern_id</span> <span class="o">&gt;=</span> <span class="n">K5_PATTERN_COUNT</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;pattern_id must be between 1 and 1022.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">(</span><span class="n">pattern_id</span><span class="p">)</span>
+            <span class="o">&gt;&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">K5_EDGE_COUNT</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="o">&amp;</span> <span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="monochromatic_k5_indices">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RK5Action.monochromatic_k5_indices">[docs]</a>
+<span class="k">def</span> <span class="nf">monochromatic_k5_indices</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return indexes of every currently monochromatic K5.&quot;&quot;&quot;</span>
+    <span class="n">_require_k5_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span>
+
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">counts</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="o">|</span> <span class="p">(</span><span class="n">counts</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span><span class="p">)</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="analyze_k5_patterns">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RK5Action.analyze_k5_patterns">[docs]</a>
+<span class="k">def</span> <span class="nf">analyze_k5_patterns</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">target_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RK5PatternAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Evaluate every nonmonochromatic recoloring of one bad K5 exactly.</span>
+
+<span class="sd">    Neighboring K5s are aggregated by two sufficient statistics:</span>
+
+<span class="sd">    - which subset of the target&#39;s ten edges they share; and</span>
+<span class="sd">    - how many blue edges they have outside the target.</span>
+
+<span class="sd">    A K5 can share only a K2, K3, K4, or K5 with the target, so only a</span>
+<span class="sd">    small number of shared-edge masks actually occur.  This reduces the</span>
+<span class="sd">    1,022-pattern calculation from tens of millions of clique-by-pattern</span>
+<span class="sd">    operations to a small grouped table without losing information.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_require_k5_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_clique</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="n">target_clique</span><span class="p">,</span>
+        <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;target_clique must be an integer.&quot;</span><span class="p">)</span>
+
+    <span class="n">target_clique</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">target_clique</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">target_clique</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">target_clique</span> <span class="o">&gt;=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">clique_count</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">&quot;target_clique is out of range.&quot;</span><span class="p">)</span>
+
+    <span class="n">target_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span><span class="p">[</span><span class="n">target_clique</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="n">target_count</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">K5_EDGE_COUNT</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;target_clique must currently be monochromatic.&quot;</span><span class="p">)</span>
+
+    <span class="n">target_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span><span class="n">target_clique</span><span class="p">]</span>
+
+    <span class="n">target_colors</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span><span class="p">[</span><span class="n">target_edges</span><span class="p">]</span>
+
+    <span class="n">old_pattern_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+            <span class="n">target_colors</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
+            <span class="o">&lt;&lt;</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">K5_EDGE_COUNT</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">affected_cliques</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span><span class="n">target_edges</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">edge_bits</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">edge_bits</span><span class="p">[</span><span class="n">target_edges</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">left_shift</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">K5_EDGE_COUNT</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="n">neighbor_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span><span class="n">affected_cliques</span><span class="p">]</span>
+
+    <span class="n">shared_masks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bitwise_or</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span>
+        <span class="n">edge_bits</span><span class="p">[</span><span class="n">neighbor_edges</span><span class="p">],</span>
+        <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">old_shared_blue</span> <span class="o">=</span> <span class="n">K5_POPCOUNT</span><span class="p">[</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">bitwise_and</span><span class="p">(</span>
+            <span class="n">shared_masks</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">(</span><span class="n">old_pattern_id</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="n">outside_blue</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span><span class="p">[</span><span class="n">affected_cliques</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span>
+        <span class="o">-</span> <span class="n">old_shared_blue</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">number_of_bins</span> <span class="o">=</span> <span class="n">K5_EDGE_COUNT</span> <span class="o">+</span> <span class="mi">1</span>
+
+    <span class="n">group_indexes</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">shared_masks</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span> <span class="o">*</span> <span class="n">number_of_bins</span>
+        <span class="o">+</span> <span class="n">outside_blue</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">group_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span>
+        <span class="n">group_indexes</span><span class="p">,</span>
+        <span class="n">minlength</span><span class="o">=</span><span class="n">K5_PATTERN_COUNT</span> <span class="o">*</span> <span class="n">number_of_bins</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+        <span class="n">K5_PATTERN_COUNT</span><span class="p">,</span>
+        <span class="n">number_of_bins</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">active_masks</span><span class="p">,</span> <span class="n">active_outside</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">group_counts</span><span class="p">)</span>
+
+    <span class="n">active_counts</span> <span class="o">=</span> <span class="n">group_counts</span><span class="p">[</span>
+        <span class="n">active_masks</span><span class="p">,</span>
+        <span class="n">active_outside</span><span class="p">,</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+    <span class="n">active_masks</span> <span class="o">=</span> <span class="n">active_masks</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
+
+    <span class="n">shared_blue</span> <span class="o">=</span> <span class="n">K5_POPCOUNT</span><span class="p">[</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">bitwise_and</span><span class="p">(</span>
+            <span class="n">K5_ALLOWED_PATTERN_IDS</span><span class="p">[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">],</span>
+            <span class="n">active_masks</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:],</span>
+        <span class="p">)</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span>
+
+    <span class="n">new_blue_counts</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">shared_blue</span>
+        <span class="o">+</span> <span class="n">active_outside</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:]</span>
+    <span class="p">)</span>
+
+    <span class="n">current_counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span><span class="p">[</span><span class="n">affected_cliques</span><span class="p">]</span>
+
+    <span class="n">current_histogram</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span>
+        <span class="n">current_counts</span><span class="p">,</span>
+        <span class="n">minlength</span><span class="o">=</span><span class="n">number_of_bins</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">new_histograms</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="p">(</span><span class="n">new_blue_counts</span> <span class="o">==</span> <span class="n">count</span><span class="p">)</span> <span class="o">@</span> <span class="n">active_counts</span>
+            <span class="k">for</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">number_of_bins</span><span class="p">)</span>
+        <span class="p">],</span>
+        <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="n">histogram_deltas</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">new_histograms</span>
+        <span class="o">-</span> <span class="n">current_histogram</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:]</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="c1"># Exact score reward is simply the negative change in the two</span>
+    <span class="c1"># monochromatic histogram bins. This is the same structural rule</span>
+    <span class="c1"># used by the ordinary single-edge action analyzer.</span>
+    <span class="n">exact_rewards</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span>
+        <span class="n">histogram_deltas</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">histogram_deltas</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">resulting_scores</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">score</span> <span class="o">-</span> <span class="n">exact_rewards</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="n">changed_edge_counts</span> <span class="o">=</span> <span class="n">K5_POPCOUNT</span><span class="p">[</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">bitwise_xor</span><span class="p">(</span>
+            <span class="n">K5_ALLOWED_PATTERN_IDS</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">(</span><span class="n">old_pattern_id</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">RK5PatternAnalysis</span><span class="p">(</span>
+        <span class="n">source_state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
+        <span class="n">state_version</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+        <span class="n">target_clique</span><span class="o">=</span><span class="n">target_clique</span><span class="p">,</span>
+        <span class="n">target_edges</span><span class="o">=</span><span class="n">target_edges</span><span class="p">,</span>
+        <span class="n">old_pattern_id</span><span class="o">=</span><span class="n">old_pattern_id</span><span class="p">,</span>
+        <span class="n">pattern_ids</span><span class="o">=</span><span class="n">K5_ALLOWED_PATTERN_IDS</span><span class="p">,</span>
+        <span class="n">histogram_deltas</span><span class="o">=</span><span class="n">histogram_deltas</span><span class="p">,</span>
+        <span class="n">exact_rewards</span><span class="o">=</span><span class="n">exact_rewards</span><span class="p">,</span>
+        <span class="n">resulting_scores</span><span class="o">=</span><span class="n">resulting_scores</span><span class="p">,</span>
+        <span class="n">changed_edge_counts</span><span class="o">=</span><span class="n">changed_edge_counts</span><span class="p">,</span>
+        <span class="n">affected_clique_count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">affected_cliques</span><span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="apply_k5_pattern">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RK5Action.apply_k5_pattern">[docs]</a>
+<span class="k">def</span> <span class="nf">apply_k5_pattern</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">target_clique</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">pattern_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply one nonmonochromatic ten-edge K5 pattern exactly.&quot;&quot;&quot;</span>
+    <span class="n">_require_k5_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_clique</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="n">target_clique</span><span class="p">,</span>
+        <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;target_clique must be an integer.&quot;</span><span class="p">)</span>
+
+    <span class="n">target_clique</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">target_clique</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">target_clique</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">target_clique</span> <span class="o">&gt;=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">clique_count</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">&quot;target_clique is out of range.&quot;</span><span class="p">)</span>
+
+    <span class="n">colors</span> <span class="o">=</span> <span class="n">pattern_colors</span><span class="p">(</span><span class="n">pattern_id</span><span class="p">)</span>
+
+    <span class="n">target_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">clique_edges</span><span class="p">[</span><span class="n">target_clique</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">state</span><span class="o">.</span><span class="n">apply_edge_recoloring</span><span class="p">(</span>
+        <span class="n">target_edges</span><span class="p">,</span>
+        <span class="n">colors</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

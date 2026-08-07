@@ -1,0 +1,736 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.REnvironment &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.REnvironment</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.REnvironment</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Validation and application of state transitions.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RAction</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RActionAnalysis</span><span class="p">,</span>
+    <span class="n">analyze_actions</span><span class="p">,</span>
+    <span class="n">immediate_rewards_for_edges</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">.REnvironmentConfig</span> <span class="kn">import</span> <span class="n">REnvironmentConfig</span>
+<span class="kn">from</span> <span class="nn">.REnvironmentMemory</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RMemory</span><span class="p">,</span>
+    <span class="n">RMemoryStatus</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+<span class="kn">from</span> <span class="nn">.RObjective</span> <span class="kn">import</span> <span class="n">RObjective</span>
+<span class="kn">from</span> <span class="nn">.RState</span> <span class="kn">import</span> <span class="n">RSearchState</span>
+
+
+<span class="k">def</span> <span class="nf">_read_only</span><span class="p">(</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return an owned, typed, read-only array.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+        <span class="n">values</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="REnvironmentAnalysis">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REnvironment.REnvironmentAnalysis">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">REnvironmentAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Complete action information for the current environment state.</span>
+
+<span class="sd">    action_analysis:</span>
+<span class="sd">        Exact structural and score consequences of every edge flip.</span>
+
+<span class="sd">    objective_rewards:</span>
+<span class="sd">        Reward assigned to every action by the selected objective.</span>
+
+<span class="sd">    memory_status:</span>
+<span class="sd">        Restrictions produced by tabu or other search memory.</span>
+
+<span class="sd">    aspiration_mask:</span>
+<span class="sd">        Blocked actions allowed because they establish a new best</span>
+<span class="sd">        exact score.</span>
+
+<span class="sd">    available_mask:</span>
+<span class="sd">        Actions currently permitted by the environment.</span>
+
+<span class="sd">    forced_fallback:</span>
+<span class="sd">        True when every normal action was blocked and the environment</span>
+<span class="sd">        exposed the actions producing the best exact resulting score.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">action_analysis</span><span class="p">:</span> <span class="n">RActionAnalysis</span>
+    <span class="n">objective_rewards</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+    <span class="n">memory_status</span><span class="p">:</span> <span class="n">RMemoryStatus</span>
+    <span class="n">aspiration_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]</span>
+    <span class="n">available_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]</span>
+    <span class="n">forced_fallback</span><span class="p">:</span> <span class="nb">bool</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">number_of_actions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action_analysis</span><span class="o">.</span><span class="n">number_of_actions</span>
+
+        <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">number_of_actions</span><span class="p">,)</span>
+
+        <span class="n">objective_rewards</span> <span class="o">=</span> <span class="n">_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">objective_rewards</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">aspiration_mask</span> <span class="o">=</span> <span class="n">_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">aspiration_mask</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">available_mask</span> <span class="o">=</span> <span class="n">_read_only</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">available_mask</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">objective_rewards</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;objective_rewards has the wrong shape.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">aspiration_mask</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;aspiration_mask has the wrong shape.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">available_mask</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;available_mask has the wrong shape.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_status</span><span class="o">.</span><span class="n">blocked_mask</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Memory masks have the wrong shape.&quot;</span><span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;objective_rewards&quot;</span><span class="p">,</span>
+            <span class="n">objective_rewards</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;aspiration_mask&quot;</span><span class="p">,</span>
+            <span class="n">aspiration_mask</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;available_mask&quot;</span><span class="p">,</span>
+            <span class="n">available_mask</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;forced_fallback&quot;</span><span class="p">,</span>
+            <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forced_fallback</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RStepResult">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REnvironment.RStepResult">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RStepResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Observable result of one environment transition.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">previous_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">immediate_reward</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">previous_energy</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">energy</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">objective_reward</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="n">best_score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">step_number</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">terminated</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">truncated</span><span class="p">:</span> <span class="nb">bool</span></div>
+
+
+
+<div class="viewcode-block" id="REnvironment">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REnvironment.REnvironment">[docs]</a>
+<span class="k">class</span> <span class="nc">REnvironment</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Own one Ramsey-search episode without choosing actions.</span>
+
+<span class="sd">    The environment:</span>
+
+<span class="sd">    - owns the mutable search state;</span>
+<span class="sd">    - asks memory which actions are blocked;</span>
+<span class="sd">    - applies aspiration and deadlock fallback;</span>
+<span class="sd">    - validates and applies selected edge flips;</span>
+<span class="sd">    - tracks the best exact score and coloring;</span>
+<span class="sd">    - determines episode termination and truncation.</span>
+
+<span class="sd">    It deliberately does not select an action. A greedy search,</span>
+<span class="sd">    neural policy, evolutionary algorithm, or other search strategy</span>
+<span class="sd">    must select from the environment&#39;s available actions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+        <span class="n">objective</span><span class="p">:</span> <span class="n">RObjective</span><span class="p">,</span>
+        <span class="n">memory</span><span class="p">:</span> <span class="n">RMemory</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">REnvironmentConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span> <span class="o">=</span> <span class="n">graph</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_objective</span> <span class="o">=</span> <span class="n">objective</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_memory</span> <span class="o">=</span> <span class="n">memory</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="n">config</span> <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">REnvironmentConfig</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="p">:</span> <span class="n">RSearchState</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_best_coloring</span><span class="p">:</span> <span class="n">RColoring</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_best_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span><span class="p">:</span> <span class="n">REnvironmentAnalysis</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cached_available_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RGraph</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the immutable graph topology.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">objective</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RObjective</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the optimization objective.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_objective</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">memory</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RMemory</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the environment&#39;s search memory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_memory</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REnvironmentConfig</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the immutable environment configuration.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RSearchState</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the active mutable search state.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Environment has not been reset.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_coloring</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return an immutable snapshot of the episode&#39;s best coloring.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_best_coloring</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Environment has not been reset.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_best_coloring</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the best exact score found in the episode.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_best_score</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Environment has not been reset.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_best_score</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">step_number</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the number of completed transitions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">terminated</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return whether an exact score of zero has been reached.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">score</span> <span class="o">==</span> <span class="mi">0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">truncated</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return whether the episode reached its step limit.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">terminated</span>
+            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="o">.</span><span class="n">max_steps</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="REnvironment.reset">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REnvironment.REnvironment.reset">[docs]</a>
+    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RSearchState</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Begin a new episode from an explicit seed coloring.</span>
+
+<span class="sd">        Seed generation is deliberately kept outside the environment.</span>
+<span class="sd">        This allows random, constructive, database, mutated, or</span>
+<span class="sd">        manually supplied seed generators to use the same environment.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="o">.</span><span class="n">problem</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Coloring problem does not match &quot;</span> <span class="s2">&quot;environment graph.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">coloring</span> <span class="o">=</span> <span class="n">RColoring</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">,</span>
+                <span class="n">coloring</span><span class="o">.</span><span class="n">colors</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="o">=</span> <span class="n">RSearchState</span><span class="p">(</span><span class="n">coloring</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_best_coloring</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">coloring_snapshot</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_best_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">score</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_memory</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_clear_cache</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span></div>
+
+
+<div class="viewcode-block" id="REnvironment.analyze_actions">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REnvironment.REnvironment.analyze_actions">[docs]</a>
+    <span class="k">def</span> <span class="nf">analyze_actions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">use_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">REnvironmentAnalysis</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate exact consequences and availability for all actions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">use_cache</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cached_action_analysis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span><span class="o">.</span><span class="n">action_analysis</span>
+
+            <span class="k">if</span> <span class="n">cached_action_analysis</span><span class="o">.</span><span class="n">applies_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">):</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span>
+
+        <span class="n">action_analysis</span> <span class="o">=</span> <span class="n">analyze_actions</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">)</span>
+
+        <span class="n">objective_rewards</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_objective</span><span class="o">.</span><span class="n">action_rewards</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+            <span class="n">action_analysis</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">memory_status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_memory</span><span class="o">.</span><span class="n">status</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="o">.</span><span class="n">use_aspiration</span><span class="p">:</span>
+            <span class="n">aspiration_mask</span> <span class="o">=</span> <span class="n">action_analysis</span><span class="o">.</span><span class="n">resulting_scores</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">aspiration_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="c1"># A blocked action becomes available if aspiration applies.</span>
+        <span class="n">available_mask</span> <span class="o">=</span> <span class="o">~</span><span class="p">(</span><span class="n">memory_status</span><span class="o">.</span><span class="n">blocked_mask</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">aspiration_mask</span><span class="p">)</span>
+
+        <span class="p">(</span>
+            <span class="n">available_mask</span><span class="p">,</span>
+            <span class="n">forced_fallback</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_available</span><span class="p">(</span>
+            <span class="n">available_mask</span><span class="p">,</span>
+            <span class="n">action_analysis</span><span class="o">.</span><span class="n">resulting_scores</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">REnvironmentAnalysis</span><span class="p">(</span>
+            <span class="n">action_analysis</span><span class="o">=</span><span class="n">action_analysis</span><span class="p">,</span>
+            <span class="n">objective_rewards</span><span class="o">=</span><span class="n">objective_rewards</span><span class="p">,</span>
+            <span class="n">memory_status</span><span class="o">=</span><span class="n">memory_status</span><span class="p">,</span>
+            <span class="n">aspiration_mask</span><span class="o">=</span><span class="n">aspiration_mask</span><span class="p">,</span>
+            <span class="n">available_mask</span><span class="o">=</span><span class="n">available_mask</span><span class="p">,</span>
+            <span class="n">forced_fallback</span><span class="o">=</span><span class="n">forced_fallback</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span> <span class="o">=</span> <span class="n">result</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cached_available_mask</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">available_mask</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="REnvironment.available_action_mask_fast">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REnvironment.REnvironment.available_action_mask_fast">[docs]</a>
+    <span class="k">def</span> <span class="nf">available_action_mask_fast</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">use_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return availability without full all-action analysis.</span>
+
+<span class="sd">        Exact score rewards are calculated only for blocked edges</span>
+<span class="sd">        when aspiration must be evaluated. If every action is blocked,</span>
+<span class="sd">        exact score rewards are calculated for all edges to provide</span>
+<span class="sd">        the deadlock fallback.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">use_cache</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">cached_action_analysis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span><span class="o">.</span><span class="n">action_analysis</span>
+
+                <span class="k">if</span> <span class="n">cached_action_analysis</span><span class="o">.</span><span class="n">applies_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span><span class="o">.</span><span class="n">available_mask</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_available_mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_available_mask</span>
+
+        <span class="n">memory_status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_memory</span><span class="o">.</span><span class="n">status</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">blocked_mask</span> <span class="o">=</span> <span class="n">memory_status</span><span class="o">.</span><span class="n">blocked_mask</span>
+
+        <span class="n">available_mask</span> <span class="o">=</span> <span class="o">~</span><span class="n">blocked_mask</span>
+
+        <span class="c1"># Aspiration allows a blocked action if it creates a new</span>
+        <span class="c1"># episode-best exact score.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="o">.</span><span class="n">use_aspiration</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">blocked_mask</span><span class="p">):</span>
+            <span class="n">blocked_edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">blocked_mask</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+            <span class="n">blocked_rewards</span> <span class="o">=</span> <span class="n">immediate_rewards_for_edges</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+                <span class="n">blocked_edges</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">blocked_resulting_scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">score</span> <span class="o">-</span> <span class="n">blocked_rewards</span>
+
+            <span class="n">aspiration</span> <span class="o">=</span> <span class="n">blocked_resulting_scores</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span>
+
+            <span class="n">available_mask</span><span class="p">[</span><span class="n">blocked_edges</span><span class="p">[</span><span class="n">aspiration</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="c1"># The environment must never deadlock.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">available_mask</span><span class="p">):</span>
+            <span class="n">all_edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">all_rewards</span> <span class="o">=</span> <span class="n">immediate_rewards_for_edges</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+                <span class="n">all_edges</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">resulting_scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">score</span> <span class="o">-</span> <span class="n">all_rewards</span>
+
+            <span class="n">best_resulting_score</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">resulting_scores</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+
+            <span class="n">available_mask</span> <span class="o">=</span> <span class="n">resulting_scores</span> <span class="o">==</span> <span class="n">best_resulting_score</span>
+
+        <span class="n">available_mask</span> <span class="o">=</span> <span class="n">_read_only</span><span class="p">(</span>
+            <span class="n">available_mask</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cached_available_mask</span> <span class="o">=</span> <span class="n">available_mask</span>
+
+        <span class="k">return</span> <span class="n">available_mask</span></div>
+
+
+<div class="viewcode-block" id="REnvironment.available_actions">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REnvironment.REnvironment.available_actions">[docs]</a>
+    <span class="k">def</span> <span class="nf">available_actions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the indexes of currently available edge actions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">available_action_mask_fast</span><span class="p">())</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="REnvironment.step">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.REnvironment.REnvironment.step">[docs]</a>
+    <span class="k">def</span> <span class="nf">step</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">edge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">full_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RStepResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate and apply one externally selected edge flip.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        edge:</span>
+<span class="sd">            Encoded edge index selected by a search strategy.</span>
+
+<span class="sd">        full_analysis:</span>
+<span class="sd">            If true, verify the selected action against complete</span>
+<span class="sd">            all-action analysis.</span>
+
+<span class="sd">            If false, use the lightweight availability path and</span>
+<span class="sd">            calculate the selected action&#39;s reward during mutation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">terminated</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">truncated</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;The environment episode has ended.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">edge</span><span class="p">,</span>
+            <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;edge must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="n">edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">edge</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">edge</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid edge index: </span><span class="si">{</span><span class="n">edge</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">full_analysis</span><span class="p">:</span>
+            <span class="n">analysis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">analyze_actions</span><span class="p">()</span>
+
+            <span class="n">available_mask</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">available_mask</span>
+
+            <span class="n">predicted_immediate_reward</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">analysis</span><span class="o">.</span><span class="n">action_analysis</span><span class="o">.</span><span class="n">immediate_rewards</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+            <span class="p">)</span>
+
+            <span class="n">predicted_objective_reward</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                <span class="n">analysis</span><span class="o">.</span><span class="n">objective_rewards</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">available_mask</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">available_action_mask_fast</span><span class="p">()</span>
+
+            <span class="n">predicted_immediate_reward</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">predicted_objective_reward</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">available_mask</span><span class="p">[</span><span class="n">edge</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Edge </span><span class="si">{</span><span class="n">edge</span><span class="si">}</span><span class="s2"> is currently unavailable.&quot;</span><span class="p">)</span>
+
+        <span class="n">previous_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">score</span>
+
+        <span class="n">previous_energy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_objective</span><span class="o">.</span><span class="n">energy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">)</span>
+
+        <span class="n">immediate_reward</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">apply_edge_flip</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">predicted_immediate_reward</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">immediate_reward</span> <span class="o">!=</span> <span class="n">predicted_immediate_reward</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Predicted and actual immediate rewards &quot;</span>
+                <span class="s2">&quot;disagree: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">predicted_immediate_reward</span><span class="si">}</span><span class="s2"> versus &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">immediate_reward</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">energy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_objective</span><span class="o">.</span><span class="n">energy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">)</span>
+
+        <span class="n">objective_reward</span> <span class="o">=</span> <span class="n">previous_energy</span> <span class="o">-</span> <span class="n">energy</span>
+
+        <span class="k">if</span> <span class="n">predicted_objective_reward</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span>
+            <span class="n">objective_reward</span><span class="p">,</span>
+            <span class="n">predicted_objective_reward</span><span class="p">,</span>
+            <span class="n">rtol</span><span class="o">=</span><span class="mf">1.0e-10</span><span class="p">,</span>
+            <span class="n">atol</span><span class="o">=</span><span class="mf">1.0e-10</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Predicted and actual objective rewards &quot;</span>
+                <span class="s2">&quot;disagree: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">predicted_objective_reward</span><span class="si">}</span><span class="s2"> versus &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">objective_reward</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_memory</span><span class="o">.</span><span class="n">record_transition</span><span class="p">(</span>
+            <span class="n">edge</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">score</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_score</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_best_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">score</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_best_coloring</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">coloring_snapshot</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_clear_cache</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">RStepResult</span><span class="p">(</span>
+            <span class="n">edge</span><span class="o">=</span><span class="n">edge</span><span class="p">,</span>
+            <span class="n">previous_score</span><span class="o">=</span><span class="n">previous_score</span><span class="p">,</span>
+            <span class="n">score</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+            <span class="n">immediate_reward</span><span class="o">=</span><span class="n">immediate_reward</span><span class="p">,</span>
+            <span class="n">previous_energy</span><span class="o">=</span><span class="n">previous_energy</span><span class="p">,</span>
+            <span class="n">energy</span><span class="o">=</span><span class="n">energy</span><span class="p">,</span>
+            <span class="n">objective_reward</span><span class="o">=</span><span class="n">objective_reward</span><span class="p">,</span>
+            <span class="n">best_score</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">best_score</span><span class="p">,</span>
+            <span class="n">step_number</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_step_number</span><span class="p">,</span>
+            <span class="n">terminated</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">terminated</span><span class="p">,</span>
+            <span class="n">truncated</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">truncated</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_ensure_available</span><span class="p">(</span>
+        <span class="n">available_mask</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
+        <span class="n">resulting_scores</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span>
+        <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">],</span>
+        <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Apply the exact-score deadlock fallback when necessary.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">available_mask</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">available_mask</span><span class="p">,</span>
+                <span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">best_resulting_score</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">resulting_scores</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">resulting_scores</span> <span class="o">==</span> <span class="n">best_resulting_score</span><span class="p">,</span>
+            <span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_clear_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Discard calculations tied to an earlier state or memory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cached_analysis</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cached_available_mask</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,735 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RVertexBalanceAction &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RVertexBalanceAction</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RVertexBalanceAction</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Objective-neutral vertex color-balance transfer actions.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RAction</span> <span class="kn">import</span> <span class="n">analyze_actions</span>
+<span class="kn">from</span> <span class="nn">.RState</span> <span class="kn">import</span> <span class="n">RSearchState</span>
+
+
+<span class="k">def</span> <span class="nf">_read_only_copy</span><span class="p">(</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="vertex_blue_degrees">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.vertex_blue_degrees">[docs]</a>
+<span class="k">def</span> <span class="nf">vertex_blue_degrees</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the number of blue (color-one) edges at every vertex.&quot;&quot;&quot;</span>
+    <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+
+    <span class="n">degrees</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+        <span class="n">n_vertices</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">blue_edges</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[</span><span class="n">state</span><span class="o">.</span><span class="n">colors</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span>
+        <span class="n">degrees</span><span class="p">,</span>
+        <span class="n">blue_edges</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span>
+        <span class="n">degrees</span><span class="p">,</span>
+        <span class="n">blue_edges</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span>
+        <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">degrees</span></div>
+
+
+
+<div class="viewcode-block" id="vertex_color_imbalances">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.vertex_color_imbalances">[docs]</a>
+<span class="k">def</span> <span class="nf">vertex_color_imbalances</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return blue degree minus red degree for every vertex.&quot;&quot;&quot;</span>
+    <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+
+    <span class="n">blue_degrees</span> <span class="o">=</span> <span class="n">vertex_blue_degrees</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="mi">2</span> <span class="o">*</span> <span class="n">blue_degrees</span>
+        <span class="o">-</span> <span class="p">(</span><span class="n">n_vertices</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="vertex_balance_energy">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.vertex_balance_energy">[docs]</a>
+<span class="k">def</span> <span class="nf">vertex_balance_energy</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return sum of squared vertex color imbalances; lower is better.&quot;&quot;&quot;</span>
+    <span class="n">imbalances</span> <span class="o">=</span> <span class="n">vertex_color_imbalances</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+            <span class="n">imbalances</span> <span class="o">*</span> <span class="n">imbalances</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RVertexBalanceTransfer">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.RVertexBalanceTransfer">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RVertexBalanceTransfer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One blue-degree transfer from donor to recipient through a pivot.&quot;&quot;&quot;</span>
+
+    <span class="n">donor_vertex</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">recipient_vertex</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">pivot_vertex</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">donor_edge</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">recipient_edge</span><span class="p">:</span> <span class="nb">int</span></div>
+
+
+
+<div class="viewcode-block" id="RVertexBalanceAnalysis">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.RVertexBalanceAnalysis">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RVertexBalanceAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exact structural consequences of all legal balance transfers.&quot;&quot;&quot;</span>
+
+    <span class="n">source_state</span><span class="p">:</span> <span class="n">RSearchState</span>
+    <span class="n">state_version</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">donor_vertices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]</span>
+    <span class="n">recipient_vertices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]</span>
+    <span class="n">pivot_vertices</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">]</span>
+    <span class="n">donor_edges</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
+    <span class="n">recipient_edges</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">]</span>
+
+    <span class="n">balance_rewards</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">histogram_deltas</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">exact_rewards</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+    <span class="n">resulting_scores</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">arrays</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;donor_vertices&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">donor_vertices</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;recipient_vertices&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">recipient_vertices</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;pivot_vertices&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">pivot_vertices</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;donor_edges&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">donor_edges</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;recipient_edges&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">recipient_edges</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;balance_rewards&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">balance_rewards</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;exact_rewards&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">exact_rewards</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;resulting_scores&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">resulting_scores</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">}</span>
+
+        <span class="n">number_of_actions</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span>
+            <span class="n">arrays</span><span class="p">[</span><span class="s2">&quot;balance_rewards&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">arrays</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="n">number_of_actions</span><span class="p">,):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> has the wrong shape.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">histogram_deltas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">histogram_deltas</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">expected_delta_shape</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">number_of_actions</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span><span class="o">.</span><span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">histogram_deltas</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_delta_shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;histogram_deltas has the wrong shape.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;state_version&quot;</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state_version</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">arrays</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+                <span class="n">_read_only_copy</span><span class="p">(</span><span class="n">values</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;histogram_deltas&quot;</span><span class="p">,</span>
+            <span class="n">_read_only_copy</span><span class="p">(</span><span class="n">histogram_deltas</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">number_of_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">balance_rewards</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RVertexBalanceAnalysis.transfer">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.RVertexBalanceAnalysis.transfer">[docs]</a>
+    <span class="k">def</span> <span class="nf">transfer</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">action_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RVertexBalanceTransfer</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">action_index</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">action_index</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">number_of_actions</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span>
+                <span class="s2">&quot;action_index is out of range.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RVertexBalanceTransfer</span><span class="p">(</span>
+            <span class="n">donor_vertex</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">donor_vertices</span><span class="p">[</span><span class="n">action_index</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="n">recipient_vertex</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">recipient_vertices</span><span class="p">[</span><span class="n">action_index</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="n">pivot_vertex</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">pivot_vertices</span><span class="p">[</span><span class="n">action_index</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="n">donor_edge</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">donor_edges</span><span class="p">[</span><span class="n">action_index</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="n">recipient_edge</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">recipient_edges</span><span class="p">[</span><span class="n">action_index</span><span class="p">]</span>
+            <span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RVertexBalanceAnalysis.applies_to">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.RVertexBalanceAnalysis.applies_to">[docs]</a>
+    <span class="k">def</span> <span class="nf">applies_to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">source_state</span> <span class="ow">is</span> <span class="n">state</span>
+            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_version</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">version</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">def</span> <span class="nf">_edge_index_matrix</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]:</span>
+    <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">n_vertices</span><span class="p">,</span> <span class="n">n_vertices</span><span class="p">),</span>
+        <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">edge_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">first</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">second</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">result</span><span class="p">[</span><span class="n">first</span><span class="p">,</span> <span class="n">second</span><span class="p">]</span> <span class="o">=</span> <span class="n">edge_indices</span>
+    <span class="n">result</span><span class="p">[</span><span class="n">second</span><span class="p">,</span> <span class="n">first</span><span class="p">]</span> <span class="o">=</span> <span class="n">edge_indices</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span> <span class="nf">_candidate_transfers</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">imbalances</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span>
+    <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
+    <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
+    <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">],</span>
+    <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">],</span>
+    <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">],</span>
+    <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">],</span>
+<span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enumerate transfers that strictly reduce squared imbalance.&quot;&quot;&quot;</span>
+    <span class="n">donors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+        <span class="n">imbalances</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="p">)</span>
+    <span class="n">recipients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span>
+        <span class="n">imbalances</span> <span class="o">&lt;</span> <span class="mi">0</span>
+    <span class="p">)</span>
+
+    <span class="n">edge_index</span> <span class="o">=</span> <span class="n">_edge_index_matrix</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">donor_vertices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">recipient_vertices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">pivot_vertices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">donor_edges</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">recipient_edges</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">balance_rewards</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+
+    <span class="k">for</span> <span class="n">donor</span> <span class="ow">in</span> <span class="n">donors</span><span class="p">:</span>
+        <span class="n">donor</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">donor</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">recipient</span> <span class="ow">in</span> <span class="n">recipients</span><span class="p">:</span>
+            <span class="n">recipient</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">recipient</span><span class="p">)</span>
+
+            <span class="c1"># Moving one blue degree from donor to recipient changes</span>
+            <span class="c1"># their imbalances by -2 and +2 respectively. The pivot&#39;s</span>
+            <span class="c1"># degree is unchanged. This is the exact reduction in</span>
+            <span class="c1"># squared imbalance energy.</span>
+            <span class="n">balance_reward</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="mi">4</span>
+                <span class="o">*</span> <span class="p">(</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">imbalances</span><span class="p">[</span><span class="n">donor</span><span class="p">])</span>
+                    <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">imbalances</span><span class="p">[</span><span class="n">recipient</span><span class="p">])</span>
+                    <span class="o">-</span> <span class="mi">2</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">balance_reward</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">for</span> <span class="n">pivot</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_vertices</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">pivot</span> <span class="ow">in</span> <span class="p">(</span>
+                    <span class="n">donor</span><span class="p">,</span>
+                    <span class="n">recipient</span><span class="p">,</span>
+                <span class="p">):</span>
+                    <span class="k">continue</span>
+
+                <span class="n">donor_edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="n">edge_index</span><span class="p">[</span><span class="n">donor</span><span class="p">,</span> <span class="n">pivot</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">recipient_edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="n">edge_index</span><span class="p">[</span><span class="n">recipient</span><span class="p">,</span> <span class="n">pivot</span><span class="p">]</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">state</span><span class="o">.</span><span class="n">colors</span><span class="p">[</span><span class="n">donor_edge</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+                    <span class="ow">and</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span><span class="p">[</span><span class="n">recipient_edge</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+                <span class="p">):</span>
+                    <span class="n">donor_vertices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">donor</span><span class="p">)</span>
+                    <span class="n">recipient_vertices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">recipient</span><span class="p">)</span>
+                    <span class="n">pivot_vertices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pivot</span><span class="p">)</span>
+                    <span class="n">donor_edges</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">donor_edge</span><span class="p">)</span>
+                    <span class="n">recipient_edges</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">recipient_edge</span>
+                    <span class="p">)</span>
+                    <span class="n">balance_rewards</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">balance_reward</span>
+                    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="n">donor_vertices</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="n">recipient_vertices</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="n">pivot_vertices</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="n">donor_edges</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="n">recipient_edges</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="n">balance_rewards</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="analyze_vertex_balance_transfers">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.analyze_vertex_balance_transfers">[docs]</a>
+<span class="k">def</span> <span class="nf">analyze_vertex_balance_transfers</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RVertexBalanceAnalysis</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Analyze every pivot transfer that moves both endpoint imbalances</span>
+<span class="sd">    toward zero.</span>
+
+<span class="sd">    For donor u, recipient v, and pivot w the required colors are:</span>
+
+<span class="sd">        u-w = blue (1)</span>
+<span class="sd">        v-w = red  (0)</span>
+
+<span class="sd">    Recoloring those edges to red and blue transfers one unit of blue</span>
+<span class="sd">    degree from u to v while leaving w and the global blue-edge count</span>
+<span class="sd">    unchanged.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">imbalances</span> <span class="o">=</span> <span class="n">vertex_color_imbalances</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="p">(</span>
+        <span class="n">donor_vertices</span><span class="p">,</span>
+        <span class="n">recipient_vertices</span><span class="p">,</span>
+        <span class="n">pivot_vertices</span><span class="p">,</span>
+        <span class="n">donor_edges</span><span class="p">,</span>
+        <span class="n">recipient_edges</span><span class="p">,</span>
+        <span class="n">balance_rewards</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="n">_candidate_transfers</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+        <span class="n">imbalances</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">number_of_actions</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span>
+        <span class="n">balance_rewards</span>
+    <span class="p">)</span>
+
+    <span class="n">number_of_bins</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">edges_per_clique</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">number_of_actions</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">RVertexBalanceAnalysis</span><span class="p">(</span>
+            <span class="n">source_state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
+            <span class="n">state_version</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+            <span class="n">donor_vertices</span><span class="o">=</span><span class="n">donor_vertices</span><span class="p">,</span>
+            <span class="n">recipient_vertices</span><span class="o">=</span><span class="n">recipient_vertices</span><span class="p">,</span>
+            <span class="n">pivot_vertices</span><span class="o">=</span><span class="n">pivot_vertices</span><span class="p">,</span>
+            <span class="n">donor_edges</span><span class="o">=</span><span class="n">donor_edges</span><span class="p">,</span>
+            <span class="n">recipient_edges</span><span class="o">=</span><span class="n">recipient_edges</span><span class="p">,</span>
+            <span class="n">balance_rewards</span><span class="o">=</span><span class="n">balance_rewards</span><span class="p">,</span>
+            <span class="n">histogram_deltas</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">number_of_bins</span><span class="p">),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">exact_rewards</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="mi">0</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">resulting_scores</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="mi">0</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="n">single_analysis</span> <span class="o">=</span> <span class="n">analyze_actions</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">histogram_deltas</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">single_analysis</span><span class="o">.</span><span class="n">histogram_deltas</span><span class="p">[</span>
+            <span class="n">donor_edges</span>
+        <span class="p">]</span>
+        <span class="o">+</span> <span class="n">single_analysis</span><span class="o">.</span><span class="n">histogram_deltas</span><span class="p">[</span>
+            <span class="n">recipient_edges</span>
+        <span class="p">]</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="c1"># The two candidate edges share the pivot. Any forbidden clique</span>
+    <span class="c1"># containing both sees one blue-&gt;red and one red-&gt;blue mutation,</span>
+    <span class="c1"># so its final blue count is unchanged. The sum of the two</span>
+    <span class="c1"># independently computed edge deltas counted that clique twice;</span>
+    <span class="c1"># remove those two artificial one-edge transitions exactly.</span>
+    <span class="k">for</span> <span class="n">action_index</span><span class="p">,</span> <span class="p">(</span>
+        <span class="n">donor_edge</span><span class="p">,</span>
+        <span class="n">recipient_edge</span><span class="p">,</span>
+    <span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+        <span class="nb">zip</span><span class="p">(</span>
+            <span class="n">donor_edges</span><span class="p">,</span>
+            <span class="n">recipient_edges</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">):</span>
+        <span class="n">shared_cliques</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">intersect1d</span><span class="p">(</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">donor_edge</span><span class="p">)</span>
+            <span class="p">],</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">edge_to_cliques</span><span class="p">[</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">recipient_edge</span><span class="p">)</span>
+            <span class="p">],</span>
+            <span class="n">assume_unique</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">shared_counts</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">color_one_counts</span><span class="p">[</span>
+            <span class="n">shared_cliques</span>
+        <span class="p">]</span>
+
+        <span class="n">shared_histogram</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span>
+            <span class="n">shared_counts</span><span class="p">,</span>
+            <span class="n">minlength</span><span class="o">=</span><span class="n">number_of_bins</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+        <span class="n">histogram_deltas</span><span class="p">[</span>
+            <span class="n">action_index</span><span class="p">,</span>
+            <span class="p">:,</span>
+        <span class="p">]</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">shared_histogram</span>
+
+        <span class="n">histogram_deltas</span><span class="p">[</span>
+            <span class="n">action_index</span><span class="p">,</span>
+            <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">-=</span> <span class="n">shared_histogram</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+
+        <span class="n">histogram_deltas</span><span class="p">[</span>
+            <span class="n">action_index</span><span class="p">,</span>
+            <span class="mi">1</span><span class="p">:,</span>
+        <span class="p">]</span> <span class="o">-=</span> <span class="n">shared_histogram</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">exact_rewards</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span>
+        <span class="n">histogram_deltas</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="o">+</span> <span class="n">histogram_deltas</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="n">resulting_scores</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">score</span> <span class="o">-</span> <span class="n">exact_rewards</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">RVertexBalanceAnalysis</span><span class="p">(</span>
+        <span class="n">source_state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
+        <span class="n">state_version</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+        <span class="n">donor_vertices</span><span class="o">=</span><span class="n">donor_vertices</span><span class="p">,</span>
+        <span class="n">recipient_vertices</span><span class="o">=</span><span class="n">recipient_vertices</span><span class="p">,</span>
+        <span class="n">pivot_vertices</span><span class="o">=</span><span class="n">pivot_vertices</span><span class="p">,</span>
+        <span class="n">donor_edges</span><span class="o">=</span><span class="n">donor_edges</span><span class="p">,</span>
+        <span class="n">recipient_edges</span><span class="o">=</span><span class="n">recipient_edges</span><span class="p">,</span>
+        <span class="n">balance_rewards</span><span class="o">=</span><span class="n">balance_rewards</span><span class="p">,</span>
+        <span class="n">histogram_deltas</span><span class="o">=</span><span class="n">histogram_deltas</span><span class="p">,</span>
+        <span class="n">exact_rewards</span><span class="o">=</span><span class="n">exact_rewards</span><span class="p">,</span>
+        <span class="n">resulting_scores</span><span class="o">=</span><span class="n">resulting_scores</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="apply_vertex_balance_transfer">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RVertexBalanceAction.apply_vertex_balance_transfer">[docs]</a>
+<span class="k">def</span> <span class="nf">apply_vertex_balance_transfer</span><span class="p">(</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">RSearchState</span><span class="p">,</span>
+    <span class="n">transfer</span><span class="p">:</span> <span class="n">RVertexBalanceTransfer</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply one validated pivot transfer and return exact score reward.&quot;&quot;&quot;</span>
+    <span class="n">n_vertices</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span>
+
+    <span class="n">vertices</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">transfer</span><span class="o">.</span><span class="n">donor_vertex</span><span class="p">,</span>
+        <span class="n">transfer</span><span class="o">.</span><span class="n">recipient_vertex</span><span class="p">,</span>
+        <span class="n">transfer</span><span class="o">.</span><span class="n">pivot_vertex</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+        <span class="n">vertex</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">vertex</span> <span class="o">&gt;=</span> <span class="n">n_vertices</span>
+        <span class="k">for</span> <span class="n">vertex</span> <span class="ow">in</span> <span class="n">vertices</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span>
+            <span class="s2">&quot;transfer contains an invalid vertex.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">vertices</span><span class="p">))</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;donor, recipient, and pivot must be distinct.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">edge_index</span> <span class="o">=</span> <span class="n">_edge_index_matrix</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">expected_donor_edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+        <span class="n">edge_index</span><span class="p">[</span>
+            <span class="n">transfer</span><span class="o">.</span><span class="n">donor_vertex</span><span class="p">,</span>
+            <span class="n">transfer</span><span class="o">.</span><span class="n">pivot_vertex</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">expected_recipient_edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+        <span class="n">edge_index</span><span class="p">[</span>
+            <span class="n">transfer</span><span class="o">.</span><span class="n">recipient_vertex</span><span class="p">,</span>
+            <span class="n">transfer</span><span class="o">.</span><span class="n">pivot_vertex</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">transfer</span><span class="o">.</span><span class="n">donor_edge</span>
+        <span class="o">!=</span> <span class="n">expected_donor_edge</span>
+        <span class="ow">or</span> <span class="n">transfer</span><span class="o">.</span><span class="n">recipient_edge</span>
+        <span class="o">!=</span> <span class="n">expected_recipient_edge</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;transfer edge indexes do not match its vertices.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span><span class="p">[</span><span class="n">transfer</span><span class="o">.</span><span class="n">donor_edge</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;donor-pivot edge must currently be blue.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">colors</span><span class="p">[</span><span class="n">transfer</span><span class="o">.</span><span class="n">recipient_edge</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;recipient-pivot edge must currently be red.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">imbalances</span> <span class="o">=</span> <span class="n">vertex_color_imbalances</span><span class="p">(</span>
+        <span class="n">state</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">imbalances</span><span class="p">[</span><span class="n">transfer</span><span class="o">.</span><span class="n">donor_vertex</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;donor vertex must currently be blue-heavy.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">imbalances</span><span class="p">[</span><span class="n">transfer</span><span class="o">.</span><span class="n">recipient_vertex</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;recipient vertex must currently be red-heavy.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">state</span><span class="o">.</span><span class="n">apply_edge_recoloring</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="n">transfer</span><span class="o">.</span><span class="n">donor_edge</span><span class="p">,</span>
+                <span class="n">transfer</span><span class="o">.</span><span class="n">recipient_edge</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,561 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RArchiveBatchParallel &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RArchiveBatchParallel</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RArchiveBatchParallel</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Process-parallel archive population for independent Ramsey searches.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">numbers</span> <span class="kn">import</span> <span class="n">Integral</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">perf_counter</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">.RArchive</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RArchive</span><span class="p">,</span>
+    <span class="n">RArchiveRecord</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">.RConstruction</span> <span class="kn">import</span> <span class="n">RConstruction</span>
+<span class="kn">from</span> <span class="nn">.RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+<span class="kn">from</span> <span class="nn">.RSearchParallel</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RExactGreedyProcessPool</span><span class="p">,</span>
+    <span class="n">RParallelSearchResult</span><span class="p">,</span>
+    <span class="n">RParallelSearchTask</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="RArchiveBatchParallelConfig">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallelConfig">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RArchiveBatchParallelConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for one process-parallel archive population run.&quot;&quot;&quot;</span>
+
+    <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">target_count</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">maximum_attempts</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">action_seed_base</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">minimum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">start_iteration</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">save_out_of_range</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_name</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;run_name must be a nonempty string.&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;target_count&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;maximum_attempts&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;batch_size&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+                <span class="n">_positive_integer</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)),</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;action_seed_base&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;start_iteration&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span>
+                <span class="n">_nonnegative_integer</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)),</span>
+            <span class="p">)</span>
+
+        <span class="n">minimum_score</span> <span class="o">=</span> <span class="n">_optional_nonnegative_integer</span><span class="p">(</span>
+            <span class="s2">&quot;minimum_score&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">minimum_score</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">maximum_score</span> <span class="o">=</span> <span class="n">_optional_nonnegative_integer</span><span class="p">(</span>
+            <span class="s2">&quot;maximum_score&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">maximum_score</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">minimum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">maximum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">minimum_score</span> <span class="o">&gt;</span> <span class="n">maximum_score</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;minimum_score cannot be greater than maximum_score.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;minimum_score&quot;</span><span class="p">,</span> <span class="n">minimum_score</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;maximum_score&quot;</span><span class="p">,</span> <span class="n">maximum_score</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_out_of_range</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;save_out_of_range must be boolean.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RArchiveBatchParallelAttempt">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallelAttempt">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RArchiveBatchParallelAttempt</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One completed worker search and its parent-side archive outcome.&quot;&quot;&quot;</span>
+
+    <span class="n">attempt</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">construction_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">search_result</span><span class="p">:</span> <span class="n">RParallelSearchResult</span>
+    <span class="n">in_score_range</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">archive_record</span><span class="p">:</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">new_unique_coloring</span><span class="p">:</span> <span class="nb">bool</span></div>
+
+
+
+<div class="viewcode-block" id="RArchiveBatchParallelPass">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallelPass">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RArchiveBatchParallelPass</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Summary of one parallel barrier of independent searches.&quot;&quot;&quot;</span>
+
+    <span class="n">pass_number</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">attempts</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RArchiveBatchParallelAttempt</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">eligible_count</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">elapsed_seconds</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">attempt_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">attempts</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">initial_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">initial_score</span>
+                <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempts</span>
+            <span class="p">],</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">final_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">final_score</span>
+                <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempts</span>
+            <span class="p">],</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
+                <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempts</span>
+            <span class="p">],</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">improved_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
+            <span class="o">&lt;</span> <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">initial_score</span>
+            <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempts</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">in_score_range_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">attempt</span><span class="o">.</span><span class="n">in_score_range</span>
+            <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempts</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">new_unique_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">attempt</span><span class="o">.</span><span class="n">in_score_range</span>
+            <span class="ow">and</span> <span class="n">attempt</span><span class="o">.</span><span class="n">new_unique_coloring</span>
+            <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempts</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">attempts_per_second</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">elapsed_seconds</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">attempt_count</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">elapsed_seconds</span></div>
+
+
+
+<div class="viewcode-block" id="RArchiveBatchParallelResult">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallelResult">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RArchiveBatchParallelResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of a bounded process-parallel population run.&quot;&quot;&quot;</span>
+
+    <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">target_count</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">maximum_attempts</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">initial_eligible_count</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">final_eligible_count</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">passes</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">RArchiveBatchParallelPass</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">elapsed_seconds</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">attempts_completed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">attempt_count</span> <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">passes</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">target_reached</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_eligible_count</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_count</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">new_eligible_colorings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_eligible_count</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_eligible_count</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">attempt</span><span class="o">.</span><span class="n">search_result</span><span class="o">.</span><span class="n">best_score</span>
+            <span class="k">for</span> <span class="n">parallel_pass</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">passes</span>
+            <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="n">parallel_pass</span><span class="o">.</span><span class="n">attempts</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span> <span class="k">if</span> <span class="n">scores</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+
+<span class="n">RArchiveBatchParallelObserver</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span>
+    <span class="p">[</span><span class="n">RArchiveBatchParallelPass</span><span class="p">],</span>
+    <span class="kc">None</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="RArchiveBatchParallel">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallel">[docs]</a>
+<span class="k">class</span> <span class="nc">RArchiveBatchParallel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Populate an archive in process-parallel search passes.</span>
+
+<span class="sd">    Seed construction and all SQLite access remain in the parent</span>
+<span class="sd">    process.  Workers receive only edge-color arrays and deterministic</span>
+<span class="sd">    policy seeds, perform complete searches, and return compact results.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+        <span class="n">construction</span><span class="p">:</span> <span class="n">RConstruction</span><span class="p">,</span>
+        <span class="n">archive</span><span class="p">:</span> <span class="n">RArchive</span><span class="p">,</span>
+        <span class="n">search_pool</span><span class="p">:</span> <span class="n">RExactGreedyProcessPool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">archive</span><span class="p">,</span> <span class="n">RArchive</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;archive must implement RArchive.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span> <span class="o">=</span> <span class="n">graph</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span> <span class="o">=</span> <span class="n">construction</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span> <span class="o">=</span> <span class="n">archive</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_search_pool</span> <span class="o">=</span> <span class="n">search_pool</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RGraph</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">construction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RConstruction</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">archive</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchive</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">search_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RExactGreedyProcessPool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_search_pool</span>
+
+<div class="viewcode-block" id="RArchiveBatchParallel.populate">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchiveBatchParallel.RArchiveBatchParallel.populate">[docs]</a>
+    <span class="k">def</span> <span class="nf">populate</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">RArchiveBatchParallelConfig</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">observer</span><span class="p">:</span> <span class="n">RArchiveBatchParallelObserver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveBatchParallelResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate until the score band is full or attempts run out.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">observer</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;observer must be callable.&quot;</span><span class="p">)</span>
+
+        <span class="n">initial_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eligible_count</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="n">eligible_count</span> <span class="o">=</span> <span class="n">initial_count</span>
+        <span class="n">attempts_completed</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">pass_number</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">pass_results</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveBatchParallelPass</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">overall_start</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span>
+
+        <span class="k">while</span> <span class="p">(</span>
+            <span class="n">eligible_count</span> <span class="o">&lt;</span> <span class="n">config</span><span class="o">.</span><span class="n">target_count</span>
+            <span class="ow">and</span> <span class="n">attempts_completed</span> <span class="o">&lt;</span> <span class="n">config</span><span class="o">.</span><span class="n">maximum_attempts</span>
+        <span class="p">):</span>
+            <span class="n">remaining_attempts</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">maximum_attempts</span> <span class="o">-</span> <span class="n">attempts_completed</span>
+            <span class="p">)</span>
+            <span class="n">remaining_target</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">target_count</span> <span class="o">-</span> <span class="n">eligible_count</span>
+
+            <span class="c1"># Do not launch more work than can possibly be needed to</span>
+            <span class="c1"># reach the target.  Duplicate/nonqualifying results may</span>
+            <span class="c1"># require another pass.</span>
+            <span class="n">current_batch_size</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span>
+                <span class="n">remaining_attempts</span><span class="p">,</span>
+                <span class="n">remaining_target</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">tasks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RParallelSearchTask</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">construction_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">for</span> <span class="n">offset</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">current_batch_size</span><span class="p">):</span>
+                <span class="n">attempt</span> <span class="o">=</span> <span class="n">attempts_completed</span> <span class="o">+</span> <span class="n">offset</span>
+                <span class="n">seed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">)</span>
+
+                <span class="n">construction_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_construction</span><span class="o">.</span><span class="n">last_source_name</span>
+                <span class="p">)</span>
+                <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">RParallelSearchTask</span><span class="p">(</span>
+                        <span class="n">task_id</span><span class="o">=</span><span class="n">attempt</span><span class="p">,</span>
+                        <span class="n">colors</span><span class="o">=</span><span class="n">seed</span><span class="o">.</span><span class="n">colors</span><span class="p">,</span>
+                        <span class="n">action_seed</span><span class="o">=</span><span class="p">(</span>
+                            <span class="n">config</span><span class="o">.</span><span class="n">action_seed_base</span> <span class="o">+</span> <span class="n">attempt</span>
+                        <span class="p">),</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+            <span class="n">pass_start</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span>
+            <span class="n">worker_results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_search_pool</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">tasks</span><span class="p">)</span>
+
+            <span class="n">attempts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveBatchParallelAttempt</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">for</span> <span class="n">offset</span><span class="p">,</span> <span class="n">worker_result</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">worker_results</span><span class="p">):</span>
+                <span class="n">attempt</span> <span class="o">=</span> <span class="n">attempts_completed</span> <span class="o">+</span> <span class="n">offset</span>
+                <span class="n">iteration</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">start_iteration</span> <span class="o">+</span> <span class="n">attempt</span>
+
+                <span class="n">in_score_range</span> <span class="o">=</span> <span class="n">_score_is_in_range</span><span class="p">(</span>
+                    <span class="n">worker_result</span><span class="o">.</span><span class="n">best_score</span><span class="p">,</span>
+                    <span class="n">minimum_score</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">minimum_score</span><span class="p">,</span>
+                    <span class="n">maximum_score</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">maximum_score</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="n">archive_record</span><span class="p">:</span> <span class="n">RArchiveRecord</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+                <span class="k">if</span> <span class="n">in_score_range</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">save_out_of_range</span><span class="p">:</span>
+                    <span class="n">best_coloring</span> <span class="o">=</span> <span class="n">RColoring</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">,</span>
+                        <span class="n">worker_result</span><span class="o">.</span><span class="n">best_colors</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">archive_record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="o">.</span><span class="n">save_coloring</span><span class="p">(</span>
+                        <span class="n">best_coloring</span><span class="p">,</span>
+                        <span class="n">run_name</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span>
+                        <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                <span class="n">new_unique</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">archive_record</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="ow">and</span> <span class="n">archive_record</span><span class="o">.</span><span class="n">times_seen</span> <span class="o">==</span> <span class="mi">1</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">in_score_range</span> <span class="ow">and</span> <span class="n">new_unique</span><span class="p">:</span>
+                    <span class="n">eligible_count</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="n">attempts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">RArchiveBatchParallelAttempt</span><span class="p">(</span>
+                        <span class="n">attempt</span><span class="o">=</span><span class="n">attempt</span><span class="p">,</span>
+                        <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+                        <span class="n">construction_name</span><span class="o">=</span><span class="n">construction_names</span><span class="p">[</span><span class="n">offset</span><span class="p">],</span>
+                        <span class="n">search_result</span><span class="o">=</span><span class="n">worker_result</span><span class="p">,</span>
+                        <span class="n">in_score_range</span><span class="o">=</span><span class="n">in_score_range</span><span class="p">,</span>
+                        <span class="n">archive_record</span><span class="o">=</span><span class="n">archive_record</span><span class="p">,</span>
+                        <span class="n">new_unique_coloring</span><span class="o">=</span><span class="n">new_unique</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+            <span class="n">pass_elapsed</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">pass_start</span>
+
+            <span class="c1"># Re-query at each barrier.  This is authoritative and also</span>
+            <span class="c1"># accounts for any independent writer using the same archive.</span>
+            <span class="n">eligible_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eligible_count</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+            <span class="n">parallel_pass</span> <span class="o">=</span> <span class="n">RArchiveBatchParallelPass</span><span class="p">(</span>
+                <span class="n">pass_number</span><span class="o">=</span><span class="n">pass_number</span><span class="p">,</span>
+                <span class="n">attempts</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">attempts</span><span class="p">),</span>
+                <span class="n">eligible_count</span><span class="o">=</span><span class="n">eligible_count</span><span class="p">,</span>
+                <span class="n">elapsed_seconds</span><span class="o">=</span><span class="n">pass_elapsed</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">pass_results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parallel_pass</span><span class="p">)</span>
+
+            <span class="n">attempts_completed</span> <span class="o">+=</span> <span class="n">current_batch_size</span>
+            <span class="n">pass_number</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="n">observer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">observer</span><span class="p">(</span><span class="n">parallel_pass</span><span class="p">)</span>
+
+        <span class="n">overall_elapsed</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">overall_start</span>
+        <span class="n">final_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eligible_count</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RArchiveBatchParallelResult</span><span class="p">(</span>
+            <span class="n">run_name</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">run_name</span><span class="p">,</span>
+            <span class="n">target_count</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">target_count</span><span class="p">,</span>
+            <span class="n">maximum_attempts</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">maximum_attempts</span><span class="p">,</span>
+            <span class="n">initial_eligible_count</span><span class="o">=</span><span class="n">initial_count</span><span class="p">,</span>
+            <span class="n">final_eligible_count</span><span class="o">=</span><span class="n">final_count</span><span class="p">,</span>
+            <span class="n">passes</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pass_results</span><span class="p">),</span>
+            <span class="n">elapsed_seconds</span><span class="o">=</span><span class="n">overall_elapsed</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_eligible_count</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">RArchiveBatchParallelConfig</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_archive</span><span class="o">.</span><span class="n">coloring_count_in_score_range</span><span class="p">(</span>
+            <span class="n">minimum_score</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">minimum_score</span><span class="p">,</span>
+            <span class="n">maximum_score</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">maximum_score</span><span class="p">,</span>
+            <span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_graph</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_score_is_in_range</span><span class="p">(</span>
+    <span class="n">score</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">minimum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">minimum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">score</span> <span class="o">&lt;</span> <span class="n">minimum_score</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">maximum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">score</span> <span class="o">&gt;</span> <span class="n">maximum_score</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="kc">True</span>
+
+
+<span class="k">def</span> <span class="nf">_nonnegative_integer</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be an integer.&quot;</span><span class="p">)</span>
+
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> cannot be negative.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span> <span class="nf">_positive_integer</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">_nonnegative_integer</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be positive.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span> <span class="nf">_optional_nonnegative_integer</span><span class="p">(</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">_nonnegative_integer</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

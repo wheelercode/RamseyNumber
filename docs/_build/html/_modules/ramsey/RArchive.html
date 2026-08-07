@@ -1,0 +1,1005 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ramsey.RArchive &mdash; Ramsey Number Search 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Ramsey Number Search
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Ramsey Number Search</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ramsey.RArchive</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ramsey.RArchive</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Persistent coloring, provenance, and leaderboard storage.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">hashlib</span> <span class="kn">import</span> <span class="n">sha256</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">sqlite3</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.typing</span> <span class="kn">import</span> <span class="n">NDArray</span>
+
+<span class="kn">from</span> <span class="nn">.RColoring</span> <span class="kn">import</span> <span class="n">RColoring</span>
+<span class="kn">from</span> <span class="nn">.RGraph</span> <span class="kn">import</span> <span class="n">RGraph</span>
+<span class="kn">from</span> <span class="nn">.RScoring</span> <span class="kn">import</span> <span class="n">binary_histogram</span>
+
+
+<div class="viewcode-block" id="RArchiveRecord">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchiveRecord">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RArchiveRecord</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Metadata for one unique archived coloring.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">coloring_id</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">state_hash</span><span class="p">:</span> <span class="nb">str</span>
+
+    <span class="n">score</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">color_zero_count</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">color_one_count</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">times_seen</span><span class="p">:</span> <span class="nb">int</span></div>
+
+
+
+<div class="viewcode-block" id="RArchivedColoring">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchivedColoring">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span>
+    <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">eq</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span> <span class="nc">RArchivedColoring</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    One restored coloring with its stored metadata and histogram.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">record</span><span class="p">:</span> <span class="n">RArchiveRecord</span>
+    <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span>
+    <span class="n">histogram</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">histogram</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">histogram</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="n">histogram</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;histogram&quot;</span><span class="p">,</span>
+            <span class="n">histogram</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RArchive">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive">[docs]</a>
+<span class="k">class</span> <span class="nc">RArchive</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Persistent storage interface for exact Ramsey colorings.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="RArchive.save_coloring">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive.save_coloring">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">save_coloring</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveRecord</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Save or observe one exact coloring.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="o">...</span></div>
+
+
+<div class="viewcode-block" id="RArchive.load_coloring">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive.load_coloring">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">load_coloring</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">coloring_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchivedColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Restore one coloring using a compatible graph.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="o">...</span></div>
+
+
+<div class="viewcode-block" id="RArchive.best_score">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive.best_score">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the lowest stored score.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="o">...</span></div>
+
+
+<div class="viewcode-block" id="RArchive.best_colorings">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive.best_colorings">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">best_colorings</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return metadata for the best stored colorings.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="o">...</span></div>
+
+
+<div class="viewcode-block" id="RArchive.colorings_in_score_range">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive.colorings_in_score_range">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">colorings_in_score_range</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">minimum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return records in an inclusive score range.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="o">...</span></div>
+
+
+<div class="viewcode-block" id="RArchive.coloring_count_in_score_range">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive.coloring_count_in_score_range">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">coloring_count_in_score_range</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">minimum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Count unique colorings in an inclusive score range.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="o">...</span></div>
+
+
+<div class="viewcode-block" id="RArchive.coloring_count">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RArchive.coloring_count">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">coloring_count</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the number of unique stored colorings.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="o">...</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="RSQLiteArchive">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive">[docs]</a>
+<span class="k">class</span> <span class="nc">RSQLiteArchive</span><span class="p">(</span><span class="n">RArchive</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    SQLite archive compatible with the original coloring database.</span>
+
+<span class="sd">    Binary colorings are packed into bits. A K43 coloring therefore</span>
+<span class="sd">    occupies 113 bytes rather than 903 bytes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">database_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">database_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">database_path</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">database_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span>
+            <span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">database_path</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">row_factory</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">Row</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;PRAGMA foreign_keys = ON&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;PRAGMA journal_mode = WAL&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;PRAGMA synchronous = NORMAL&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_create_schema</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_create_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create the compatible coloring table and indexes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                CREATE TABLE IF NOT EXISTS colorings (</span>
+<span class="s2">                    coloring_id INTEGER PRIMARY KEY,</span>
+<span class="s2">                    state_hash TEXT NOT NULL UNIQUE,</span>
+
+<span class="s2">                    n_vertices INTEGER NOT NULL,</span>
+<span class="s2">                    k_size INTEGER NOT NULL,</span>
+<span class="s2">                    edge_count INTEGER NOT NULL,</span>
+
+<span class="s2">                    packed_coloring BLOB NOT NULL,</span>
+<span class="s2">                    histogram BLOB NOT NULL,</span>
+
+<span class="s2">                    score INTEGER NOT NULL,</span>
+<span class="s2">                    red_kn_count INTEGER NOT NULL,</span>
+<span class="s2">                    blue_kn_count INTEGER NOT NULL,</span>
+
+<span class="s2">                    first_run TEXT NOT NULL,</span>
+<span class="s2">                    first_iteration INTEGER NOT NULL,</span>
+
+<span class="s2">                    last_run TEXT NOT NULL,</span>
+<span class="s2">                    last_iteration INTEGER NOT NULL,</span>
+
+<span class="s2">                    times_seen INTEGER NOT NULL DEFAULT 1,</span>
+
+<span class="s2">                    created_at TEXT NOT NULL</span>
+<span class="s2">                        DEFAULT CURRENT_TIMESTAMP,</span>
+
+<span class="s2">                    updated_at TEXT NOT NULL</span>
+<span class="s2">                        DEFAULT CURRENT_TIMESTAMP</span>
+<span class="s2">                )</span>
+<span class="s2">                &quot;&quot;&quot;</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                CREATE INDEX IF NOT EXISTS</span>
+<span class="s2">                    colorings_score_index</span>
+<span class="s2">                ON colorings (</span>
+<span class="s2">                    score,</span>
+<span class="s2">                    coloring_id</span>
+<span class="s2">                )</span>
+<span class="s2">                &quot;&quot;&quot;</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                CREATE INDEX IF NOT EXISTS</span>
+<span class="s2">                    colorings_problem_score_index</span>
+<span class="s2">                ON colorings (</span>
+<span class="s2">                    n_vertices,</span>
+<span class="s2">                    k_size,</span>
+<span class="s2">                    score,</span>
+<span class="s2">                    coloring_id</span>
+<span class="s2">                )</span>
+<span class="s2">                &quot;&quot;&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RSQLiteArchive.save_coloring">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.save_coloring">[docs]</a>
+    <span class="k">def</span> <span class="nf">save_coloring</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">coloring</span><span class="p">:</span> <span class="n">RColoring</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveRecord</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Save or observe one exact coloring.</span>
+
+<span class="sd">        The histogram and score are calculated from the coloring</span>
+<span class="sd">        inside the archive boundary. Callers cannot accidentally</span>
+<span class="sd">        supply metadata belonging to a different coloring.</span>
+
+<span class="sd">        If the coloring already exists, its observation count and</span>
+<span class="sd">        most recent provenance are updated.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
+
+        <span class="p">(</span>
+            <span class="n">n_vertices</span><span class="p">,</span>
+            <span class="n">k_size</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem_key</span><span class="p">(</span><span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_provenance</span><span class="p">(</span>
+            <span class="n">run_name</span><span class="p">,</span>
+            <span class="n">iteration</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">histogram</span> <span class="o">=</span> <span class="n">binary_histogram</span><span class="p">(</span><span class="n">coloring</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
+            <span class="s2">&quot;&lt;i8&quot;</span><span class="p">,</span>
+            <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">color_zero_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">histogram</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="n">color_one_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">histogram</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="n">score</span> <span class="o">=</span> <span class="n">color_zero_count</span> <span class="o">+</span> <span class="n">color_one_count</span>
+
+        <span class="n">packed_coloring</span> <span class="o">=</span> <span class="n">coloring</span><span class="o">.</span><span class="n">packed</span><span class="p">()</span>
+
+        <span class="n">state_hash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compatible_state_hash</span><span class="p">(</span>
+            <span class="n">packed_coloring</span><span class="p">,</span>
+            <span class="n">n_vertices</span><span class="p">,</span>
+            <span class="n">k_size</span><span class="p">,</span>
+            <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                INSERT INTO colorings (</span>
+<span class="sd">                    state_hash,</span>
+<span class="sd">                    n_vertices,</span>
+<span class="sd">                    k_size,</span>
+<span class="sd">                    edge_count,</span>
+
+<span class="sd">                    packed_coloring,</span>
+<span class="sd">                    histogram,</span>
+
+<span class="sd">                    score,</span>
+<span class="sd">                    red_kn_count,</span>
+<span class="sd">                    blue_kn_count,</span>
+
+<span class="sd">                    first_run,</span>
+<span class="sd">                    first_iteration,</span>
+<span class="sd">                    last_run,</span>
+<span class="sd">                    last_iteration</span>
+<span class="sd">                )</span>
+<span class="sd">                VALUES (</span>
+<span class="sd">                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?</span>
+<span class="sd">                )</span>
+<span class="sd">                ON CONFLICT(state_hash)</span>
+<span class="sd">                DO UPDATE SET</span>
+<span class="sd">                    last_run = excluded.last_run,</span>
+<span class="sd">                    last_iteration = excluded.last_iteration,</span>
+<span class="sd">                    times_seen =</span>
+<span class="sd">                        colorings.times_seen + 1,</span>
+<span class="sd">                    updated_at = CURRENT_TIMESTAMP</span>
+<span class="sd">                &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="p">(</span>
+                    <span class="n">state_hash</span><span class="p">,</span>
+                    <span class="n">n_vertices</span><span class="p">,</span>
+                    <span class="n">k_size</span><span class="p">,</span>
+                    <span class="n">coloring</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">,</span>
+                    <span class="n">packed_coloring</span><span class="p">,</span>
+                    <span class="n">histogram</span><span class="o">.</span><span class="n">tobytes</span><span class="p">(),</span>
+                    <span class="n">score</span><span class="p">,</span>
+                    <span class="n">color_zero_count</span><span class="p">,</span>
+                    <span class="n">color_one_count</span><span class="p">,</span>
+                    <span class="n">run_name</span><span class="p">,</span>
+                    <span class="n">iteration</span><span class="p">,</span>
+                    <span class="n">run_name</span><span class="p">,</span>
+                    <span class="n">iteration</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            SELECT *</span>
+<span class="sd">            FROM colorings</span>
+<span class="sd">            WHERE state_hash = ?</span>
+<span class="sd">            &quot;&quot;&quot;</span><span class="p">,</span>
+            <span class="p">(</span><span class="n">state_hash</span><span class="p">,),</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">row</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Coloring was not found after insertion.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_row_to_record</span><span class="p">(</span><span class="n">row</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RSQLiteArchive.load_coloring">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.load_coloring">[docs]</a>
+    <span class="k">def</span> <span class="nf">load_coloring</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">coloring_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchivedColoring</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Restore one coloring using a compatible graph.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
+
+        <span class="p">(</span>
+            <span class="n">n_vertices</span><span class="p">,</span>
+            <span class="n">k_size</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem_key</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
+
+        <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            SELECT *</span>
+<span class="sd">            FROM colorings</span>
+<span class="sd">            WHERE coloring_id = ?</span>
+<span class="sd">            &quot;&quot;&quot;</span><span class="p">,</span>
+            <span class="p">(</span><span class="n">coloring_id</span><span class="p">,),</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">row</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown coloring ID: &quot;</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">coloring_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;n_vertices&quot;</span><span class="p">])</span> <span class="o">!=</span> <span class="n">n_vertices</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;k_size&quot;</span><span class="p">])</span> <span class="o">!=</span> <span class="n">k_size</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Archived coloring problem does &quot;</span> <span class="s2">&quot;not match graph.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;edge_count&quot;</span><span class="p">])</span> <span class="o">!=</span> <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Archived coloring edge count does &quot;</span> <span class="s2">&quot;not match graph.&quot;</span><span class="p">)</span>
+
+        <span class="n">packed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">frombuffer</span><span class="p">(</span>
+            <span class="n">row</span><span class="p">[</span><span class="s2">&quot;packed_coloring&quot;</span><span class="p">],</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unpackbits</span><span class="p">(</span>
+            <span class="n">packed</span><span class="p">,</span>
+            <span class="n">bitorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">,</span>
+        <span class="p">)[</span>
+            <span class="p">:</span> <span class="n">graph</span><span class="o">.</span><span class="n">number_of_edges</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+
+        <span class="n">expected_bins</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">edges_per_clique</span><span class="p">(</span><span class="n">k_size</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">histogram</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">frombuffer</span><span class="p">(</span>
+            <span class="n">row</span><span class="p">[</span><span class="s2">&quot;histogram&quot;</span><span class="p">],</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;&lt;i8&quot;</span><span class="p">,</span>
+            <span class="n">count</span><span class="o">=</span><span class="n">expected_bins</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">RArchivedColoring</span><span class="p">(</span>
+            <span class="n">record</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_row_to_record</span><span class="p">(</span><span class="n">row</span><span class="p">),</span>
+            <span class="n">coloring</span><span class="o">=</span><span class="n">RColoring</span><span class="p">(</span>
+                <span class="n">graph</span><span class="p">,</span>
+                <span class="n">colors</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">histogram</span><span class="o">=</span><span class="n">histogram</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RSQLiteArchive.best_score">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.best_score">[docs]</a>
+    <span class="k">def</span> <span class="nf">best_score</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the lowest stored score.</span>
+
+<span class="sd">        If graph is supplied, only colorings belonging to that</span>
+<span class="sd">        problem are considered.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
+
+        <span class="p">(</span>
+            <span class="n">where_clause</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem_filter</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
+
+        <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT MIN(score) AS best_score</span>
+<span class="s2">            FROM colorings</span>
+<span class="s2">            </span><span class="si">{</span><span class="n">where_clause</span><span class="si">}</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">row</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;best_score&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;best_score&quot;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="RSQLiteArchive.best_colorings">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.best_colorings">[docs]</a>
+    <span class="k">def</span> <span class="nf">best_colorings</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return metadata for the best stored colorings.</span>
+
+<span class="sd">        Results are ordered by score and then coloring ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">limit</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">limit</span><span class="p">,</span>
+            <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;limit must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">limit</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;limit must be positive.&quot;</span><span class="p">)</span>
+
+        <span class="p">(</span>
+            <span class="n">where_clause</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem_filter</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
+
+        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT *</span>
+<span class="s2">            FROM colorings</span>
+<span class="s2">            </span><span class="si">{</span><span class="n">where_clause</span><span class="si">}</span>
+<span class="s2">            ORDER BY</span>
+<span class="s2">                score ASC,</span>
+<span class="s2">                coloring_id ASC</span>
+<span class="s2">            LIMIT ?</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">,</span>
+            <span class="p">(</span>
+                <span class="o">*</span><span class="n">parameters</span><span class="p">,</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">limit</span><span class="p">),</span>
+            <span class="p">),</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_row_to_record</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="RSQLiteArchive.coloring_count">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.coloring_count">[docs]</a>
+    <span class="k">def</span> <span class="nf">coloring_count</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the number of unique stored colorings.</span>
+
+<span class="sd">        If graph is supplied, only colorings belonging to that</span>
+<span class="sd">        problem are counted.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
+
+        <span class="p">(</span>
+            <span class="n">where_clause</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem_filter</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
+
+        <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT COUNT(*) AS coloring_count</span>
+<span class="s2">            FROM colorings</span>
+<span class="s2">            </span><span class="si">{</span><span class="n">where_clause</span><span class="si">}</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;coloring_count&quot;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="RSQLiteArchive.colorings_in_score_range">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.colorings_in_score_range">[docs]</a>
+    <span class="k">def</span> <span class="nf">colorings_in_score_range</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">minimum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RArchiveRecord</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return records ordered by score within inclusive bounds.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
+
+        <span class="p">(</span>
+            <span class="n">where_clause</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_score_range_filter</span><span class="p">(</span>
+            <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">,</span>
+            <span class="n">minimum_score</span><span class="o">=</span><span class="n">minimum_score</span><span class="p">,</span>
+            <span class="n">maximum_score</span><span class="o">=</span><span class="n">maximum_score</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">limit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_optional_positive_integer</span><span class="p">(</span>
+            <span class="s2">&quot;limit&quot;</span><span class="p">,</span>
+            <span class="n">limit</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">limit_clause</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">limit_clause</span> <span class="o">=</span> <span class="s2">&quot;LIMIT ?&quot;</span>
+            <span class="n">parameters</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="o">*</span><span class="n">parameters</span><span class="p">,</span>
+                <span class="n">limit</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT *</span>
+<span class="s2">            FROM colorings</span>
+<span class="s2">            </span><span class="si">{</span><span class="n">where_clause</span><span class="si">}</span>
+<span class="s2">            ORDER BY</span>
+<span class="s2">                score ASC,</span>
+<span class="s2">                coloring_id ASC</span>
+<span class="s2">            </span><span class="si">{</span><span class="n">limit_clause</span><span class="si">}</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_row_to_record</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="RSQLiteArchive.coloring_count_in_score_range">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.coloring_count_in_score_range">[docs]</a>
+    <span class="k">def</span> <span class="nf">coloring_count_in_score_range</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">minimum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Count bounded records without loading their metadata.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
+
+        <span class="p">(</span>
+            <span class="n">where_clause</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_score_range_filter</span><span class="p">(</span>
+            <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">,</span>
+            <span class="n">minimum_score</span><span class="o">=</span><span class="n">minimum_score</span><span class="p">,</span>
+            <span class="n">maximum_score</span><span class="o">=</span><span class="n">maximum_score</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            SELECT COUNT(*) AS coloring_count</span>
+<span class="s2">            FROM colorings</span>
+<span class="s2">            </span><span class="si">{</span><span class="n">where_clause</span><span class="si">}</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;coloring_count&quot;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="RSQLiteArchive.close">
+<a class="viewcode-back" href="../../ramsey.html#ramsey.RArchive.RSQLiteArchive.close">[docs]</a>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Commit outstanding work and close the archive.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RSQLiteArchive&quot;</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_open</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">exception_type</span><span class="p">,</span>
+        <span class="n">exception_value</span><span class="p">,</span>
+        <span class="n">traceback</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_compatible_state_hash</span><span class="p">(</span>
+        <span class="n">packed_coloring</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
+        <span class="n">n_vertices</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">k_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">edge_count</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create the exact identifier used by ColoringDatabase.</span>
+
+<span class="sd">        Retaining this format allows existing database files to</span>
+<span class="sd">        recognize identical colorings saved through the new API.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_vertices</span><span class="si">}</span><span class="s2">:&quot;</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">k_size</span><span class="si">}</span><span class="s2">:&quot;</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">edge_count</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;ascii&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">sha256</span><span class="p">(</span><span class="n">header</span> <span class="o">+</span> <span class="n">packed_coloring</span><span class="p">)</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_row_to_record</span><span class="p">(</span>
+        <span class="n">row</span><span class="p">:</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">Row</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RArchiveRecord</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convert one SQLite row into immutable metadata.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">RArchiveRecord</span><span class="p">(</span>
+            <span class="n">coloring_id</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;coloring_id&quot;</span><span class="p">]),</span>
+            <span class="n">state_hash</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;state_hash&quot;</span><span class="p">]),</span>
+            <span class="n">score</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]),</span>
+            <span class="n">color_zero_count</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;red_kn_count&quot;</span><span class="p">]),</span>
+            <span class="n">color_one_count</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;blue_kn_count&quot;</span><span class="p">]),</span>
+            <span class="n">run_name</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;last_run&quot;</span><span class="p">]),</span>
+            <span class="n">iteration</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;last_iteration&quot;</span><span class="p">]),</span>
+            <span class="n">times_seen</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;times_seen&quot;</span><span class="p">]),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_problem_key</span><span class="p">(</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the problem fields supported by the compatible schema.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">problem</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">problem</span>
+
+        <span class="k">if</span> <span class="n">problem</span><span class="o">.</span><span class="n">n_colors</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">problem</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;RSQLiteArchive currently supports &quot;</span> <span class="s2">&quot;symmetric two-color problems.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">problem</span><span class="o">.</span><span class="n">n_vertices</span><span class="p">,</span>
+            <span class="n">problem</span><span class="o">.</span><span class="n">required_clique_sizes</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_problem_filter</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span>
+        <span class="nb">str</span><span class="p">,</span>
+        <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Build the optional SQL problem filter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">graph</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="p">()</span>
+
+        <span class="p">(</span>
+            <span class="n">n_vertices</span><span class="p">,</span>
+            <span class="n">k_size</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem_key</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s2">&quot;WHERE n_vertices = ? &quot;</span> <span class="s2">&quot;AND k_size = ?&quot;</span><span class="p">),</span>
+            <span class="p">(</span>
+                <span class="n">n_vertices</span><span class="p">,</span>
+                <span class="n">k_size</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_score_range_filter</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">RGraph</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">minimum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">maximum_score</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span>
+        <span class="nb">str</span><span class="p">,</span>
+        <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Build a validated SQL problem-and-score filter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">minimum_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_optional_nonnegative_integer</span><span class="p">(</span>
+            <span class="s2">&quot;minimum_score&quot;</span><span class="p">,</span>
+            <span class="n">minimum_score</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">maximum_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_optional_nonnegative_integer</span><span class="p">(</span>
+            <span class="s2">&quot;maximum_score&quot;</span><span class="p">,</span>
+            <span class="n">maximum_score</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">minimum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">maximum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">minimum_score</span> <span class="o">&gt;</span> <span class="n">maximum_score</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;minimum_score cannot be greater than &quot;</span>
+                <span class="s2">&quot;maximum_score.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">clauses</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">parameters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">graph</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="p">(</span>
+                <span class="n">n_vertices</span><span class="p">,</span>
+                <span class="n">k_size</span><span class="p">,</span>
+            <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_problem_key</span><span class="p">(</span><span class="n">graph</span><span class="p">)</span>
+
+            <span class="n">clauses</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="s2">&quot;n_vertices = ?&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;k_size = ?&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="n">parameters</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="n">n_vertices</span><span class="p">,</span>
+                    <span class="n">k_size</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">minimum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">clauses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;score &gt;= ?&quot;</span><span class="p">)</span>
+            <span class="n">parameters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">minimum_score</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">maximum_score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">clauses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;score &lt;= ?&quot;</span><span class="p">)</span>
+            <span class="n">parameters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">maximum_score</span><span class="p">)</span>
+
+        <span class="n">where_clause</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">clauses</span><span class="p">:</span>
+            <span class="n">where_clause</span> <span class="o">=</span> <span class="s2">&quot;WHERE &quot;</span> <span class="o">+</span> <span class="s2">&quot; AND &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">clauses</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">where_clause</span><span class="p">,</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="n">parameters</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_validate_provenance</span><span class="p">(</span>
+        <span class="n">run_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate run metadata stored with a coloring.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">run_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">run_name</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;run_name must be a nonempty string.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">iteration</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">iteration</span><span class="p">,</span>
+            <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;iteration must be an integer.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">iteration</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;iteration cannot be negative.&quot;</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_validate_optional_nonnegative_integer</span><span class="p">(</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate an optional nonnegative integer.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">value</span><span class="p">,</span>
+            <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">),</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be an integer or None.&quot;</span><span class="p">)</span>
+
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> cannot be negative.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_validate_optional_positive_integer</span><span class="p">(</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate an optional positive integer.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">RSQLiteArchive</span><span class="o">.</span><span class="n">_validate_optional_nonnegative_integer</span><span class="p">(</span>
+            <span class="n">name</span><span class="p">,</span>
+            <span class="n">value</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be positive when supplied.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">_require_open</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reject operations after the archive has been closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Archive is closed.&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Ryan Wheeler + ChatGPT.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
