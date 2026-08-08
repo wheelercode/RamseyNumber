@@ -81,7 +81,30 @@ from .RVerification import (
     RColoringVerification,
     RStateVerification,
 )
+from .RHistogramBandPolicy import (
+    RHistogramBandDecision,
+    RHistogramBandGreedyPolicy,
+    RHistogramBandPolicyConfig,
+    histogram_band_loads,
+)
+from .RConfigurableGreedyPolicy import (
+    RConfigurableGreedyDecision,
+    RConfigurableGreedyPolicy,
+    RConfigurableGreedyPolicyConfig,
+)
 
+from .RK5ConnectionAnalysis import (
+    RK5ConnectionAnalysis,
+    calculate_k5_connection_analysis,
+)
+from .RFlexibility import (
+    RFlexibilityProfile,
+    calculate_flexibility,
+)
+from .RGenerationalExperiment import (
+    RGenerationalExperiment,
+    RGenerationalExperimentConfig
+)
 
 __all__ = [
     "RActionAnalysis",
@@ -134,4 +157,17 @@ __all__ = [
     "RTabuMemoryConfig",
     "METRIC_VERSION",
     "calculate_metrics",
+    "RHistogramBandDecision",
+    "RHistogramBandGreedyPolicy",
+    "RHistogramBandPolicyConfig",
+    "histogram_band_loads",
+    "RConfigurableGreedyDecision",
+    "RConfigurableGreedyPolicy",
+    "RConfigurableGreedyPolicyConfig",
+    "RK5ConnectionAnalysis",
+    "calculate_k5_connection_analysis",
+    "RFlexibility",
+    "calculate_flexibility",
+    "RGenerationalExperiment",
+    "RGenerationalExperimentConfig"
 ]
